@@ -31,4 +31,6 @@ jobs:
             /usr/local/sbin/cachy-frozen-admin-restrict
 
       - name: Statik testleri çalıştır
+        env:
+          SHELLCHECK_OPTS: --severity=error
         run: bash ./deepfreeze/tests/static.sh
