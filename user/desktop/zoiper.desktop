@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Zoiper
+Exec=/usr/bin/zoiper
+Icon=zoiper
+Terminal=false
+Categories=Network;Telephony;
+

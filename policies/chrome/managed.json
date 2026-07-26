@@ -1,0 +1,12 @@
+{
+  "BrowserSignin": 1,
+  "DefaultBrowserSettingEnabled": true,
+  "HomepageIsNewTabPage": false,
+  "HomepageLocation": "https://www.google.com/",
+  "RestoreOnStartup": 4,
+  "RestoreOnStartupURLs": [
+    "https://www.google.com/"
+  ],
+  "ShowHomeButton": true
+}
+

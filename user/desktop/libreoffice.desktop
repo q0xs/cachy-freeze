@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=LibreOffice
+Exec=/usr/bin/libreoffice
+Icon=libreoffice-startcenter
+Terminal=false
+Categories=Office;
+

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly CONFIG=/etc/cachy-freeze-grub-auth.conf
+[[ -r $CONFIG ]] || exit 0
+
+# Root tarafından oluşturulan dosya yalnızca kullanıcı adı ve PBKDF2 özeti
+# içerir; açık parola diske yazılmaz.
+# shellcheck source=/dev/null
+source "$CONFIG"
+
+[[ ${GRUB_AUTH_USER:-} =~ ^[a-zA-Z0-9_.-]+$ ]] || exit 1
+[[ ${GRUB_AUTH_HASH:-} == grub.pbkdf2.* ]] || exit 1
+
+cat <<EOF
+set superusers="$GRUB_AUTH_USER"
+password_pbkdf2 $GRUB_AUTH_USER $GRUB_AUTH_HASH
+EOF

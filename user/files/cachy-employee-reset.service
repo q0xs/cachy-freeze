@@ -1,0 +1,13 @@
+[Unit]
+Description=Reset managed employee home for frozen boot
+ConditionKernelCommandLine=cachy.freeze=1
+Before=display-manager.service
+After=home.mount
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cachy-employee-reset
+
+[Install]
+WantedBy=multi-user.target
+

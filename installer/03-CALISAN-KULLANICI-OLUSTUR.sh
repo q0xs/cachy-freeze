@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+readonly ADMIN_USER=localadm
+# shellcheck source=lib/common.sh
+source "$PROJECT_ROOT/installer/lib/common.sh"
+
+require_root
+require_maintenance
+
+id "$ADMIN_USER" >/dev/null 2>&1 ||
+  die "Beklenen yonetici hesabi bulunamadi: $ADMIN_USER"
+id -nG "$ADMIN_USER" | grep -Eq '(^| )wheel( |$)' ||
+  die "$ADMIN_USER wheel grubunda degil; yonetici hesabi dogrulanamadi."
+[[ $(passwd -S "$ADMIN_USER" | awk '{print $2}') == P ]] ||
+  die "$ADMIN_USER icin etkin bir parola ayarlanmamis."
+if getent group nopasswdlogin >/dev/null; then
+  gpasswd -d "$ADMIN_USER" nopasswdlogin 2>/dev/null || true
+fi
+
+[[ -r /dev/tty && -w /dev/tty ]] ||
+  die "Kullanici bilgilerini girmek icin etkilesimli terminal gerekli."
+
+printf '%s\n' \
+  "Calisan hesabi bilgileri" \
+  "Kullanici adi kucuk harf, rakam, _ ve - icerebilir." >/dev/tty
+
+read -r -p "Kullanici adi (ornek: ahmet): " employee_user </dev/tty
+employee_user=${employee_user,,}
+[[ $employee_user =~ ^[a-z][a-z0-9_-]{2,31}$ ]] ||
+  die "Gecersiz kullanici adi: $employee_user"
+[[ $employee_user != "$ADMIN_USER" ]] ||
+  die "Calisan ve yonetici adi ayni olamaz."
+if id "$employee_user" >/dev/null 2>&1; then
+  configured_employee=$(
+    sed -n 's/^EMPLOYEE_USER=//p' /etc/cachy-employee.conf 2>/dev/null || true
+  )
+  [[ $configured_employee == "$employee_user" ]] ||
+    die "Bu kullanici zaten var ve yonetilen calisan hesabi degil: $employee_user"
+fi
+
+read -r -p "Gorunen ad ve soyad: " employee_full_name </dev/tty
+[[ -n ${employee_full_name//[[:space:]]/} ]] ||
+  die "Gorunen ad bos olamaz."
+[[ $employee_full_name != *:* && $employee_full_name != *$'\n'* ]] ||
+  die "Gorunen ad ':' karakteri iceremez."
+
+while :; do
+  read -r -s -p "Calisan parolasi: " employee_password </dev/tty
+  printf '\n' >/dev/tty
+  read -r -s -p "Parolayi tekrar gir: " employee_password_again </dev/tty
+  printf '\n' >/dev/tty
+  [[ -n $employee_password ]] || {
+    printf 'Parola bos olamaz.\n' >/dev/tty
+    continue
+  }
+  [[ $employee_password != *:* ]] || {
+    printf "Parola ':' karakteri iceremez.\n" >/dev/tty
+    continue
+  }
+  [[ $employee_password == "$employee_password_again" ]] || {
+    printf 'Parolalar ayni degil; tekrar dene.\n' >/dev/tty
+    continue
+  }
+  break
+done
+
+for command in wine unzip rsync google-chrome-stable slack libreoffice zoiper \
+  anydesk; do
+  command -v "$command" >/dev/null ||
+    die "Once 02-UYGULAMALARI-KUR.sh calistirilmali. Eksik: $command"
+done
+
+if ! id "$employee_user" >/dev/null 2>&1; then
+  useradd --create-home --shell /bin/bash \
+    --comment "$employee_full_name" "$employee_user"
+else
+  usermod --comment "$employee_full_name" "$employee_user"
+fi
+printf '%s:%s\n' "$employee_user" "$employee_password" | chpasswd
+unset employee_password employee_password_again
+
+gpasswd -d "$employee_user" wheel 2>/dev/null || true
+gpasswd -d "$employee_user" sudo 2>/dev/null || true
+employee_groups=()
+for group in audio video input; do
+  getent group "$group" >/dev/null && employee_groups+=("$group")
+done
+((${#employee_groups[@]} > 0)) &&
+  usermod -G "$(IFS=,; printf '%s' "${employee_groups[*]}")" "$employee_user"
+
+home=$(getent passwd "$employee_user" | cut -d: -f6)
+install -d -o "$employee_user" -g "$employee_user" -m 0755 \
+  "$home/Desktop" "$home/.config" "$home/.local" "$home/.local/share"
+install -d -o "$employee_user" -g "$employee_user" -m 0755 \
+  "$home/.local/share/applications" "$home/.local/share/company-wine"
+install -o "$employee_user" -g "$employee_user" -m 0444 \
+  "$PROJECT_ROOT/user/files/kdeglobals" "$home/.config/kdeglobals"
+
+for desktop in "$PROJECT_ROOT"/user/desktop/*.desktop; do
+  install -o "$employee_user" -g "$employee_user" -m 0555 \
+    "$desktop" "$home/Desktop/${desktop##*/}"
+done
+
+prefix="$home/.local/share/company-wine/microsip"
+install -d -o "$employee_user" -g "$employee_user" -m 0700 "$prefix"
+runuser -u "$employee_user" -- \
+  env WINEPREFIX="$prefix" WINEDEBUG=-all xvfb-run -a wineboot -u
+install -d -o "$employee_user" -g "$employee_user" -m 0755 \
+  "$prefix/drive_c/Program Files/MicroSIP"
+runuser -u "$employee_user" -- \
+  unzip -o "/opt/company/microsip/$(</opt/company/microsip/CURRENT)" \
+    -d "$prefix/drive_c/Program Files/MicroSIP"
+
+cat >"$home/.config/mimeapps.list" <<'EOF'
+[Default Applications]
+x-scheme-handler/http=google-chrome.desktop
+x-scheme-handler/https=google-chrome.desktop
+text/html=google-chrome.desktop
+
+[Added Associations]
+x-scheme-handler/http=google-chrome.desktop;
+x-scheme-handler/https=google-chrome.desktop;
+text/html=google-chrome.desktop;
+EOF
+chown "$employee_user:$employee_user" "$home/.config/mimeapps.list"
+chmod 0444 "$home/.config/mimeapps.list"
+
+install -m 0755 \
+  "$PROJECT_ROOT/user/files/company-microsip" \
+  /usr/local/bin/company-microsip
+install -m 0755 \
+  "$PROJECT_ROOT/user/files/cachy-kurulum-oturum-kapat" \
+  /usr/local/bin/cachy-kurulum-oturum-kapat
+install -m 0755 \
+  "$PROJECT_ROOT/user/files/cachy-employee-reset" \
+  /usr/local/sbin/cachy-employee-reset
+install -m 0644 \
+  "$PROJECT_ROOT/user/files/cachy-employee-reset.service" \
+  /etc/systemd/system/cachy-employee-reset.service
+install -m 0755 \
+  "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict" \
+  /usr/local/sbin/cachy-frozen-admin-restrict
+install -m 0644 \
+  "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict.service" \
+  /etc/systemd/system/cachy-frozen-admin-restrict.service
+
+# Standart kullanici zaten wheel/sudo grubunda degil. Tum Polkit
+# eylemlerini kosulsuz reddetmek; ag, oturum ve masaustu servisleri gibi
+# normal kullanici islemlerini de bozar. Eski kurulumdan kaldiysa kaldir.
+rm -f /etc/polkit-1/rules.d/49-company-employee.rules
+
+cat >/etc/cachy-employee.conf <<EOF
+EMPLOYEE_USER=$employee_user
+EOF
+chmod 0600 /etc/cachy-employee.conf
+
+cat >/etc/cachy-frozen-admin.conf <<EOF
+ADMIN_USER=$ADMIN_USER
+EOF
+chmod 0600 /etc/cachy-frozen-admin.conf
+
+rm -rf --one-file-system "/var/lib/cachy-employee-template/$employee_user"
+install -d -m 0700 /var/lib/cachy-employee-template
+cp -a "$home" "/var/lib/cachy-employee-template/$employee_user"
+systemctl daemon-reload
+systemctl enable cachy-employee-reset.service
+systemctl enable cachy-frozen-admin-restrict.service
+systemctl is-enabled --quiet cachy-employee-reset.service ||
+  die "Calisan sifirlama servisi etkinlestirilemedi."
+systemctl is-enabled --quiet cachy-frozen-admin-restrict.service ||
+  die "Frozen yonetici kisitlama servisi etkinlestirilemedi."
+
+if id -nG "$employee_user" | grep -Eq '(^| )(wheel|sudo)( |$)'; then
+  die "Calisan ayricalikli gruptan cikarilamadi."
+fi
+
+printf '%s\n' \
+  "Calisan hesabi hazir: $employee_user ($employee_full_name)" \
+  "$ADMIN_USER yalnizca Maintenance oturumunda kullanilacak." \
+  "Frozen modda yonetici isteyen islemler $ADMIN_USER parolasini sorabilir." \
+  "Parola kurulum sirasinda sizin girdiginiz parola olarak ayarlandi."

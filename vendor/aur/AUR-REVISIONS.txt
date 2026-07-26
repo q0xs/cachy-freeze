@@ -1,0 +1,3 @@
+google-chrome 2902e90d3c7a3430ebca7d06fc8afcfc710e0506
+slack-desktop 1275d6840eb7998cd94ae5d1ea7687c2b219f6e6
+zoiper-bin f0bcd999b937b3991d3f70cb24a0a50a2d0f38d4

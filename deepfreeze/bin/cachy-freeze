@@ -1,0 +1,246 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly PROGRAM=${0##*/}
+readonly CONFIG_FILE=${CACHY_FREEZE_CONFIG:-/etc/cachy-freeze.conf}
+readonly DEFAULT_CONFIG="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/etc/cachy-freeze.conf"
+
+die() {
+  printf 'HATA: %s\n' "$*" >&2
+  exit 1
+}
+
+info() {
+  printf '%s\n' "$*"
+}
+
+require_root() {
+  (( EUID == 0 )) || die "Bu işlem root yetkisi gerektirir."
+}
+
+load_config() {
+  local selected=$CONFIG_FILE
+  [[ -r $selected ]] || selected=$DEFAULT_CONFIG
+  # This file is installed root-owned and is not writable by regular users.
+  # shellcheck source=../etc/cachy-freeze.conf
+  source "$selected"
+
+  local name
+  for name in STATE_DIR TOP_MOUNT MAINTENANCE_SUBVOL GOLDEN_SUBVOL ACTIVE_SUBVOL \
+    PREVIOUS_SUBVOL NEXT_SUBVOL; do
+    [[ -n ${!name:-} ]] || die "Eksik yapılandırma: $name"
+  done
+}
+
+root_source() {
+  findmnt -n -o SOURCE /
+}
+
+root_device() {
+  findmnt -n -o SOURCE / | sed 's/\[.*$//'
+}
+
+root_subvolume() {
+  local source
+  source=$(root_source)
+  [[ $source == *'['*']' ]] || die "Kök Btrfs alt birimi bulunamadı: $source"
+  source=${source#*\[}
+  source=${source%\]}
+  printf '%s\n' "${source#/}"
+}
+
+root_uuid() {
+  findmnt -n -o UUID /
+}
+
+ensure_btrfs_root() {
+  [[ $(findmnt -n -o FSTYPE /) == btrfs ]] ||
+    die "Kök dosya sistemi Btrfs değil."
+}
+
+ensure_uefi_grub() {
+  [[ -d /sys/firmware/efi ]] || die "Sistem UEFI modunda açılmamış."
+  command -v grub-mkconfig >/dev/null || die "grub-mkconfig bulunamadı."
+  [[ -d /boot/grub ]] || die "/boot/grub bulunamadı."
+  [[ -d /boot/efi/EFI ]] || die "EFI sistem bölümü bağlı değil."
+}
+
+ensure_boot_layout() {
+  local boot_target
+  boot_target=$(findmnt -n -o TARGET --target /boot)
+  [[ $boot_target == / ]] ||
+    die "/boot ayrı bir dosya sisteminde. Bu proje /boot'un Btrfs @ kökü içinde olmasını ve EFI bölümünün /boot/efi konumuna bağlanmasını gerektirir."
+  [[ -r /boot/vmlinuz-linux-cachyos ]] ||
+    die "CachyOS kernel dosyası bulunamadı: /boot/vmlinuz-linux-cachyos"
+  [[ -r /boot/initramfs-linux-cachyos.img ]] ||
+    die "CachyOS initramfs dosyası bulunamadı: /boot/initramfs-linux-cachyos.img"
+}
+
+mount_top() {
+  mkdir -p "$TOP_MOUNT"
+  if mountpoint -q "$TOP_MOUNT"; then
+    local mounted_uuid
+    mounted_uuid=$(findmnt -n -o UUID "$TOP_MOUNT")
+    [[ $mounted_uuid == "$(root_uuid)" ]] ||
+      die "$TOP_MOUNT üzerinde farklı bir dosya sistemi bağlı."
+    return
+  fi
+  mount -o subvolid=5 "$(root_device)" "$TOP_MOUNT"
+}
+
+unmount_top() {
+  mountpoint -q "$TOP_MOUNT" && umount "$TOP_MOUNT"
+}
+
+subvol_exists() {
+  btrfs subvolume show "$TOP_MOUNT/$1" >/dev/null 2>&1
+}
+
+preflight() {
+  require_root
+  ensure_btrfs_root
+  ensure_uefi_grub
+  ensure_boot_layout
+
+  local current
+  current=$(root_subvolume)
+  [[ $current == "$MAINTENANCE_SUBVOL" || $current == "$ACTIVE_SUBVOL" ]] ||
+    die "Beklenmeyen kök alt birimi: $current"
+
+  command -v btrfs >/dev/null || die "btrfs aracı bulunamadı."
+  command -v mkinitcpio >/dev/null || die "mkinitcpio bulunamadı."
+  command -v grub-editenv >/dev/null || die "grub-editenv bulunamadı."
+
+  trap unmount_top EXIT
+  mount_top
+
+  subvol_exists "$MAINTENANCE_SUBVOL" ||
+    die "$MAINTENANCE_SUBVOL alt birimi bulunamadı."
+
+  local nested
+  nested=$(btrfs subvolume list -o "$TOP_MOUNT/$MAINTENANCE_SUBVOL" | wc -l)
+
+  info "Deep Freeze ön kontrolü başarılı."
+  info "Kök aygıt: $(root_device)"
+  info "Btrfs UUID: $(root_uuid)"
+  info "Çalışan kök: $current"
+  info "Bakım kökü içindeki ayrı alt birim sayısı: $nested"
+  info "Golden mevcut: $(subvol_exists "$GOLDEN_SUBVOL" && echo evet || echo hayır)"
+  info "Active mevcut: $(subvol_exists "$ACTIVE_SUBVOL" && echo evet || echo hayır)"
+}
+
+status() {
+  require_root
+  ensure_btrfs_root
+  trap unmount_top EXIT
+  mount_top
+
+  local default_entry=bilinmiyor
+  if [[ -r /boot/grub/grubenv ]]; then
+    default_entry=$(grub-editenv /boot/grub/grubenv list |
+      sed -n 's/^saved_entry=//p')
+    [[ -n $default_entry ]] || default_entry=ayarlanmamis
+  fi
+
+  info "Boot modu: $default_entry"
+  info "Çalışan kök: $(root_subvolume)"
+  info "Golden: $(subvol_exists "$GOLDEN_SUBVOL" && echo mevcut || echo yok)"
+  info "Active: $(subvol_exists "$ACTIVE_SUBVOL" && echo mevcut || echo yok)"
+}
+
+publish() {
+  require_root
+  ensure_btrfs_root
+  ensure_uefi_grub
+  ensure_boot_layout
+  [[ $(root_subvolume) == "$MAINTENANCE_SUBVOL" ]] ||
+    die "Golden yalnızca Maintenance kökünde yayınlanabilir."
+
+  trap unmount_top EXIT
+  mount_top
+  sync
+
+  if subvol_exists "$PREVIOUS_SUBVOL"; then
+    btrfs subvolume delete "$TOP_MOUNT/$PREVIOUS_SUBVOL"
+    btrfs subvolume sync "$TOP_MOUNT"
+  fi
+  if subvol_exists "$GOLDEN_SUBVOL"; then
+    mv "$TOP_MOUNT/$GOLDEN_SUBVOL" "$TOP_MOUNT/$PREVIOUS_SUBVOL"
+  fi
+
+  btrfs subvolume snapshot -r \
+    "$TOP_MOUNT/$MAINTENANCE_SUBVOL" \
+    "$TOP_MOUNT/$GOLDEN_SUBVOL"
+
+  if subvol_exists "$NEXT_SUBVOL"; then
+    btrfs subvolume delete "$TOP_MOUNT/$NEXT_SUBVOL"
+  fi
+  btrfs subvolume snapshot \
+    "$TOP_MOUNT/$GOLDEN_SUBVOL" \
+    "$TOP_MOUNT/$NEXT_SUBVOL"
+
+  if subvol_exists "$ACTIVE_SUBVOL"; then
+    if subvol_exists "$PREVIOUS_SUBVOL"; then
+      btrfs subvolume delete "$TOP_MOUNT/$ACTIVE_SUBVOL"
+      btrfs subvolume sync "$TOP_MOUNT"
+    else
+      mv "$TOP_MOUNT/$ACTIVE_SUBVOL" "$TOP_MOUNT/$PREVIOUS_SUBVOL"
+    fi
+  fi
+  mv "$TOP_MOUNT/$NEXT_SUBVOL" "$TOP_MOUNT/$ACTIVE_SUBVOL"
+  sync
+  info "Yeni Golden ve Active snapshot hazır."
+}
+
+set_boot_mode() {
+  require_root
+  local entry=$1
+  [[ -r /boot/grub/grub.cfg ]] || die "GRUB yapılandırması bulunamadı."
+  grep -q -- "--id '$entry'" /boot/grub/grub.cfg ||
+    die "GRUB girişi bulunamadı: $entry"
+  grub-set-default "$entry"
+  info "Sonraki kalıcı boot modu: $entry"
+}
+
+freeze() {
+  require_root
+  trap unmount_top EXIT
+  mount_top
+  subvol_exists "$GOLDEN_SUBVOL" || die "Golden snapshot yok."
+  subvol_exists "$ACTIVE_SUBVOL" || die "Active snapshot yok."
+  unmount_top
+  trap - EXIT
+  set_boot_mode cachyos-frozen
+}
+
+thaw() {
+  set_boot_mode cachyos-maintenance
+}
+
+usage() {
+  cat <<EOF
+Kullanım: $PROGRAM <komut>
+
+Komutlar:
+  preflight  Sistemi değiştirmeden uygunluğu denetle
+  status     Mevcut freeze durumunu göster
+  publish    Maintenance sistemini yeni Golden olarak yayınla
+  freeze     Sonraki açılışları Frozen moda ayarla
+  thaw       Sonraki açılışları Maintenance moda ayarla
+EOF
+}
+
+main() {
+  load_config
+  case ${1:-} in
+    preflight) preflight ;;
+    status) status ;;
+    publish) publish ;;
+    freeze) freeze ;;
+    thaw) thaw ;;
+    -h|--help|help) usage ;;
+    *) usage >&2; exit 2 ;;
+  esac
+}
+
+main "$@"

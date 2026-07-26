@@ -1,0 +1,12 @@
+[KDE Action Restrictions][$i]
+action/executeshellcommand=false
+action/run_command=false
+ghns=false
+plasma/containment_actions=false
+plasma/plasmashell/unlockedDesktop=false
+run_command=false
+shell_access=false
+
+[KDE Resource Restrictions][$i]
+autostart=false
+xdgdata-apps=false

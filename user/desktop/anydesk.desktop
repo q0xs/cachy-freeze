@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=AnyDesk
+Exec=/usr/bin/anydesk
+Icon=anydesk
+Terminal=false
+Categories=Network;RemoteAccess;

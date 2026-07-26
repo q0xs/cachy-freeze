@@ -1,0 +1,20 @@
+# Bu makinedeki geçici GitHub CLI dosyaları
+/.tools/
+/gh_*_windows_*.zip
+/gh_*_checksums.txt
+
+# Önceki kopyalamadan kalan kökün birebir yinelenen kopyası
+/CachyOS-USB-Kurulum/
+
+# Çalışma zamanı ve günlük dosyaları
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+
+# İşletim sistemi ve editör dosyaları
+.DS_Store
+Thumbs.db
+/.idea/
+/.vscode/

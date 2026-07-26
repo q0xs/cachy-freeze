@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=MicroSIP
+Exec=/usr/local/bin/company-microsip
+Icon=phone
+Terminal=false
+Categories=Network;Telephony;
+

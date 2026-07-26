@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly CONFIG=/etc/cachy-frozen-admin.conf
+readonly NOLOGIN_SHELL=/usr/bin/nologin
+
+die() {
+  printf 'HATA: %s\n' "$*" >&2
+  exit 1
+}
+
+[[ -r $CONFIG ]] || die "Yapilandirma bulunamadi: $CONFIG"
+# Dosya kurulumda root tarafindan olusturulur ve yalnizca root yazabilir.
+# shellcheck disable=SC1090
+source "$CONFIG"
+
+[[ ${ADMIN_USER:-} =~ ^[a-z][a-z0-9_-]{1,31}$ ]] ||
+  die "Gecersiz yonetici hesabi."
+[[ -x $NOLOGIN_SHELL ]] || die "nologin kabugu bulunamadi."
+id "$ADMIN_USER" >/dev/null 2>&1 ||
+  die "Yonetici hesabi bulunamadi: $ADMIN_USER"
+
+# Yalnizca Frozen kokte calisir. Parola ve grup yetkileri degistirilmez; boylece
+# Polkit gerektiginde yonetici parolasiyla yetkilendirme yapabilir. Oturum
+# acmak ise nologin kabugu tarafindan engellenir. Frozen kok her acilista
+# Golden'dan yeniden olusturuldugu icin Maintenance hesabinin kabugu etkilenmez.
+usermod --shell "$NOLOGIN_SHELL" "$ADMIN_USER"
+
+admin_home=$(getent passwd "$ADMIN_USER" | cut -d: -f6)
+[[ -n $admin_home && -d $admin_home ]] && chmod 0700 "$admin_home"
+
+install -d -m 0755 /var/lib/AccountsService/users
+cat >"/var/lib/AccountsService/users/$ADMIN_USER" <<EOF
+[User]
+SystemAccount=true
+EOF
+chmod 0600 "/var/lib/AccountsService/users/$ADMIN_USER"
+

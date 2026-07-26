@@ -1,0 +1,14 @@
+[Unit]
+Description=Restrict administrator interactive login in CachyOS frozen mode
+ConditionKernelCommandLine=cachy.freeze=1
+After=local-fs.target
+Before=systemd-user-sessions.service display-manager.service sshd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cachy-frozen-admin-restrict
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+

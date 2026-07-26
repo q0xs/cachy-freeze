@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+prefix="$HOME/.local/share/company-wine/microsip"
+exe="$prefix/drive_c/Program Files/MicroSIP/microsip.exe"
+[[ -f $exe ]] || {
+  printf 'MicroSIP yonetilen kurulumu bulunamadi.\n' >&2
+  exit 1
+}
+export WINEPREFIX=$prefix
+export WINEDEBUG=-all
+exec /usr/bin/wine "$exe" "$@"
+

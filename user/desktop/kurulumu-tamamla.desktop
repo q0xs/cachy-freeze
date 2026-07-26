@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Kurulumu Tamamlamak İçin Çıkış Yap
+Comment=Uygulama testlerinden sonra localadm hesabına dön
+Exec=/usr/local/bin/cachy-kurulum-oturum-kapat
+Icon=system-log-out
+Terminal=false
+Categories=System;
+

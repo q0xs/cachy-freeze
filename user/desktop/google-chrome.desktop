@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Google Chrome
+Exec=/usr/bin/google-chrome-stable
+Icon=google-chrome
+Terminal=false
+Categories=Network;WebBrowser;
+
