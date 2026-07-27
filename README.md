@@ -1,55 +1,68 @@
-# CachyOS Kurumsal Laptop Kurulumu
+# CachyOS Corporate Laptop Provisioning
 
-CachyOS üzerinde şirket laptopu hazırlamak ve sistemi yeniden başlatmalarda
-temiz bir **Frozen** duruma döndürmek için kullanılan kurulum paketidir.
+This repository provisions CachyOS laptops for shared call-center and sales
+workstations. It installs the required applications, creates a restricted
+employee account, and restores the machine to a clean **Frozen** state after
+every reboot.
 
-Proje; UEFI, Btrfs ve GRUB düzenini doğrular, gerekli uygulamaları kurar,
-yönetici yetkisi olmayan çalışan hesabını hazırlar ve Btrfs snapshot tabanlı
-Frozen/Maintenance açılış düzenini kurar.
+> [!IMPORTANT]
+> For the complete installation procedure in Turkish, read
+> **[KURULUM-TR.md](KURULUM-TR.md)**.
 
 > [!CAUTION]
-> Bu betikler açılış zincirini, initramfs'i, GRUB yapılandırmasını ve Btrfs alt
-> birimlerini değiştirir. İlk kurulum mutlaka yedeği alınmış bir pilot cihazda
-> ve cihazın başında yapılmalıdır.
+> These scripts modify the boot chain, initramfs, GRUB configuration, and Btrfs
+> subvolumes. Perform the first installation on a backed-up pilot device while
+> you have physical access to it.
 
-## Belgeler
+## Overview
 
-- [Ayrıntılı kurulum akışı](BASLA-BURADAN.md)
-- [GitHub üzerinden Linux'ta çalışma](GITHUB-ILE-CALISMA.md)
-- [Pilot cihaz kontrolleri](PILOT-NOTLARI.md)
-- [Ekran gelmezse kurtarma notları](KURTARMA-EKRAN-GELMEZSE.txt)
-- [USB ile kurulum (isteğe bağlı/eski yöntem)](USB-KURULUM.txt)
+The project validates the required UEFI, Btrfs, and GRUB layout before making
+changes. It then:
 
-## Sistem nasıl çalışır?
+- installs the workstation applications;
+- creates the managed employee account;
+- enables microphone, speaker, headset, video, input, and realtime access;
+- requests the `localadm` administrator password for privileged desktop
+  actions instead of immediately denying them;
+- hides `localadm` from the graphical login screen in Frozen mode;
+- restores both the employee and `localadm` home directories from clean
+  templates during every Frozen boot;
+- maintains a Golden Btrfs snapshot from which the active Frozen system is
+  recreated;
+- displays one GRUB entry whose title reflects the selected mode: **FROZEN**
+  or **THAWED**.
 
-| Mod | Amaç | Yeniden başlatma sonrası |
+## Boot modes
+
+| Mode | Purpose | Persistence |
 | --- | --- | --- |
-| **THAWED (Maintenance)** | Kalıcı bakım, güncelleme ve yapılandırma | Değişiklikler korunur |
-| **Golden** | Frozen sistemin yayımlanmış ana şablonu | Doğrudan kullanılmaz |
-| **Frozen** | Çalışanın günlük, sıfırlanan sistemi | Yerel değişiklikler silinir |
+| **FROZEN** | Normal employee operation | Local changes are removed on reboot |
+| **THAWED** | Persistent maintenance and updates | Changes are retained |
+| **Golden** | Published source snapshot for Frozen mode | Not booted directly |
 
-Frozen sistem her açılışta Golden snapshot'tan yeniden oluşturulur. Yönetilen
-çalışan ve `localadm` ev dizinleri de temiz şablonlarına döndürülür. Maintenance
-modunda yapılan bir değişiklik kendiliğinden Frozen'a geçmez; bakım sonunda
-`BAKIM-02-DEGISIKLIKLERI-YAYINLA.sh` çalıştırılmalıdır.
+FROZEN boots without a GRUB password. THAWED requires the `cachyadmin` GRUB
+user and the password configured during installation.
 
-## Gereksinimler
+Changes made in THAWED mode do not automatically become the new Frozen
+baseline. Publish them with `BAKIM-02-DEGISIKLIKLERI-YAYINLA.sh`.
 
-- UEFI açılış
-- CachyOS ve KDE Plasma
-- Btrfs kök dosya sistemi
+## Requirements
+
+- CachyOS with KDE Plasma
+- UEFI boot
+- Btrfs root filesystem
 - GRUB
-- EFI bölümünün `/boot/efi` konumunda bağlı olması
-- Ayrı bir `/boot` bölümünün **olmaması**
-- İnternet bağlantısı
-- `sudo` yetkili yerel yönetici hesabı
+- EFI system partition mounted at `/boot/efi`
+- no separate `/boot` filesystem
+- internet access
+- local `localadm` account with `sudo` privileges and an active password
 
-Betik, güvenli olmayan bir disk veya açılış düzeni görürse kurulumu durdurur.
+The installer stops when it detects an unsupported disk or boot layout.
 
-## Projeyi GitHub'dan alma
+## Clone the repository
 
-Önerilen yöntem, projeyi Maintenance modunda veya henüz dondurulmamış temiz
-CachyOS kurulumunda GitHub'dan klonlamaktır:
+Run this from a clean CachyOS installation or while the system is in THAWED
+mode:
 
 ```bash
 sudo pacman -S --needed git github-cli
@@ -60,58 +73,59 @@ gh repo clone q0xs/CachyOS-USB-Kurulum
 cd CachyOS-USB-Kurulum
 ```
 
-Depo özeldir; klonlama için `q0xs` hesabının veya izin verilmiş başka bir
-GitHub hesabının kimlik doğrulaması gerekir.
+The repository is private, so the authenticated GitHub account must have
+access.
 
-## Hızlı kurulum
+## Quick installation
 
-Normal kullanımda yalnızca aşağıdaki dört giriş betiği çalıştırılır:
+Use the top-level entry scripts. Do not run scripts under `installer/` or
+`deepfreeze/` individually during a normal installation.
 
-1. Ana kurulumu başlat:
+1. Start provisioning:
 
    ```bash
    bash ./ADIM-01-KURULUMU-BASLAT.sh
    ```
 
-2. Çalışan hesabında uygulamaları ve ses/kamera erişimini test et. Ayrıcalıklı
-   bir masaüstü işleminin `localadm` parolasını sorduğunu doğrula.
+2. Sign in to the employee account and verify:
 
-3. Kurulumu tamamla ve Golden sistemi yayımla:
+   - Chrome, Slack, AnyDesk, LibreOffice, MicroSIP, and Zoiper;
+   - microphone, speaker, and headset input/output;
+   - an administrative desktop action asks for the `localadm` password;
+   - the employee account is not a direct member of `wheel` or `sudo`.
+
+3. Return to `localadm`, complete the installation, and publish the Golden
+   snapshot:
 
    ```bash
    bash ./ADIM-02-KURULUMU-TAMAMLA.sh
    sudo reboot
    ```
 
-4. İlk Frozen testini yap. Oluşturduğun geçici bir dosyanın yeniden başlatmadan
-   sonra silindiğini doğrula.
+4. During the first FROZEN test, create a temporary file in both managed
+   accounts when practical, reboot, and confirm that it is removed.
 
-`installer/` ve `deepfreeze/` altındaki dosyalar normal kurulum sırasında tek
-tek çalıştırılmamalıdır. Tüm adımlar ve beklenen ekranlar için
-[`BASLA-BURADAN.md`](BASLA-BURADAN.md) izlenmelidir.
+See **[KURULUM-TR.md](KURULUM-TR.md)** for the full Turkish procedure and
+expected prompts.
 
-## Bakım
+## Maintenance
 
-Frozen sistemden sonraki açılışı Maintenance yapmak için:
+Schedule the next boot as THAWED:
 
 ```bash
 bash ./BAKIM-01-COZ.sh
 sudo reboot
 ```
 
-Maintenance modunda bakım tamamlandıktan sonra değişiklikleri yeni Golden
-olarak yayımlamak için:
+After completing maintenance, publish the updated Golden snapshot and return
+to FROZEN:
 
 ```bash
 bash ./BAKIM-02-DEGISIKLIKLERI-YAYINLA.sh
 sudo reboot
 ```
 
-GRUB moda göre yalnızca tek giriş gösterir: **FROZEN** veya **THAWED**.
-FROZEN parola istemez. THAWED seçildiğinde `cachyadmin` kullanıcısı ve kurulum
-sırasında belirlenen GRUB parolası istenir.
-
-## Proje yapısı
+## Repository layout
 
 ```text
 .
@@ -119,34 +133,41 @@ sırasında belirlenen GRUB parolası istenir.
 ├── ADIM-02-KURULUMU-TAMAMLA.sh
 ├── BAKIM-01-COZ.sh
 ├── BAKIM-02-DEGISIKLIKLERI-YAYINLA.sh
-├── deepfreeze/   # Btrfs, initramfs ve GRUB Frozen altyapısı
-├── installer/    # Kurulum ve yayımlama adımları
-├── policies/     # Yönetilen uygulama ilkeleri
-├── user/         # Çalışan hesabı servisleri ve masaüstü girişleri
-└── vendor/       # Çevrimdışı/denetlenmiş paketleme yardımcıları
+├── KURULUM-TR.md  # Complete Turkish installation guide
+├── deepfreeze/    # Btrfs, initramfs, and GRUB infrastructure
+├── installer/     # Provisioning and publishing steps
+├── policies/      # Managed application policies
+├── user/          # Employee account services and desktop entries
+└── vendor/        # Offline or reviewed packaging helpers
 ```
 
-## Statik kontroller
+## Validation
 
-Bir Linux ortamında:
+Run the repository's static checks:
 
 ```bash
 bash ./deepfreeze/tests/static.sh
+bash ./deepfreeze/tests/grub-generation.sh
 ```
 
-Test; Bash sözdizimini, temel yapılandırmayı, masaüstü girişlerini, JSON
-dosyasını ve sistemde bulunuyorsa ShellCheck/systemd doğrulamalarını çalıştırır.
-Disk veya boot zincirini değiştiren entegrasyon testleri yalnızca ayrılmış test
-ortamında çalıştırılmalıdır.
+The static suite checks Bash syntax, core configuration, desktop entries, JSON,
+and—when available—ShellCheck and systemd units. Run boot-chain and Btrfs
+integration tests only on a dedicated test device.
 
-## Güvenlik ve yedekleme
+## Additional documentation
 
-- GitHub yedeği proje dosyalarını korur; çalışır durumdaki laptopun disk
-  yedeğinin veya önyüklenebilir kurtarma medyasının yerini tutmaz.
-- Parola, erişim anahtarı, cihaz UUID'si ve gerçek kullanıcı verilerini depoya
-  eklemeyin.
-- Frozen modda yapılan ve GitHub'a gönderilmeyen değişiklikler yeniden
-  başlatmada kaybolur.
-- `@`, `@golden` veya `@active` Btrfs alt birimlerini elle silmeyin.
-- `btrfs check --repair` komutunu uzman yönlendirmesi olmadan çalıştırmayın.
-- Dondurma veya yayımlama sırasında bilgisayarın gücünü kesmeyin.
+- [Turkish installation guide](KURULUM-TR.md)
+- [Pilot-device checklist](PILOT-NOTLARI.md)
+- [GitHub workflow on Linux](GITHUB-ILE-CALISMA.md)
+- [Boot recovery notes](KURTARMA-EKRAN-GELMEZSE.txt)
+- [Optional legacy USB workflow](USB-KURULUM.txt)
+
+## Safety and backups
+
+- GitHub protects the project files; it is not a disk image or a replacement
+  for bootable recovery media.
+- Never commit passwords, access tokens, device UUIDs, or real user data.
+- Unpushed changes made in FROZEN mode disappear after reboot.
+- Do not manually delete the `@`, `@golden`, or `@active` Btrfs subvolumes.
+- Do not run `btrfs check --repair` without expert guidance.
+- Do not cut power while freezing or publishing snapshots.
