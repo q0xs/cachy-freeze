@@ -1,7 +1,7 @@
-# CachyOS Kurumsal Laptop Kurulumu
+# CachyOS Kurumsal Laptop Kurulumu — Türkçe Rehber
 
-Bu belge ayrıntılı kurulum sırasıdır. Projenin genel açıklaması ve güvenlik
-uyarıları için önce `README.md` dosyasını oku.
+Bu belge ayrıntılı Türkçe kurulum sırasıdır. Projenin İngilizce genel
+açıklaması ve güvenlik uyarıları için `README.md` dosyasını da oku.
 
 Önerilen yöntem projeyi GitHub'dan almaktır. USB ile kopyalama yalnızca internet
 erişimi olmayan kurulumlar için isteğe bağlı bir alternatiftir. Klasör içindeki

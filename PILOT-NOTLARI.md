@@ -31,4 +31,4 @@ cat /etc/mkinitcpio.conf
 ```
 
 Gerçek kurulumdan önce harici diske sistem yedeği alınmalıdır. Ana ve son
-kullanıcı kurulumu için `BASLA-BURADAN.md` izlenmelidir.
+kullanıcı kurulumu için `KURULUM-TR.md` izlenmelidir.
