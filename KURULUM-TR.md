@@ -25,8 +25,11 @@ yöneticisini birden fazla CachyOS bilgisayara kurmak için depoyu klonladıktan
 sonra çalıştır:
 
 ```bash
-bash ./CACHY-FREEZE-UYGULAMASINI-KUR.sh
+bash ./03-ALTERNATIF-SADECE-FREEZE-UYGULAMASI.sh
 ```
+
+Bu dosya tam kurulumun `01` ve `02` adımlarına alternatiftir; tam kurulumdan
+sonra ayrıca çalıştırılmaz.
 
 Kurucu her bilgisayarın Btrfs UUID'sini kendisi algılar. İşlem yalnızca UEFI,
 Btrfs ve GRUB kullanan, EFI bölümü `/boot/efi` konumunda bağlı olan ve ayrı
@@ -69,7 +72,7 @@ pwd
 ## 3. Ana kurulumu çalıştır
 
 ```bash
-bash ./ADIM-01-KURULUMU-BASLAT.sh
+bash ./01-TAM-KURULUMU-BASLAT.sh
 ```
 
 Bu adım internetten sistem güncellemelerini ve uygulamaları kurar. Ardından
@@ -118,7 +121,7 @@ parolanla giriş yap.
 Maintenance hesabına dön ve çalıştır:
 
 ```bash
-bash ./ADIM-02-KURULUMU-TAMAMLA.sh
+bash ./02-TAM-KURULUMU-TAMAMLA.sh
 ```
 
 Dosya önce onay ister; ardından GRUB parolasını ayarlar, çalışan hesabında test
@@ -137,7 +140,7 @@ GRUB'dan THAWED seçip `cachyadmin` ve GRUB parolasıyla açabilirsin.
 Güncelleme veya ayar değişikliğinden sonra:
 
 ```bash
-bash ./BAKIM-02-DEGISIKLIKLERI-YAYINLA.sh
+bash ./11-BAKIM-YAYINLA-VE-DONDUR.sh
 sudo reboot
 ```
 
@@ -146,7 +149,7 @@ Bu bakım dosyası hem Golden'ı yayınlar hem sonraki açılışı Frozen yapar
 Frozen içindeyken sonraki açılışları kalıcı olarak Maintenance yapmak istersen:
 
 ```bash
-bash ./BAKIM-01-COZ.sh
+bash ./10-BAKIM-ERIT.sh
 sudo reboot
 ```
 
