@@ -136,10 +136,17 @@ bash ./03-ALTERNATIF-SADECE-FREEZE-UYGULAMASI.sh
 ```
 
 The installer detects that computer's Btrfs UUID and installs a
-Polkit-authenticated **Cachy Freeze Manager** desktop application. It does not
-embed machine-specific identifiers in the repository. The supported layout is
-UEFI + Btrfs + GRUB, with the EFI partition mounted at `/boot/efi` and no
-separate `/boot` filesystem.
+Polkit-authenticated **Cachy Freeze Manager** PyQt6 desktop application. The
+window shows the current mode and provides two primary actions:
+
+- **Thaw:** schedule the next boot in persistent maintenance mode.
+- **Freeze:** publish the current maintenance system as the new Golden
+  snapshot, then schedule Frozen mode.
+
+Both actions show confirmation and progress feedback and offer to reboot when
+finished. The repository does not embed machine-specific identifiers. The
+supported layout is UEFI + Btrfs + GRUB, with the EFI partition mounted at
+`/boot/efi` and no separate `/boot` filesystem.
 
 ## Maintenance
 

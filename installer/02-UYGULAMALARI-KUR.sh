@@ -26,6 +26,7 @@ pacman -Syu --needed --noconfirm \
   kdialog \
   kwallet \
   nss \
+  python-pyqt6 \
   rsync \
   ttf-liberation \
   unzip \

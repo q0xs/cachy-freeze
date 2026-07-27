@@ -11,9 +11,9 @@ readonly INSTALLER_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 pacman -S --needed --noconfirm \
   btrfs-progs \
   grub \
-  kdialog \
   mkinitcpio \
-  polkit
+  polkit \
+  python-pyqt6
 
 bash "$INSTALLER_DIR/01-DEEPFREEZE-KUR.sh"
 bash "$INSTALLER_DIR/06-GOLDEN-YAYINLA.sh"

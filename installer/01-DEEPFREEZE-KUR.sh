@@ -11,6 +11,9 @@ die() {
 
 (( EUID == 0 )) || die "Su sekilde calistir: sudo $0"
 [[ -r $DF_ROOT/bin/cachy-freeze ]] || die "Deep Freeze proje dosyalari eksik."
+command -v python >/dev/null || die "Python bulunamadi."
+python -c 'import PyQt6' 2>/dev/null ||
+  die "PyQt6 bulunamadi. Once python-pyqt6 paketini kur."
 
 CACHY_FREEZE_CONFIG="$DF_ROOT/etc/cachy-freeze.conf" \
   bash "$DF_ROOT/bin/cachy-freeze" preflight
