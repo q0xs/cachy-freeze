@@ -1,93 +1,356 @@
-#!/usr/bin/env bash
-set -Eeuo pipefail
+#!/usr/bin/env python3
+"""Graphical controller for the Cachy Freeze Btrfs backend."""
 
-readonly APP_NAME="Cachy Freeze Yöneticisi"
-readonly HELPER=/usr/lib/cachy-freeze/cachy-freeze-manager-helper
+from __future__ import annotations
 
-show_error() {
-  kdialog --title "$APP_NAME" --error "$1"
-}
+import os
+import sys
+from pathlib import Path
 
-current_mode() {
-  if grep -qw 'cachy.freeze=1' /proc/cmdline; then
-    printf '%s' "Mevcut açılış: DONDURULMUŞ"
-  elif grep -qw 'cachy.freeze=0' /proc/cmdline; then
-    printf '%s' "Mevcut açılış: ERİTİLMİŞ (Bakım)"
-  else
-    printf '%s' "Mevcut açılış: Bilinmiyor"
-  fi
-}
+from PyQt6.QtCore import QProcess, Qt
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
-run_action() {
-  local action=$1 success_message=$2 output rc
-  set +e
-  output=$(pkexec "$HELPER" "$action" 2>&1)
-  rc=$?
-  set -e
 
-  if (( rc != 0 )); then
-    # 126/127, Polkit penceresinin kullanıcı tarafından kapatılmasıdır.
-    (( rc == 126 || rc == 127 )) && return 0
-    show_error "${output:-İşlem tamamlanamadı.}"
-    return 0
-  fi
+APP_NAME = "Cachy Freeze Yöneticisi"
+HELPER = "/usr/lib/cachy-freeze/cachy-freeze-manager-helper"
 
-  if kdialog --title "$APP_NAME" --yesno \
-    "$success_message
 
-Değişiklik yeniden başlatınca uygulanacak.
-Şimdi yeniden başlatılsın mı?" \
-    --yes-label "Yeniden Başlat" --no-label "Daha Sonra"; then
-    set +e
-    output=$(pkexec "$HELPER" reboot 2>&1)
-    rc=$?
-    set -e
-    (( rc == 0 || rc == 126 || rc == 127 )) ||
-      show_error "${output:-Yeniden başlatma başlatılamadı.}"
-  fi
-}
+class FreezeManager(QMainWindow):
+    def __init__(self) -> None:
+        super().__init__()
+        self.process: QProcess | None = None
+        self.pending_action = ""
+        self.setWindowTitle(APP_NAME)
+        self.setMinimumSize(720, 500)
+        self.resize(780, 540)
+        self._build_ui()
+        self._apply_style()
+        self.refresh_status()
 
-command -v kdialog >/dev/null 2>&1 || {
-  printf '%s\n' "HATA: kdialog kurulu değil." >&2
-  exit 1
-}
-command -v pkexec >/dev/null 2>&1 || {
-  show_error "Polkit pkexec bulunamadı."
-  exit 1
-}
-[[ -x $HELPER ]] || {
-  show_error "Cachy Freeze uygulaması eksik veya bozuk."
-  exit 1
-}
+    def _build_ui(self) -> None:
+        root = QWidget()
+        layout = QVBoxLayout(root)
+        layout.setContentsMargins(36, 30, 36, 30)
+        layout.setSpacing(20)
 
-while :; do
-  choice=$(
-    kdialog --title "$APP_NAME" \
-      --menu "$(current_mode)
+        title = QLabel("Cachy Freeze")
+        title.setObjectName("title")
+        subtitle = QLabel(
+            "Sistemin kalıcı bakım ve sıfırlanan çalışma modunu yönetin."
+        )
+        subtitle.setObjectName("subtitle")
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
 
-Sonraki açılış modunu seçin:" \
-      thaw "Erit — Kalıcı bakım moduna geç" \
-      freeze "Dondur — Değişiklikleri yeniden başlatmada sıfırla" \
-      close "Kapat" \
-      --cancel-label "Kapat" 2>/dev/null
-  ) || exit 0
+        status_card = QFrame()
+        status_card.setObjectName("card")
+        status_layout = QVBoxLayout(status_card)
+        status_layout.setContentsMargins(24, 20, 24, 20)
+        status_caption = QLabel("MEVCUT DURUM")
+        status_caption.setObjectName("caption")
+        self.status_label = QLabel()
+        self.status_label.setObjectName("status")
+        self.status_detail = QLabel()
+        self.status_detail.setObjectName("detail")
+        self.status_detail.setWordWrap(True)
+        status_layout.addWidget(status_caption)
+        status_layout.addWidget(self.status_label)
+        status_layout.addWidget(self.status_detail)
+        layout.addWidget(status_card)
 
-  case $choice in
-    thaw)
-      run_action thaw "Sistem eritildi ve bakım modu seçildi."
-      ;;
-    freeze)
-      if kdialog --title "$APP_NAME" --warningyesno \
-        "Sistem dondurulsun mu?
+        button_row = QHBoxLayout()
+        button_row.setSpacing(16)
 
-Bakım modundaki mevcut sistem Golden olarak kaydedilecektir.
-Sonraki Dondurulmuş açılışta yeni değişiklikler temizlenecektir." \
-        --yes-label "Dondur" --no-label "Vazgeç"; then
-        run_action freeze "Sistem donduruldu."
-      fi
-      ;;
-    close)
-      exit 0
-      ;;
-  esac
-done
+        self.thaw_button = QPushButton(
+            "  ERİT\n  Kalıcı bakım moduna geç"
+        )
+        self.thaw_button.setObjectName("thawButton")
+        self.thaw_button.setMinimumHeight(104)
+        self.thaw_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.thaw_button.clicked.connect(self.confirm_thaw)
+
+        self.freeze_button = QPushButton(
+            "  DONDUR\n  Golden al ve sistemi koru"
+        )
+        self.freeze_button.setObjectName("freezeButton")
+        self.freeze_button.setMinimumHeight(104)
+        self.freeze_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.freeze_button.clicked.connect(self.confirm_freeze)
+
+        button_row.addWidget(self.thaw_button)
+        button_row.addWidget(self.freeze_button)
+        layout.addLayout(button_row)
+
+        info = QLabel(
+            "Dondur işlemi bakım modunda önce mevcut sistemi Golden snapshot "
+            "olarak kaydeder. Sonraki Frozen açılışlarda yapılan değişiklikler "
+            "yeniden başlatınca temizlenir."
+        )
+        info.setObjectName("info")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.progress.setTextVisible(False)
+        self.progress.hide()
+        layout.addWidget(self.progress)
+
+        self.operation_label = QLabel()
+        self.operation_label.setObjectName("operation")
+        self.operation_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.operation_label)
+        layout.addStretch()
+
+        self.setCentralWidget(root)
+
+    def _apply_style(self) -> None:
+        self.setStyleSheet(
+            """
+            QMainWindow, QWidget {
+                background: #11151c;
+                color: #edf2f7;
+                font-family: "Noto Sans", "Inter", sans-serif;
+                font-size: 14px;
+            }
+            QLabel#title {
+                font-size: 31px;
+                font-weight: 700;
+                color: #ffffff;
+            }
+            QLabel#subtitle {
+                color: #9aa8ba;
+                font-size: 15px;
+                margin-bottom: 6px;
+            }
+            QFrame#card {
+                background: #1a202a;
+                border: 1px solid #2b3544;
+                border-radius: 14px;
+            }
+            QLabel#caption {
+                color: #8290a3;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 1px;
+            }
+            QLabel#status {
+                font-size: 24px;
+                font-weight: 700;
+                color: #ffffff;
+                margin-top: 4px;
+            }
+            QLabel#detail, QLabel#info {
+                color: #aab5c4;
+                line-height: 1.4;
+            }
+            QLabel#info {
+                background: #171d26;
+                border-left: 3px solid #4f8cff;
+                border-radius: 5px;
+                padding: 12px 14px;
+            }
+            QPushButton {
+                border: 1px solid transparent;
+                border-radius: 12px;
+                color: white;
+                font-size: 16px;
+                font-weight: 700;
+                text-align: left;
+                padding: 16px;
+            }
+            QPushButton#thawButton {
+                background: #b96a16;
+                border-color: #d78325;
+            }
+            QPushButton#thawButton:hover { background: #cf7718; }
+            QPushButton#freezeButton {
+                background: #1967b3;
+                border-color: #2684dc;
+            }
+            QPushButton#freezeButton:hover { background: #2176c8; }
+            QPushButton:disabled {
+                background: #303845;
+                border-color: #3a4554;
+                color: #778396;
+            }
+            QProgressBar {
+                background: #252d39;
+                border: 0;
+                border-radius: 4px;
+                max-height: 8px;
+            }
+            QProgressBar::chunk {
+                background: #4f8cff;
+                border-radius: 4px;
+            }
+            QLabel#operation { color: #9eacc0; }
+            QMessageBox { background: #1a202a; }
+            """
+        )
+
+    @staticmethod
+    def boot_mode() -> str:
+        try:
+            command_line = Path("/proc/cmdline").read_text(
+                encoding="utf-8"
+            )
+        except OSError:
+            return "unknown"
+        if "cachy.freeze=1" in command_line.split():
+            return "frozen"
+        if "cachy.freeze=0" in command_line.split():
+            return "thawed"
+        return "unknown"
+
+    def refresh_status(self) -> None:
+        mode = self.boot_mode()
+        if mode == "frozen":
+            self.status_label.setText("DONDURULMUŞ")
+            self.status_label.setStyleSheet("color: #62a9f6;")
+            self.status_detail.setText(
+                "Kullanıcı değişiklikleri yeniden başlatmada temizlenir."
+            )
+        elif mode == "thawed":
+            self.status_label.setText("ERİTİLMİŞ — BAKIM")
+            self.status_label.setStyleSheet("color: #f0a64b;")
+            self.status_detail.setText(
+                "Yapılan sistem değişiklikleri kalıcıdır. Dondur ile yeni "
+                "Golden snapshot oluşturabilirsiniz."
+            )
+        else:
+            self.status_label.setText("DURUM ALGILANAMADI")
+            self.status_label.setStyleSheet("color: #ef6b73;")
+            self.status_detail.setText(
+                "Cachy Freeze çekirdek parametresi bu açılışta bulunamadı."
+            )
+
+    def confirm_thaw(self) -> None:
+        answer = QMessageBox.question(
+            self,
+            "Sistemi Erit",
+            "Sonraki açılış kalıcı bakım modunda yapılsın mı?\n\n"
+            "Bu modda yapılan değişiklikler yeniden başlatmada silinmez.",
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Yes,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.run_action("thaw", "Bakım modu ayarlanıyor…")
+
+    def confirm_freeze(self) -> None:
+        answer = QMessageBox.warning(
+            self,
+            "Sistemi Dondur",
+            "Mevcut bakım sistemi Golden snapshot olarak kaydedilecek ve "
+            "sonraki açılış Frozen olacaktır.\n\n"
+            "İşlem sırasında bilgisayarı kapatmayın. Devam edilsin mi?",
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.run_action(
+                "freeze", "Golden snapshot alınıyor ve sistem donduruluyor…"
+            )
+
+    def run_action(self, action: str, message: str) -> None:
+        if not os.access(HELPER, os.X_OK):
+            self.show_error("Yetkili Cachy Freeze yardımcısı bulunamadı.")
+            return
+        self.pending_action = action
+        self.set_busy(True, message)
+        self.process = QProcess(self)
+        self.process.setProgram("/usr/bin/pkexec")
+        self.process.setArguments([HELPER, action])
+        self.process.finished.connect(self.action_finished)
+        self.process.errorOccurred.connect(self.action_error)
+        self.process.start()
+
+    def action_finished(
+        self, exit_code: int, _status: QProcess.ExitStatus
+    ) -> None:
+        assert self.process is not None
+        error_text = bytes(self.process.readAllStandardError()).decode(
+            errors="replace"
+        ).strip()
+        output_text = bytes(self.process.readAllStandardOutput()).decode(
+            errors="replace"
+        ).strip()
+        action = self.pending_action
+        self.set_busy(False)
+
+        if exit_code in (126, 127):
+            self.operation_label.setText("İşlem iptal edildi.")
+            return
+        if exit_code != 0:
+            self.show_error(error_text or output_text or "İşlem tamamlanamadı.")
+            return
+        if action == "reboot":
+            self.operation_label.setText("Sistem yeniden başlatılıyor…")
+            return
+
+        result = (
+            "Sistem eritildi; sonraki açılış bakım modunda olacak."
+            if action == "thaw"
+            else "Golden snapshot hazırlandı ve sistem donduruldu."
+        )
+        self.operation_label.setText(result)
+        self.offer_reboot(result)
+
+    def action_error(self, _error: QProcess.ProcessError) -> None:
+        if (
+            self.process is not None
+            and self.process.state() == QProcess.ProcessState.NotRunning
+        ):
+            self.set_busy(False)
+            self.show_error("Yetkili işlem başlatılamadı.")
+
+    def offer_reboot(self, result: str) -> None:
+        answer = QMessageBox.question(
+            self,
+            "İşlem Tamamlandı",
+            f"{result}\n\nDeğişikliği uygulamak için şimdi yeniden "
+            "başlatılsın mı?",
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.run_action("reboot", "Sistem yeniden başlatılıyor…")
+
+    def set_busy(self, busy: bool, message: str = "") -> None:
+        self.thaw_button.setDisabled(busy)
+        self.freeze_button.setDisabled(busy)
+        self.progress.setVisible(busy)
+        self.operation_label.setText(message)
+
+    def show_error(self, message: str) -> None:
+        QMessageBox.critical(self, "Cachy Freeze Hatası", message)
+        self.operation_label.setText("İşlem başarısız.")
+
+
+def main() -> int:
+    app = QApplication(sys.argv)
+    app.setApplicationName(APP_NAME)
+    app.setOrganizationName("CachyOS Workstation")
+    app.setFont(QFont("Noto Sans", 10))
+    window = FreezeManager()
+    window.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

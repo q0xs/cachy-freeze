@@ -15,7 +15,6 @@ done < <(
       -path "$PROJECT_ROOT/deepfreeze/initcpio/install-hook" -o \
       -path "$PROJECT_ROOT/deepfreeze/grub/01_cachy_auth" -o \
       -path "$PROJECT_ROOT/deepfreeze/grub/40_cachy_freeze" -o \
-      -path "$PROJECT_ROOT/app/cachy-freeze-manager" -o \
       -path "$PROJECT_ROOT/app/cachy-freeze-manager-helper" -o \
       -path "$PROJECT_ROOT/user/files/cachy-employee-reset" -o \
       -path "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict" -o \
@@ -71,6 +70,9 @@ done
 
 if command -v python >/dev/null; then
   python -m json.tool "$PROJECT_ROOT/policies/chrome/managed.json" >/dev/null
+  python -c \
+    'compile(open(__import__("sys").argv[1], encoding="utf-8").read(), __import__("sys").argv[1], "exec")' \
+    "$PROJECT_ROOT/app/cachy-freeze-manager"
 fi
 
 if command -v xmllint >/dev/null; then

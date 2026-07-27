@@ -37,11 +37,12 @@ Btrfs ve GRUB kullanan, EFI bölümü `/boot/efi` konumunda bağlı olan ve ayr�
 **Cachy Freeze Yöneticisi** adıyla görünür:
 
 - **Erit:** Sonraki açılışı kalıcı bakım moduna geçirir.
-- **Dondur:** Bakım sistemini Golden olarak kaydeder ve sonraki açılışı
-  sıfırlanan Frozen moda geçirir.
+- **Dondur:** Bakım sistemini önce yeni Golden snapshot olarak kaydeder,
+  ardından sonraki açılışı sıfırlanan Frozen moda geçirir.
 
-Her iki işlem yönetici parolası ister ve ardından yeniden başlatmayı teklif
-eder.
+PyQt6 arayüzü mevcut modu bir durum kartında gösterir; işlem sırasında ilerleme
+göstergesi sunar. Her iki işlem yönetici parolası ister, sonucunu gösterir ve
+ardından yeniden başlatmayı teklif eder.
 
 Kurulum tamamlanıp yeni sistem açıldıktan sonra `localadm` hesabında terminali
 aç.
