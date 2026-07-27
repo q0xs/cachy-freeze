@@ -32,8 +32,22 @@ install -d -m 0755 \
   /usr/lib/cachy-freeze \
   /etc/initcpio/install \
   /etc/grub.d \
-  /usr/local/sbin
+  /usr/local/sbin \
+  /usr/share/applications \
+  /usr/share/polkit-1/actions
 install -m 0755 "$DF_ROOT/bin/cachy-freeze" /usr/local/sbin/cachy-freeze
+install -m 0755 \
+  "$PROJECT_ROOT/app/cachy-freeze-manager" \
+  /usr/bin/cachy-freeze-manager
+install -m 0755 \
+  "$PROJECT_ROOT/app/cachy-freeze-manager-helper" \
+  /usr/lib/cachy-freeze/cachy-freeze-manager-helper
+install -m 0644 \
+  "$PROJECT_ROOT/app/cachy-freeze-manager.desktop" \
+  /usr/share/applications/cachy-freeze-manager.desktop
+install -m 0644 \
+  "$PROJECT_ROOT/app/org.cachyos.cachy-freeze.policy" \
+  /usr/share/polkit-1/actions/org.cachyos.cachy-freeze.policy
 install -m 0755 \
   "$DF_ROOT/initcpio/cachy-freeze-reset" \
   /usr/lib/cachy-freeze/cachy-freeze-reset
@@ -106,6 +120,12 @@ grep -q -- "--id 'cachyos-current'" /boot/grub/grub.cfg ||
   die "Tek GRUB girisi eksik: cachyos-current"
 [[ $(grep -c '^menuentry ' /boot/grub/grub.cfg) -eq 1 ]] ||
   die "GRUB menusunde bir disinda giris bulundu."
+[[ -x /usr/bin/cachy-freeze-manager ]] ||
+  die "Cachy Freeze masaustu uygulamasi kurulamadi."
+[[ -x /usr/lib/cachy-freeze/cachy-freeze-manager-helper ]] ||
+  die "Cachy Freeze yetkili yardimcisi kurulamadi."
+[[ -r /usr/share/applications/cachy-freeze-manager.desktop ]] ||
+  die "Cachy Freeze uygulama menu girdisi kurulamadi."
 
 /usr/local/sbin/cachy-freeze thaw
 

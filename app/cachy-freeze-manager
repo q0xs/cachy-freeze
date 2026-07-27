@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly APP_NAME="Cachy Freeze Yöneticisi"
+readonly HELPER=/usr/lib/cachy-freeze/cachy-freeze-manager-helper
+
+show_error() {
+  kdialog --title "$APP_NAME" --error "$1"
+}
+
+current_mode() {
+  if grep -qw 'cachy.freeze=1' /proc/cmdline; then
+    printf '%s' "Mevcut açılış: DONDURULMUŞ"
+  elif grep -qw 'cachy.freeze=0' /proc/cmdline; then
+    printf '%s' "Mevcut açılış: ERİTİLMİŞ (Bakım)"
+  else
+    printf '%s' "Mevcut açılış: Bilinmiyor"
+  fi
+}
+
+run_action() {
+  local action=$1 success_message=$2 output rc
+  set +e
+  output=$(pkexec "$HELPER" "$action" 2>&1)
+  rc=$?
+  set -e
+
+  if (( rc != 0 )); then
+    # 126/127, Polkit penceresinin kullanıcı tarafından kapatılmasıdır.
+    (( rc == 126 || rc == 127 )) && return 0
+    show_error "${output:-İşlem tamamlanamadı.}"
+    return 0
+  fi
+
+  if kdialog --title "$APP_NAME" --yesno \
+    "$success_message
+
+Değişiklik yeniden başlatınca uygulanacak.
+Şimdi yeniden başlatılsın mı?" \
+    --yes-label "Yeniden Başlat" --no-label "Daha Sonra"; then
+    set +e
+    output=$(pkexec "$HELPER" reboot 2>&1)
+    rc=$?
+    set -e
+    (( rc == 0 || rc == 126 || rc == 127 )) ||
+      show_error "${output:-Yeniden başlatma başlatılamadı.}"
+  fi
+}
+
+command -v kdialog >/dev/null 2>&1 || {
+  printf '%s\n' "HATA: kdialog kurulu değil." >&2
+  exit 1
+}
+command -v pkexec >/dev/null 2>&1 || {
+  show_error "Polkit pkexec bulunamadı."
+  exit 1
+}
+[[ -x $HELPER ]] || {
+  show_error "Cachy Freeze uygulaması eksik veya bozuk."
+  exit 1
+}
+
+while :; do
+  choice=$(
+    kdialog --title "$APP_NAME" \
+      --menu "$(current_mode)
+
+Sonraki açılış modunu seçin:" \
+      thaw "Erit — Kalıcı bakım moduna geç" \
+      freeze "Dondur — Değişiklikleri yeniden başlatmada sıfırla" \
+      close "Kapat" \
+      --cancel-label "Kapat" 2>/dev/null
+  ) || exit 0
+
+  case $choice in
+    thaw)
+      run_action thaw "Sistem eritildi ve bakım modu seçildi."
+      ;;
+    freeze)
+      if kdialog --title "$APP_NAME" --warningyesno \
+        "Sistem dondurulsun mu?
+
+Bakım modundaki mevcut sistem Golden olarak kaydedilecektir.
+Sonraki Dondurulmuş açılışta yeni değişiklikler temizlenecektir." \
+        --yes-label "Dondur" --no-label "Vazgeç"; then
+        run_action freeze "Sistem donduruldu."
+      fi
+      ;;
+    close)
+      exit 0
+      ;;
+  esac
+done

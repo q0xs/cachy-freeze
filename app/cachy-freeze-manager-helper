@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly BACKEND=/usr/local/sbin/cachy-freeze
+
+(( EUID == 0 )) || {
+  printf '%s\n' "HATA: Yönetici yetkisi gerekli." >&2
+  exit 1
+}
+[[ -x $BACKEND ]] || {
+  printf '%s\n' "HATA: Cachy Freeze altyapısı kurulu değil." >&2
+  exit 1
+}
+
+case ${1:-} in
+  thaw)
+    exec "$BACKEND" thaw
+    ;;
+  freeze)
+    if [[ $(findmnt -n -o SOURCE /) == *'[/@]' ]]; then
+      "$BACKEND" publish
+    fi
+    exec "$BACKEND" freeze
+    ;;
+  reboot)
+    exec /usr/bin/systemctl reboot
+    ;;
+  *)
+    printf '%s\n' "HATA: Geçersiz işlem." >&2
+    exit 2
+    ;;
+esac

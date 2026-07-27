@@ -18,6 +18,28 @@ CachyOS kurulumunda:
 - Ayrı bir `/boot` bölümü oluşturma.
 - Yönetici hesabını oluştur ve internete bağlan.
 
+## Yalnızca Cachy Freeze masaüstü uygulamasını kurmak
+
+Kurumsal uygulamalar ve çalışan hesabı olmadan yalnızca grafik dondurma
+yöneticisini birden fazla CachyOS bilgisayara kurmak için depoyu klonladıktan
+sonra çalıştır:
+
+```bash
+bash ./CACHY-FREEZE-UYGULAMASINI-KUR.sh
+```
+
+Kurucu her bilgisayarın Btrfs UUID'sini kendisi algılar. İşlem yalnızca UEFI,
+Btrfs ve GRUB kullanan, EFI bölümü `/boot/efi` konumunda bağlı olan ve ayrı
+`/boot` bölümü bulunmayan CachyOS kurulumlarında devam eder. Uygulama menüsünde
+**Cachy Freeze Yöneticisi** adıyla görünür:
+
+- **Erit:** Sonraki açılışı kalıcı bakım moduna geçirir.
+- **Dondur:** Bakım sistemini Golden olarak kaydeder ve sonraki açılışı
+  sıfırlanan Frozen moda geçirir.
+
+Her iki işlem yönetici parolası ister ve ardından yeniden başlatmayı teklif
+eder.
+
 Kurulum tamamlanıp yeni sistem açıldıktan sonra `localadm` hesabında terminali
 aç.
 
@@ -59,6 +81,11 @@ Bu adım internetten sistem güncellemelerini ve uygulamaları kurar. Ardından
 
 Parola yazılırken ekranda görünmez. Çalışan hesabı yönetici olmaz fakat Chrome,
 Slack, AnyDesk, LibreOffice, MicroSIP ve Zoiper'i normal şekilde açabilir.
+Plasma ilk girişten itibaren Breeze Dark koyu temayla açılır. Çalışan hesabı
+Windows'taki standart kullanıcı gibi kendi masaüstünü ve kullanıcı ayarlarını
+değiştirebilir; terminal ve normal uygulama özellikleri yapay olarak
+kapatılmaz. Sistem paketi kurma veya yönetim ayarı değiştirme gibi ayrıcalıklı
+işlemler `localadm` yönetici parolasını ister.
 Frozen modda `localadm` grafik oturum ekranında görünmez. Yönetici onayı
 gereken masaüstü işlemleri “yetkisiz” diye kapanmak yerine mevcut `localadm`
 parolasını ister. Çalışan ve `localadm` ev dizinleri her Frozen açılışta temiz
@@ -77,6 +104,8 @@ Ana kurulum bitince sistem Maintenance modunda kalır. Çalışan hesabına geç
 - Mikrofon, hoparlör ve kulaklık giriş/çıkışları çalışıyor.
 - Ayrıcalıklı bir masaüstü işlemi `localadm` parolasını soruyor.
 - Çalışan hesabı doğrudan `sudo` grubunda bulunmuyor.
+- Plasma ve uygulamalar koyu temayla açılıyor.
+- Çalışan kendi kullanıcı ayarlarını değiştirebiliyor.
 
 Bir sorun varsa henüz dondurma yapma.
 

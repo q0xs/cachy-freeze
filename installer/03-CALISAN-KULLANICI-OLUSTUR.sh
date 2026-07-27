@@ -96,8 +96,10 @@ install -d -o "$employee_user" -g "$employee_user" -m 0755 \
   "$home/Desktop" "$home/.config" "$home/.local" "$home/.local/share"
 install -d -o "$employee_user" -g "$employee_user" -m 0755 \
   "$home/.local/share/applications" "$home/.local/share/company-wine"
-install -o "$employee_user" -g "$employee_user" -m 0444 \
+install -o "$employee_user" -g "$employee_user" -m 0644 \
   "$PROJECT_ROOT/user/files/kdeglobals" "$home/.config/kdeglobals"
+install -o "$employee_user" -g "$employee_user" -m 0644 \
+  "$PROJECT_ROOT/user/files/plasmarc" "$home/.config/plasmarc"
 
 for desktop in "$PROJECT_ROOT"/user/desktop/*.desktop; do
   install -o "$employee_user" -g "$employee_user" -m 0555 \
@@ -108,11 +110,32 @@ prefix="$home/.local/share/company-wine/microsip"
 install -d -o "$employee_user" -g "$employee_user" -m 0700 "$prefix"
 runuser -u "$employee_user" -- \
   env WINEPREFIX="$prefix" WINEDEBUG=-all xvfb-run -a wineboot -u
+microsip_target="$prefix/drive_c/Program Files/MicroSIP"
+microsip_stage=$(mktemp -d)
+trap 'rm -rf --one-file-system "$microsip_stage"' EXIT
+unzip -q "/opt/company/microsip/$(</opt/company/microsip/CURRENT)" \
+  -d "$microsip_stage"
+microsip_exe=$(
+  find "$microsip_stage" -type f -iname 'microsip.exe' -print -quit
+)
+[[ -n $microsip_exe ]] ||
+  die "MicroSIP arsivinden calistirilabilir dosya cikmadi."
 install -d -o "$employee_user" -g "$employee_user" -m 0755 \
-  "$prefix/drive_c/Program Files/MicroSIP"
-runuser -u "$employee_user" -- \
-  unzip -o "/opt/company/microsip/$(</opt/company/microsip/CURRENT)" \
-    -d "$prefix/drive_c/Program Files/MicroSIP"
+  "$microsip_target"
+rsync -a --delete "${microsip_exe%/*}/" "$microsip_target/"
+microsip_installed_exe=$(
+  find "$microsip_target" -maxdepth 1 -type f -iname 'microsip.exe' \
+    -print -quit
+)
+[[ -n $microsip_installed_exe ]] ||
+  die "MicroSIP hedef dizine kurulamadi."
+if [[ $microsip_installed_exe != "$microsip_target/microsip.exe" ]]; then
+  mv "$microsip_installed_exe" "$microsip_target/microsip.exe"
+fi
+chown -R "$employee_user:$employee_user" "$microsip_target"
+chmod 0755 "$microsip_target/microsip.exe"
+rm -rf --one-file-system "$microsip_stage"
+trap - EXIT
 
 cat >"$home/.config/mimeapps.list" <<'EOF'
 [Default Applications]
@@ -126,7 +149,7 @@ x-scheme-handler/https=google-chrome.desktop;
 text/html=google-chrome.desktop;
 EOF
 chown "$employee_user:$employee_user" "$home/.config/mimeapps.list"
-chmod 0444 "$home/.config/mimeapps.list"
+chmod 0644 "$home/.config/mimeapps.list"
 
 install -m 0755 \
   "$PROJECT_ROOT/user/files/company-microsip" \
