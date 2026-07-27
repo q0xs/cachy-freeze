@@ -135,14 +135,18 @@ status() {
   trap unmount_top EXIT
   mount_top
 
-  local default_entry=bilinmiyor
+  local default_entry=bilinmiyor boot_mode=bilinmiyor
   if [[ -r /boot/grub/grubenv ]]; then
-    default_entry=$(grub-editenv /boot/grub/grubenv list |
-      sed -n 's/^saved_entry=//p')
+    local grub_environment
+    grub_environment=$(grub-editenv /boot/grub/grubenv list)
+    default_entry=$(sed -n 's/^saved_entry=//p' <<<"$grub_environment")
     [[ -n $default_entry ]] || default_entry=ayarlanmamis
+    boot_mode=$(sed -n 's/^cachy_mode=//p' <<<"$grub_environment")
+    [[ -n $boot_mode ]] || boot_mode=frozen
   fi
 
-  info "Boot modu: $default_entry"
+  info "Boot modu: $boot_mode"
+  info "GRUB girişi: $default_entry"
   info "Çalışan kök: $(root_subvolume)"
   info "Golden: $(subvol_exists "$GOLDEN_SUBVOL" && echo mevcut || echo yok)"
   info "Active: $(subvol_exists "$ACTIVE_SUBVOL" && echo mevcut || echo yok)"
@@ -194,12 +198,15 @@ publish() {
 
 set_boot_mode() {
   require_root
-  local entry=$1
+  local mode=$1
+  [[ $mode == frozen || $mode == thawed ]] ||
+    die "Geçersiz boot modu: $mode"
   [[ -r /boot/grub/grub.cfg ]] || die "GRUB yapılandırması bulunamadı."
-  grep -q -- "--id '$entry'" /boot/grub/grub.cfg ||
-    die "GRUB girişi bulunamadı: $entry"
-  grub-set-default "$entry"
-  info "Sonraki kalıcı boot modu: $entry"
+  grep -q -- "--id 'cachyos-current'" /boot/grub/grub.cfg ||
+    die "Tek GRUB girişi bulunamadı: cachyos-current"
+  grub-editenv /boot/grub/grubenv set "cachy_mode=$mode"
+  grub-set-default cachyos-current
+  info "Sonraki kalıcı boot modu: $mode"
 }
 
 freeze() {
@@ -210,11 +217,11 @@ freeze() {
   subvol_exists "$ACTIVE_SUBVOL" || die "Active snapshot yok."
   unmount_top
   trap - EXIT
-  set_boot_mode cachyos-frozen
+  set_boot_mode frozen
 }
 
 thaw() {
-  set_boot_mode cachyos-maintenance
+  set_boot_mode thawed
 }
 
 usage() {
