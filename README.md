@@ -48,7 +48,7 @@ FROZEN boots without a GRUB password. THAWED requires the `cachyadmin` GRUB
 user and the password configured during installation.
 
 Changes made in THAWED mode do not automatically become the new Frozen
-baseline. Publish them with `BAKIM-02-DEGISIKLIKLERI-YAYINLA.sh`.
+baseline. Publish them with `11-BAKIM-YAYINLA-VE-DONDUR.sh`.
 
 ## Requirements
 
@@ -80,15 +80,29 @@ cd CachyOS-USB-Kurulum
 The repository is private, so the authenticated GitHub account must have
 access.
 
-## Quick installation
+## Installation file order
 
 Use the top-level entry scripts. Do not run scripts under `installer/` or
-`deepfreeze/` individually during a normal installation.
+`deepfreeze/` individually during a normal installation. The filenames are
+numbered in their intended order:
+
+| File | When to use it |
+| --- | --- |
+| `01-TAM-KURULUMU-BASLAT.sh` | Starts the complete corporate workstation installation |
+| `02-TAM-KURULUMU-TAMAMLA.sh` | Run after testing the employee applications |
+| `03-ALTERNATIF-SADECE-FREEZE-UYGULAMASI.sh` | Alternative to 01–02; installs only the graphical Freeze Manager |
+| `10-BAKIM-ERIT.sh` | Schedules the next boot in persistent maintenance mode |
+| `11-BAKIM-YAYINLA-VE-DONDUR.sh` | Publishes maintenance changes and returns to Frozen mode |
+
+Do not run `03` after a complete `01`–`02` installation. It is a standalone
+alternative for computers that need only the Freeze Manager.
+
+## Complete workstation installation
 
 1. Start provisioning:
 
    ```bash
-   bash ./ADIM-01-KURULUMU-BASLAT.sh
+   bash ./01-TAM-KURULUMU-BASLAT.sh
    ```
 
 2. Sign in to the employee account and verify:
@@ -102,7 +116,7 @@ Use the top-level entry scripts. Do not run scripts under `installer/` or
    snapshot:
 
    ```bash
-   bash ./ADIM-02-KURULUMU-TAMAMLA.sh
+   bash ./02-TAM-KURULUMU-TAMAMLA.sh
    sudo reboot
    ```
 
@@ -118,7 +132,7 @@ To install only the reusable graphical freeze/thaw manager on a compatible
 CachyOS computer:
 
 ```bash
-bash ./CACHY-FREEZE-UYGULAMASINI-KUR.sh
+bash ./03-ALTERNATIF-SADECE-FREEZE-UYGULAMASI.sh
 ```
 
 The installer detects that computer's Btrfs UUID and installs a
@@ -132,7 +146,7 @@ separate `/boot` filesystem.
 Schedule the next boot as THAWED:
 
 ```bash
-bash ./BAKIM-01-COZ.sh
+bash ./10-BAKIM-ERIT.sh
 sudo reboot
 ```
 
@@ -140,7 +154,7 @@ After completing maintenance, publish the updated Golden snapshot and return
 to FROZEN:
 
 ```bash
-bash ./BAKIM-02-DEGISIKLIKLERI-YAYINLA.sh
+bash ./11-BAKIM-YAYINLA-VE-DONDUR.sh
 sudo reboot
 ```
 
@@ -148,11 +162,11 @@ sudo reboot
 
 ```text
 .
-├── ADIM-01-KURULUMU-BASLAT.sh
-├── ADIM-02-KURULUMU-TAMAMLA.sh
-├── BAKIM-01-COZ.sh
-├── BAKIM-02-DEGISIKLIKLERI-YAYINLA.sh
-├── CACHY-FREEZE-UYGULAMASINI-KUR.sh
+├── 01-TAM-KURULUMU-BASLAT.sh
+├── 02-TAM-KURULUMU-TAMAMLA.sh
+├── 03-ALTERNATIF-SADECE-FREEZE-UYGULAMASI.sh
+├── 10-BAKIM-ERIT.sh
+├── 11-BAKIM-YAYINLA-VE-DONDUR.sh
 ├── app/           # Graphical freeze/thaw manager and Polkit policy
 ├── KURULUM-TR.md  # Complete Turkish installation guide
 ├── deepfreeze/    # Btrfs, initramfs, and GRUB infrastructure

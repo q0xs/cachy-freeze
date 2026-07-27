@@ -13,9 +13,9 @@ Temiz CachyOS kurulumundan sonra once su dosyayi oku:
 
 Ana sira:
 
-  1. bash ./ADIM-01-KURULUMU-BASLAT.sh
+  1. bash ./01-TAM-KURULUMU-BASLAT.sh
   2. Uygulamalari calisan hesabinda kontrol et.
-  3. bash ./ADIM-02-KURULUMU-TAMAMLA.sh
+  3. bash ./02-TAM-KURULUMU-TAMAMLA.sh
   4. sudo reboot
 
 ONEMLI:
