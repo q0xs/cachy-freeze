@@ -1,12 +1,9 @@
-[KDE Action Restrictions][$i]
-action/executeshellcommand=false
-action/run_command=false
-ghns=false
-plasma/containment_actions=false
-plasma/plasmashell/unlockedDesktop=false
-run_command=false
-shell_access=false
+[General]
+ColorScheme=BreezeDark
 
-[KDE Resource Restrictions][$i]
-autostart=false
-xdgdata-apps=false
+[Icons]
+Theme=breeze-dark
+
+[KDE]
+LookAndFeelPackage=org.kde.breezedark.desktop
+widgetStyle=Breeze

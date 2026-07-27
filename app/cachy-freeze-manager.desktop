@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Cachy Freeze Yöneticisi
+GenericName=Dondurma ve Bakım Modu
+Comment=Sistemi erit veya dondur
+Exec=/usr/bin/cachy-freeze-manager
+Icon=drive-harddisk
+Terminal=false
+Categories=System;
+Keywords=freeze;deepfreeze;dondur;erit;bakım;
+StartupNotify=true

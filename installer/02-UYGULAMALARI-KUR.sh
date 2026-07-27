@@ -66,6 +66,9 @@ if [[ ! -s $microsip_zip ]]; then
   unzip -t "$microsip_zip.download"
   mv "$microsip_zip.download" "$microsip_zip"
 fi
+unzip -Z1 "$microsip_zip" |
+  grep -Ei '(^|/)microsip\.exe$' >/dev/null ||
+  die "MicroSIP portable arsivinde microsip.exe bulunamadi."
 printf '%s\n' "${microsip_zip##*/}" >/opt/company/microsip/CURRENT
 sha256sum "$microsip_zip" >/opt/company/microsip/SHA256SUMS
 chmod 0644 \

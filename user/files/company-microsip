@@ -3,10 +3,15 @@ set -Eeuo pipefail
 prefix="$HOME/.local/share/company-wine/microsip"
 exe="$prefix/drive_c/Program Files/MicroSIP/microsip.exe"
 [[ -f $exe ]] || {
-  printf 'MicroSIP yonetilen kurulumu bulunamadi.\n' >&2
-  exit 1
+  exe=$(
+    find "$prefix/drive_c/Program Files/MicroSIP" -maxdepth 1 \
+      -type f -iname 'microsip.exe' -print -quit 2>/dev/null || true
+  )
+  [[ -n $exe ]] || {
+    printf 'MicroSIP yonetilen kurulumu bulunamadi.\n' >&2
+    exit 1
+  }
 }
 export WINEPREFIX=$prefix
 export WINEDEBUG=-all
 exec /usr/bin/wine "$exe" "$@"
-

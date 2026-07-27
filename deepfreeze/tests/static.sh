@@ -15,6 +15,8 @@ done < <(
       -path "$PROJECT_ROOT/deepfreeze/initcpio/install-hook" -o \
       -path "$PROJECT_ROOT/deepfreeze/grub/01_cachy_auth" -o \
       -path "$PROJECT_ROOT/deepfreeze/grub/40_cachy_freeze" -o \
+      -path "$PROJECT_ROOT/app/cachy-freeze-manager" -o \
+      -path "$PROJECT_ROOT/app/cachy-freeze-manager-helper" -o \
       -path "$PROJECT_ROOT/user/files/cachy-employee-reset" -o \
       -path "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict" -o \
       -path "$PROJECT_ROOT/user/files/cachy-kurulum-oturum-kapat" -o \
@@ -45,8 +47,22 @@ grep -q 'AUTH_ADMIN_KEEP' \
   "$ROOT/../user/files/49-company-employee-auth.rules"
 grep -q 'cachy-user-template' \
   "$ROOT/../user/files/cachy-employee-reset"
+grep -q '^ColorScheme=BreezeDark$' \
+  "$PROJECT_ROOT/user/files/kdeglobals"
+grep -q '^LookAndFeelPackage=org.kde.breezedark.desktop$' \
+  "$PROJECT_ROOT/user/files/kdeglobals"
+grep -q '^name=breeze-dark$' \
+  "$PROJECT_ROOT/user/files/plasmarc"
+! grep -q 'Action Restrictions' \
+  "$PROJECT_ROOT/user/files/kdeglobals"
+grep -q 'gpasswd -d "$employee_user" wheel' \
+  "$PROJECT_ROOT/installer/03-CALISAN-KULLANICI-OLUSTUR.sh"
+grep -q 'auth_admin_keep' \
+  "$PROJECT_ROOT/app/org.cachyos.cachy-freeze.policy"
+grep -q '^Exec=/usr/bin/cachy-freeze-manager$' \
+  "$PROJECT_ROOT/app/cachy-freeze-manager.desktop"
 
-[[ $(find "$PROJECT_ROOT" -maxdepth 1 -type f -name '*.sh' | wc -l) -eq 4 ]]
+[[ $(find "$PROJECT_ROOT" -maxdepth 1 -type f -name '*.sh' | wc -l) -eq 5 ]]
 for desktop in "$PROJECT_ROOT"/user/desktop/*.desktop; do
   grep -qx '\[Desktop Entry\]' "$desktop"
   grep -q '^Type=Application$' "$desktop"
@@ -55,6 +71,10 @@ done
 
 if command -v python >/dev/null; then
   python -m json.tool "$PROJECT_ROOT/policies/chrome/managed.json" >/dev/null
+fi
+
+if command -v xmllint >/dev/null; then
+  xmllint --noout "$PROJECT_ROOT/app/org.cachyos.cachy-freeze.policy"
 fi
 
 if command -v systemd-analyze >/dev/null; then

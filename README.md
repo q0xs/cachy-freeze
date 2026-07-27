@@ -24,6 +24,10 @@ changes. It then:
 - enables microphone, speaker, headset, video, input, and realtime access;
 - requests the `localadm` administrator password for privileged desktop
   actions instead of immediately denying them;
+- gives the employee a normal Windows-standard-user-like desktop experience:
+  user settings remain available, while system changes require Polkit
+  authentication with the `localadm` password;
+- starts the employee's Plasma session with the Breeze Dark theme;
 - hides `localadm` from the graphical login screen in Frozen mode;
 - restores both the employee and `localadm` home directories from clean
   templates during every Frozen boot;
@@ -108,6 +112,21 @@ Use the top-level entry scripts. Do not run scripts under `installer/` or
 See **[KURULUM-TR.md](KURULUM-TR.md)** for the full Turkish procedure and
 expected prompts.
 
+## Standalone freeze manager
+
+To install only the reusable graphical freeze/thaw manager on a compatible
+CachyOS computer:
+
+```bash
+bash ./CACHY-FREEZE-UYGULAMASINI-KUR.sh
+```
+
+The installer detects that computer's Btrfs UUID and installs a
+Polkit-authenticated **Cachy Freeze Manager** desktop application. It does not
+embed machine-specific identifiers in the repository. The supported layout is
+UEFI + Btrfs + GRUB, with the EFI partition mounted at `/boot/efi` and no
+separate `/boot` filesystem.
+
 ## Maintenance
 
 Schedule the next boot as THAWED:
@@ -133,6 +152,8 @@ sudo reboot
 ├── ADIM-02-KURULUMU-TAMAMLA.sh
 ├── BAKIM-01-COZ.sh
 ├── BAKIM-02-DEGISIKLIKLERI-YAYINLA.sh
+├── CACHY-FREEZE-UYGULAMASINI-KUR.sh
+├── app/           # Graphical freeze/thaw manager and Polkit policy
 ├── KURULUM-TR.md  # Complete Turkish installation guide
 ├── deepfreeze/    # Btrfs, initramfs, and GRUB infrastructure
 ├── installer/     # Provisioning and publishing steps

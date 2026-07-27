@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>CachyOS Workstation</vendor>
+  <vendor_url>https://cachyos.org/</vendor_url>
+
+  <action id="org.cachyos.cachy-freeze.manage">
+    <description>Manage Cachy Freeze boot mode</description>
+    <message>Authentication is required to change the freeze mode</message>
+    <description xml:lang="tr">Cachy Freeze açılış modunu yönet</description>
+    <message xml:lang="tr">Dondurma modunu değiştirmek için kimlik doğrulaması gerekli</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/cachy-freeze/cachy-freeze-manager-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

@@ -199,13 +199,38 @@ publish() {
 set_boot_mode() {
   require_root
   local mode=$1
+  local grub_cfg=/boot/grub/grub.cfg
+  local grub_env=/boot/grub/grubenv
   [[ $mode == frozen || $mode == thawed ]] ||
     die "Geçersiz boot modu: $mode"
-  [[ -r /boot/grub/grub.cfg ]] || die "GRUB yapılandırması bulunamadı."
-  grep -q -- "--id 'cachyos-current'" /boot/grub/grub.cfg ||
+
+  # /boot her Btrfs snapshot'ının içindedir. Frozen kökten çalışırken o
+  # snapshot'ın grubenv dosyasını değiştirmek, firmware'in @ alt biriminden
+  # yüklediği GRUB'u etkilemez. Her zaman kanonik Maintenance kopyasını yaz.
+  trap unmount_top EXIT
+  mount_top
+  if [[ $(root_subvolume) != "$MAINTENANCE_SUBVOL" ]]; then
+    grub_cfg="$TOP_MOUNT/$MAINTENANCE_SUBVOL/boot/grub/grub.cfg"
+    grub_env="$TOP_MOUNT/$MAINTENANCE_SUBVOL/boot/grub/grubenv"
+  fi
+
+  [[ -r $grub_cfg ]] || die "GRUB yapılandırması bulunamadı: $grub_cfg"
+  [[ -r $grub_env ]] || die "GRUB ortam dosyası bulunamadı: $grub_env"
+  grep -q -- "--id 'cachyos-current'" "$grub_cfg" ||
     die "Tek GRUB girişi bulunamadı: cachyos-current"
-  grub-editenv /boot/grub/grubenv set "cachy_mode=$mode"
-  grub-set-default cachyos-current
+  grub-editenv "$grub_env" set \
+    "cachy_mode=$mode" \
+    "saved_entry=cachyos-current"
+
+  local written_mode written_entry
+  written_mode=$(
+    grub-editenv "$grub_env" list | sed -n 's/^cachy_mode=//p'
+  )
+  written_entry=$(
+    grub-editenv "$grub_env" list | sed -n 's/^saved_entry=//p'
+  )
+  [[ $written_mode == "$mode" && $written_entry == cachyos-current ]] ||
+    die "GRUB boot modu doğrulanamadı."
   info "Sonraki kalıcı boot modu: $mode"
 }
 
