@@ -15,42 +15,41 @@ kernel_args=$(sed -n \
   /etc/default/grub)
 
 emit_entry() {
-  local title=$1 id=$2 subvol=$3 freeze_arg=$4 kernel=$5 initramfs=$6
-  local access_arg=${7:-}
-  local initrd_line boot_subvol=$subvol
+  local kernel=$1 initramfs=$2
+  local initrd_line
   [[ -r $BOOT_DIR/$kernel && -r $BOOT_DIR/$initramfs ]] || return 0
-  initrd_line="/$boot_subvol/boot/$initramfs"
+  initrd_line="/\$cachy_subvol/boot/$initramfs"
   if [[ -r $BOOT_DIR/intel-ucode.img ]]; then
-    initrd_line="/$boot_subvol/boot/intel-ucode.img $initrd_line"
+    initrd_line="/\$cachy_subvol/boot/intel-ucode.img $initrd_line"
   elif [[ -r $BOOT_DIR/amd-ucode.img ]]; then
-    initrd_line="/$boot_subvol/boot/amd-ucode.img $initrd_line"
+    initrd_line="/\$cachy_subvol/boot/amd-ucode.img $initrd_line"
   fi
 
   cat <<EOF
-menuentry '$title' --class cachyos --class gnu-linux --class os --id '$id' $access_arg {
+if [ "\${cachy_mode}" = "thawed" ]; then
+    set cachy_title="THAWED"
+    set cachy_subvol="$MAINTENANCE_SUBVOL"
+    set cachy_freeze_arg="cachy.freeze=0"
+else
+    set cachy_title="FROZEN"
+    set cachy_subvol="$ACTIVE_SUBVOL"
+    set cachy_freeze_arg="cachy.freeze=1"
+fi
+
+menuentry "\${cachy_title}" --class cachyos --class gnu-linux --class os --id 'cachyos-current' --unrestricted {
+    if [ "\${cachy_mode}" = "thawed" ]; then
+        authenticate
+    fi
     insmod gzio
     insmod part_gpt
     insmod btrfs
     search --no-floppy --fs-uuid --set=root $root_uuid
-    linux /$boot_subvol/boot/$kernel root=UUID=$root_uuid rw rootflags=subvol=$subvol $freeze_arg $kernel_args
+    linux /\$cachy_subvol/boot/$kernel root=UUID=$root_uuid rw rootflags=subvol=\$cachy_subvol \$cachy_freeze_arg $kernel_args
     initrd $initrd_line
 }
 EOF
 }
 
 emit_entry \
-  'CachyOS Kurumsal - Frozen' \
-  'cachyos-frozen' \
-  "$ACTIVE_SUBVOL" \
-  'cachy.freeze=1' \
-  'vmlinuz-linux-cachyos' \
-  'initramfs-linux-cachyos.img' \
-  '--unrestricted'
-
-emit_entry \
-  'CachyOS Kurumsal - Maintenance' \
-  'cachyos-maintenance' \
-  "$MAINTENANCE_SUBVOL" \
-  'cachy.freeze=0' \
   'vmlinuz-linux-cachyos' \
   'initramfs-linux-cachyos.img'

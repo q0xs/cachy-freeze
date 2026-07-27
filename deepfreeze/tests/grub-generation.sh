@@ -26,27 +26,30 @@ CACHY_FREEZE_CONFIG="$ROOT/etc/cachy-freeze.conf" \
   CACHY_FREEZE_BOOT_DIR="$BOOT_DIR" \
   "$ROOT/grub/40_cachy_freeze" >"$OUTPUT"
 
-for id in \
-  cachyos-frozen \
-  cachyos-maintenance; do
-  grep -q -- "--id '$id'" "$OUTPUT" || fail "GRUB girişi eksik: $id"
-done
-
-[[ $(grep -c '^menuentry ' "$OUTPUT") -eq 2 ]] ||
-  fail "Tam olarak iki kurumsal GRUB girişi üretilmedi."
-grep -q 'rootflags=subvol=@active cachy.freeze=1' "$OUTPUT" ||
-  fail "Frozen kök parametresi yanlış."
-grep -q 'linux /@active/boot/vmlinuz-linux-cachyos ' "$OUTPUT" ||
-  fail "Frozen kernel active alt biriminden yüklenmiyor."
-grep -q "menuentry 'CachyOS Kurumsal - Frozen'.*--unrestricted" "$OUTPUT" ||
-  fail "Frozen girişi parolasız değil."
-grep -q 'rootflags=subvol=@ cachy.freeze=0' "$OUTPUT" ||
-  fail "Maintenance kök parametresi yanlış."
-grep -q 'linux /@/boot/vmlinuz-linux-cachyos ' "$OUTPUT" ||
-  fail "Maintenance kernel @ alt biriminden yüklenmiyor."
-if grep -q "menuentry 'CachyOS Kurumsal - Maintenance'.*--unrestricted" "$OUTPUT"; then
-  fail "Maintenance girişi yanlışlıkla parolasız."
-fi
+grep -q -- "--id 'cachyos-current'" "$OUTPUT" ||
+  fail "Tek GRUB girişi eksik."
+[[ $(grep -c '^menuentry ' "$OUTPUT") -eq 1 ]] ||
+  fail "Tam olarak bir kurumsal GRUB girişi üretilmedi."
+grep -q 'set cachy_title="FROZEN"' "$OUTPUT" ||
+  fail "Frozen başlığı eksik."
+grep -q 'set cachy_title="THAWED"' "$OUTPUT" ||
+  fail "Thawed başlığı eksik."
+grep -q 'set cachy_subvol="@active"' "$OUTPUT" ||
+  fail "Frozen kök seçimi yanlış."
+grep -q 'set cachy_subvol="@"' "$OUTPUT" ||
+  fail "Thawed kök seçimi yanlış."
+grep -q 'set cachy_freeze_arg="cachy.freeze=1"' "$OUTPUT" ||
+  fail "Frozen kernel parametresi yanlış."
+grep -q 'set cachy_freeze_arg="cachy.freeze=0"' "$OUTPUT" ||
+  fail "Thawed kernel parametresi yanlış."
+grep -Fq 'linux /$cachy_subvol/boot/vmlinuz-linux-cachyos ' "$OUTPUT" ||
+  fail "Kernel dinamik alt birimden yüklenmiyor."
+grep -Fq 'if [ "${cachy_mode}" = "thawed" ]; then' "$OUTPUT" ||
+  fail "Thawed yetkilendirme koşulu eksik."
+grep -q '^[[:space:]]*authenticate$' "$OUTPUT" ||
+  fail "Thawed GRUB parola denetimi eksik."
+grep -q "^menuentry .*--unrestricted" "$OUTPUT" ||
+  fail "Frozen girişinin parolasız seçimi eksik."
 
 grub-script-check "$OUTPUT"
 printf '%s\n' "GRUB üretim ve sözdizimi testi başarılı."

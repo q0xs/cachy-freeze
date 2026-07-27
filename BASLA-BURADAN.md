@@ -59,9 +59,10 @@ Bu adım internetten sistem güncellemelerini ve uygulamaları kurar. Ardından
 
 Parola yazılırken ekranda görünmez. Çalışan hesabı yönetici olmaz fakat Chrome,
 Slack, AnyDesk, LibreOffice, MicroSIP ve Zoiper'i normal şekilde açabilir.
-Frozen modda `localadm` oturum ekranında görünmez ve bu hesapla oturum
-açılamaz. Yönetici onayı gereken bir işlem olursa mevcut `localadm` parolası
-kullanılabilir. Maintenance modda `localadm` normal tam yetkili hesabıdır.
+Frozen modda `localadm` grafik oturum ekranında görünmez. Yönetici onayı
+gereken masaüstü işlemleri “yetkisiz” diye kapanmak yerine mevcut `localadm`
+parolasını ister. Çalışan ve `localadm` ev dizinleri her Frozen açılışta temiz
+şablonlarına döner. THAWED modda `localadm` normal tam yetkili hesabıdır.
 
 ## 4. Bilgisayarı yeniden başlatmadan uygulamaları kontrol et
 
@@ -73,7 +74,9 @@ Ana kurulum bitince sistem Maintenance modunda kalır. Çalışan hesabına geç
 - AnyDesk açılıyor.
 - LibreOffice açılıyor.
 - MicroSIP ve Zoiper açılıyor.
-- Çalışan hesabı `sudo` kullanamıyor.
+- Mikrofon, hoparlör ve kulaklık giriş/çıkışları çalışıyor.
+- Ayrıcalıklı bir masaüstü işlemi `localadm` parolasını soruyor.
+- Çalışan hesabı doğrudan `sudo` grubunda bulunmuyor.
 
 Bir sorun varsa henüz dondurma yapma.
 
@@ -92,15 +95,16 @@ bash ./ADIM-02-KURULUMU-TAMAMLA.sh
 Dosya önce onay ister; ardından GRUB parolasını ayarlar, çalışan hesabında test
 edilen ayarları sıfırlama şablonuna aktarır, Golden'ı yayınlar ve sonraki açılışı
 Frozen yapar. GRUB kullanıcı adı `cachyadmin` olur. Belirlediğin parolayı güvenli
-bir yerde sakla. Frozen girişi parola istemez; Maintenance girişi kullanıcı
-adı/parola ister. İşlem bitince `sudo reboot` komutunu elle çalıştır.
+bir yerde sakla. GRUB moda göre tek bir **FROZEN** veya **THAWED** girişi
+gösterir. FROZEN parola istemez; THAWED kullanıcı adı/parola ister. İşlem
+bitince `sudo reboot` komutunu elle çalıştır.
 
 GRUB'da Frozen açılmalı. Çalışan hesabında küçük bir deneme dosyası oluştur,
 yeniden başlat ve dosyanın silindiğini doğrula.
 
 ## Sonradan bakım yapmak
 
-GRUB'dan Maintenance seçip `cachyadmin` ve GRUB parolasıyla açabilirsin.
+GRUB'dan THAWED seçip `cachyadmin` ve GRUB parolasıyla açabilirsin.
 Güncelleme veya ayar değişikliğinden sonra:
 
 ```bash

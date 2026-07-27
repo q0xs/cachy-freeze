@@ -41,6 +41,10 @@ grep -q 'ConditionKernelCommandLine=cachy.freeze=1' \
 grep -q 'ConditionKernelCommandLine=cachy.freeze=1' \
   "$ROOT/../user/files/cachy-frozen-admin-restrict.service"
 grep -q 'ensure_boot_layout' "$ROOT/bin/cachy-freeze"
+grep -q 'AUTH_ADMIN_KEEP' \
+  "$ROOT/../user/files/49-company-employee-auth.rules"
+grep -q 'cachy-user-template' \
+  "$ROOT/../user/files/cachy-employee-reset"
 
 [[ $(find "$PROJECT_ROOT" -maxdepth 1 -type f -name '*.sh' | wc -l) -eq 4 ]]
 for desktop in "$PROJECT_ROOT"/user/desktop/*.desktop; do
