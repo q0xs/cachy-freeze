@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 readonly INSTALLER_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+readonly PROJECT_ROOT=$(cd -- "$INSTALLER_DIR/.." && pwd)
 # shellcheck source=lib/common.sh
 source "$INSTALLER_DIR/lib/common.sh"
 
@@ -11,7 +12,10 @@ require_maintenance
 readonly CONFIG=/etc/cachy-employee.conf
 readonly ADMIN_CONFIG=/etc/cachy-frozen-admin.conf
 [[ -r $CONFIG ]] || die "Calisan yapilandirmasi bulunamadi."
-[[ -r $ADMIN_CONFIG ]] || die "Yonetici yapilandirmasi bulunamadi."
+if [[ ! -r $ADMIN_CONFIG ]]; then
+  printf '%s\n' 'ADMIN_USER=localadm' >"$ADMIN_CONFIG"
+  chmod 0600 "$ADMIN_CONFIG"
+fi
 # Dosya root tarafindan olusturulur ve yalnizca root yazabilir.
 # shellcheck disable=SC1090
 source "$CONFIG"
@@ -26,6 +30,33 @@ id "$EMPLOYEE_USER" >/dev/null 2>&1 ||
   die "Calisan hesabi bulunamadi: $EMPLOYEE_USER"
 id "$ADMIN_USER" >/dev/null 2>&1 ||
   die "Yonetici hesabi bulunamadi: $ADMIN_USER"
+
+# Eski kurulumlari yeni iki-kullanici reset ve yetkilendirme duzenine tasir.
+install -m 0755 \
+  "$PROJECT_ROOT/user/files/cachy-employee-reset" \
+  /usr/local/sbin/cachy-employee-reset
+install -m 0644 \
+  "$PROJECT_ROOT/user/files/cachy-employee-reset.service" \
+  /etc/systemd/system/cachy-employee-reset.service
+install -m 0755 \
+  "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict" \
+  /usr/local/sbin/cachy-frozen-admin-restrict
+install -m 0644 \
+  "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict.service" \
+  /etc/systemd/system/cachy-frozen-admin-restrict.service
+
+install -d -m 0755 /etc/polkit-1/rules.d
+sed "s/__EMPLOYEE_USER__/$EMPLOYEE_USER/g" \
+  "$PROJECT_ROOT/user/files/49-company-employee-auth.rules" \
+  >/etc/polkit-1/rules.d/49-company-employee-auth.rules
+chown root:root /etc/polkit-1/rules.d/49-company-employee-auth.rules
+chmod 0644 /etc/polkit-1/rules.d/49-company-employee-auth.rules
+
+# Eski Frozen servisinin nologin degisikligi Golden'a tasinmasin.
+usermod --shell /bin/bash "$ADMIN_USER"
+systemctl daemon-reload
+systemctl enable cachy-employee-reset.service
+systemctl enable cachy-frozen-admin-restrict.service
 
 # Kopya alinirken kullanici sureclerinin dosya degistirmesini engelle.
 loginctl terminate-user "$EMPLOYEE_USER" 2>/dev/null || true
