@@ -24,11 +24,12 @@ Frozen/Maintenance açılış düzenini kurar.
 
 | Mod | Amaç | Yeniden başlatma sonrası |
 | --- | --- | --- |
-| **Maintenance** | Kalıcı bakım, güncelleme ve yapılandırma | Değişiklikler korunur |
+| **THAWED (Maintenance)** | Kalıcı bakım, güncelleme ve yapılandırma | Değişiklikler korunur |
 | **Golden** | Frozen sistemin yayımlanmış ana şablonu | Doğrudan kullanılmaz |
 | **Frozen** | Çalışanın günlük, sıfırlanan sistemi | Yerel değişiklikler silinir |
 
-Frozen sistem her açılışta Golden snapshot'tan yeniden oluşturulur. Maintenance
+Frozen sistem her açılışta Golden snapshot'tan yeniden oluşturulur. Yönetilen
+çalışan ve `localadm` ev dizinleri de temiz şablonlarına döndürülür. Maintenance
 modunda yapılan bir değişiklik kendiliğinden Frozen'a geçmez; bakım sonunda
 `BAKIM-02-DEGISIKLIKLERI-YAYINLA.sh` çalıştırılmalıdır.
 
@@ -72,8 +73,8 @@ Normal kullanımda yalnızca aşağıdaki dört giriş betiği çalıştırılı
    bash ./ADIM-01-KURULUMU-BASLAT.sh
    ```
 
-2. Çalışan hesabında uygulamaları, ses/kamera erişimini ve `sudo` kısıtını test
-   et.
+2. Çalışan hesabında uygulamaları ve ses/kamera erişimini test et. Ayrıcalıklı
+   bir masaüstü işleminin `localadm` parolasını sorduğunu doğrula.
 
 3. Kurulumu tamamla ve Golden sistemi yayımla:
 
@@ -106,8 +107,9 @@ bash ./BAKIM-02-DEGISIKLIKLERI-YAYINLA.sh
 sudo reboot
 ```
 
-GRUB Maintenance girişi `cachyadmin` kullanıcısını ve kurulum sırasında
-belirlenen GRUB parolasını ister. Frozen girişi parola istemez.
+GRUB moda göre yalnızca tek giriş gösterir: **FROZEN** veya **THAWED**.
+FROZEN parola istemez. THAWED seçildiğinde `cachyadmin` kullanıcısı ve kurulum
+sırasında belirlenen GRUB parolası istenir.
 
 ## Proje yapısı
 

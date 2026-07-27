@@ -84,11 +84,12 @@ unset employee_password employee_password_again
 gpasswd -d "$employee_user" wheel 2>/dev/null || true
 gpasswd -d "$employee_user" sudo 2>/dev/null || true
 employee_groups=()
-for group in audio video input; do
+for group in audio video input realtime; do
   getent group "$group" >/dev/null && employee_groups+=("$group")
 done
 ((${#employee_groups[@]} > 0)) &&
-  usermod -G "$(IFS=,; printf '%s' "${employee_groups[*]}")" "$employee_user"
+  usermod --append --groups \
+    "$(IFS=,; printf '%s' "${employee_groups[*]}")" "$employee_user"
 
 home=$(getent passwd "$employee_user" | cut -d: -f6)
 install -d -o "$employee_user" -g "$employee_user" -m 0755 \
@@ -146,10 +147,14 @@ install -m 0644 \
   "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict.service" \
   /etc/systemd/system/cachy-frozen-admin-restrict.service
 
-# Standart kullanici zaten wheel/sudo grubunda degil. Tum Polkit
-# eylemlerini kosulsuz reddetmek; ag, oturum ve masaustu servisleri gibi
-# normal kullanici islemlerini de bozar. Eski kurulumdan kaldiysa kaldir.
-rm -f /etc/polkit-1/rules.d/49-company-employee.rules
+# Calisan wheel/sudo grubunda kalmaz. Masaustundeki ayricalikli islemler
+# "yetkisiz" diye kapanmak yerine yerel yonetici parolasini ister.
+install -d -m 0755 /etc/polkit-1/rules.d
+sed "s/__EMPLOYEE_USER__/$employee_user/g" \
+  "$PROJECT_ROOT/user/files/49-company-employee-auth.rules" \
+  >/etc/polkit-1/rules.d/49-company-employee-auth.rules
+chown root:root /etc/polkit-1/rules.d/49-company-employee-auth.rules
+chmod 0644 /etc/polkit-1/rules.d/49-company-employee-auth.rules
 
 cat >/etc/cachy-employee.conf <<EOF
 EMPLOYEE_USER=$employee_user
@@ -161,9 +166,15 @@ ADMIN_USER=$ADMIN_USER
 EOF
 chmod 0600 /etc/cachy-frozen-admin.conf
 
-rm -rf --one-file-system "/var/lib/cachy-employee-template/$employee_user"
-install -d -m 0700 /var/lib/cachy-employee-template
-cp -a "$home" "/var/lib/cachy-employee-template/$employee_user"
+template_root=/var/lib/cachy-user-template
+rm -rf --one-file-system "$template_root/$employee_user" \
+  "$template_root/$ADMIN_USER"
+install -d -m 0700 "$template_root"
+cp -a "$home" "$template_root/$employee_user"
+admin_home=$(getent passwd "$ADMIN_USER" | cut -d: -f6)
+[[ -n $admin_home && -d $admin_home ]] ||
+  die "Yonetici ev dizini bulunamadi."
+cp -a "$admin_home" "$template_root/$ADMIN_USER"
 systemctl daemon-reload
 systemctl enable cachy-employee-reset.service
 systemctl enable cachy-frozen-admin-restrict.service
@@ -178,6 +189,7 @@ fi
 
 printf '%s\n' \
   "Calisan hesabi hazir: $employee_user ($employee_full_name)" \
-  "$ADMIN_USER yalnizca Maintenance oturumunda kullanilacak." \
-  "Frozen modda yonetici isteyen islemler $ADMIN_USER parolasini sorabilir." \
+  "$ADMIN_USER Frozen grafik giris ekraninda gizlenecek." \
+  "Frozen modda tum yonetilen hesaplar temiz sablonlarina doner." \
+  "Ayricalikli masaustu islemleri $ADMIN_USER parolasini sorar." \
   "Parola kurulum sirasinda sizin girdiginiz parola olarak ayarlandi."

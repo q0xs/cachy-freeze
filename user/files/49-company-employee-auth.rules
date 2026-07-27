@@ -1,0 +1,7 @@
+// Installed after replacing __EMPLOYEE_USER__ with the managed account name.
+polkit.addRule(function(action, subject) {
+    if (subject.user == "__EMPLOYEE_USER__" &&
+        subject.local && subject.active) {
+        return polkit.Result.AUTH_ADMIN_KEEP;
+    }
+});

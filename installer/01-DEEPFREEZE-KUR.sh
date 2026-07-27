@@ -80,7 +80,7 @@ else
   printf '%s\n' 'GRUB_SAVEDEFAULT=false' >>/etc/default/grub
 fi
 
-# Yalnızca iki kurumsal girişi göster. Diğer üreticiler silinmez; çalıştırma
+# Yalnızca tek kurumsal girişi göster. Diğer üreticiler silinmez; çalıştırma
 # izinleri kapatılır ve yukarıdaki kurulum yedeğinde özgün halleri korunur.
 for generator in /etc/grub.d/*; do
   [[ -f $generator ]] || continue
@@ -102,17 +102,15 @@ for image in /boot/initramfs-linux-cachyos.img /boot/initramfs-linux-cachyos-lts
   lsinitcpio "$image" | grep -qx 'usr/lib/cachy-freeze/cachy-freeze-reset' ||
     die "Reset programi initramfs icinde yok: $image"
 done
-for entry in cachyos-frozen cachyos-maintenance; do
-  grep -q -- "--id '$entry'" /boot/grub/grub.cfg ||
-    die "GRUB girisi eksik: $entry"
-done
-[[ $(grep -c '^menuentry ' /boot/grub/grub.cfg) -eq 2 ]] ||
-  die "GRUB menusunde iki disinda giris bulundu."
+grep -q -- "--id 'cachyos-current'" /boot/grub/grub.cfg ||
+  die "Tek GRUB girisi eksik: cachyos-current"
+[[ $(grep -c '^menuentry ' /boot/grub/grub.cfg) -eq 1 ]] ||
+  die "GRUB menusunde bir disinda giris bulundu."
 
 /usr/local/sbin/cachy-freeze thaw
 
 printf '%s\n' \
   "Deep Freeze kuruldu ve test edildi." \
-  "Guvenli varsayilan: Maintenance." \
+  "Guvenli varsayilan: THAWED (Maintenance)." \
   "Golden henuz yayinlanmadi; 06-GOLDEN-YAYINLA.sh calistirilmali." \
   "Frozen moda gecmek icin 04-DONDUR.sh dosyasini ayrica calistir."

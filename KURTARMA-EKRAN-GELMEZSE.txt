@@ -9,14 +9,14 @@ UUID'ler degisecegi icin eski UUID kullanmak tehlikelidir.
 
 GRUB parolanla su girisi sec:
 
-  CachyOS Kurumsal - Maintenance
+  THAWED
 
 2. SIYAH EKRAN VAR AMA TTY ACILIYORSA
 --------------------------------------
 
 Ctrl+Alt+F3 tuslarina bas. Yonetici hesabinla giris yap:
 
-  sudo grub-set-default cachyos-maintenance
+  sudo /usr/local/sbin/cachy-freeze thaw
   sudo reboot
 
 3. GRUB GELMIYORSA
@@ -36,5 +36,5 @@ destek al ve bu USB klasorunu goster.
 - @, @golden veya @active Btrfs alt birimlerini silme.
 - Diski yeniden formatlama.
 - btrfs check --repair calistirma.
-- Maintenance girisiyle acmayi dene.
+- THAWED girisiyle acmayi dene.
 - Btrfs snapshot tek basina disk yedegi degildir.

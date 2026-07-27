@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly CONFIG=/etc/cachy-employee.conf
-[[ -r $CONFIG ]] || exit 0
+readonly EMPLOYEE_CONFIG=/etc/cachy-employee.conf
+readonly ADMIN_CONFIG=/etc/cachy-frozen-admin.conf
+readonly TEMPLATE_ROOT=/var/lib/cachy-user-template
+
+[[ -r $EMPLOYEE_CONFIG && -r $ADMIN_CONFIG ]] || exit 0
 # shellcheck disable=SC1090
-source "$CONFIG"
+source "$EMPLOYEE_CONFIG"
+# shellcheck disable=SC1090
+source "$ADMIN_CONFIG"
 
 [[ $EMPLOYEE_USER =~ ^[a-z][a-z0-9_-]{1,31}$ ]] || exit 1
-template="/var/lib/cachy-employee-template/$EMPLOYEE_USER"
-home=$(getent passwd "$EMPLOYEE_USER" | cut -d: -f6)
-[[ -d $template && -n $home && -d $home ]] || exit 1
+[[ $ADMIN_USER =~ ^[a-z][a-z0-9_-]{1,31}$ ]] || exit 1
 
-rsync -aHAX --delete "$template/" "$home/"
-chown -R "$EMPLOYEE_USER:$EMPLOYEE_USER" "$home"
-
+for user in "$ADMIN_USER" "$EMPLOYEE_USER"; do
+  template="$TEMPLATE_ROOT/$user"
+  home=$(getent passwd "$user" | cut -d: -f6)
+  [[ -d $template && -n $home && -d $home ]] || exit 1
+  rsync -aHAX --delete "$template/" "$home/"
+  chown -R "$user:$user" "$home"
+done

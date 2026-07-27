@@ -37,18 +37,16 @@ grep -q "^set superusers=\"$AUTH_USER\"$" /boot/grub/grub.cfg ||
   die "GRUB kullanicisi yapilandirmaya eklenemedi."
 grep -q "^password_pbkdf2 $AUTH_USER " /boot/grub/grub.cfg ||
   die "GRUB parola ozeti yapilandirmaya eklenemedi."
-grep -q "menuentry 'CachyOS Kurumsal - Frozen'.*--unrestricted" \
+grep -q "menuentry .*--id 'cachyos-current'.*--unrestricted" \
   /boot/grub/grub.cfg ||
-  die "Frozen girisi parolasiz olarak isaretlenemedi."
-maintenance_line=$(grep "menuentry 'CachyOS Kurumsal - Maintenance'" \
-  /boot/grub/grub.cfg || true)
-[[ -n $maintenance_line ]] || die "Maintenance GRUB girisi bulunamadi."
-[[ $maintenance_line != *--unrestricted* ]] ||
-  die "Maintenance girisi yanlislikla parolasiz birakildi."
-[[ $(grep -c '^menuentry ' /boot/grub/grub.cfg) -eq 2 ]] ||
-  die "GRUB menusunde Frozen ve Maintenance disinda giris bulundu."
+  die "Tek GRUB girisi bulunamadi."
+grep -q '^[[:space:]]*authenticate$' /boot/grub/grub.cfg ||
+  die "THAWED parola denetimi GRUB yapilandirmasina eklenemedi."
+[[ $(grep -c '^menuentry ' /boot/grub/grub.cfg) -eq 1 ]] ||
+  die "GRUB menusunde birden fazla giris bulundu."
 
 printf '%s\n' \
   "GRUB Maintenance korumasi etkinlestirildi." \
   "Kullanici adi: $AUTH_USER" \
-  "Frozen parolasiz; Maintenance ve diger yonetim girisleri sifrelidir."
+  "Menu moda gore FROZEN veya THAWED olarak tek giris gosterir." \
+  "FROZEN parolasiz; THAWED girisi GRUB parolasiyla korunur."
