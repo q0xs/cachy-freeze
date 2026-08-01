@@ -31,16 +31,18 @@ application.quit()
 PY
 
 set +e
+launcher_log="$TEST_ROOT/setup-launcher.log"
 QT_QPA_PLATFORM=offscreen \
 XDG_CONFIG_HOME="$TEST_ROOT/config-launcher" \
 PYTHONPATH="$PROJECT_ROOT/src:$PROJECT_ROOT/app" \
   timeout 2s python -s -m cachy_freeze_gui.main \
-    --setup-source "$PROJECT_ROOT" >/dev/null 2>&1
+    --setup-source "$PROJECT_ROOT" >"$launcher_log" 2>&1
 launcher_rc=$?
 set -e
 [[ $launcher_rc -eq 124 ]] || {
   printf 'Kurulum baslaticisi olay dongusunde kalmadi (kod: %s).\n' \
     "$launcher_rc" >&2
+  sed -n '1,120p' "$launcher_log" >&2
   exit 1
 }
 
