@@ -1,0 +1,9 @@
+[Unit]
+Description=Evaluate the Cachy Freeze automatic snapshot policy
+After=var-lib-cachy\x2dfreeze.mount
+RequiresMountsFor=/var/lib/cachy-freeze
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cachy-freeze auto-snapshot
+TimeoutStartSec=10min

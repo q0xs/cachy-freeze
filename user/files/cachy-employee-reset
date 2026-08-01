@@ -1,23 +1,38 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly EMPLOYEE_CONFIG=/etc/cachy-employee.conf
-readonly ADMIN_CONFIG=/etc/cachy-frozen-admin.conf
-readonly TEMPLATE_ROOT=/var/lib/cachy-user-template
+readonly TEMPLATE_ROOT=${CACHY_USER_TEMPLATE_ROOT:-/var/lib/cachy-user-template}
 
-[[ -r $EMPLOYEE_CONFIG && -r $ADMIN_CONFIG ]] || exit 0
-# shellcheck disable=SC1090
-source "$EMPLOYEE_CONFIG"
-# shellcheck disable=SC1090
-source "$ADMIN_CONFIG"
+[[ -d $TEMPLATE_ROOT ]] || exit 0
 
-[[ $EMPLOYEE_USER =~ ^[a-z][a-z0-9_-]{1,31}$ ]] || exit 1
-[[ $ADMIN_USER =~ ^[a-z][a-z0-9_-]{1,31}$ ]] || exit 1
+for candidate in "$TEMPLATE_ROOT"/*.next; do
+  [[ -d $candidate ]] || continue
+  username=${candidate##*/}
+  username=${username%.next}
+  [[ $username =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || continue
+  if [[ ! -e $TEMPLATE_ROOT/$username ]]; then
+    mv "$candidate" "$TEMPLATE_ROOT/$username"
+  else
+    rm -rf --one-file-system "$candidate"
+  fi
+done
 
-for user in "$ADMIN_USER" "$EMPLOYEE_USER"; do
-  template="$TEMPLATE_ROOT/$user"
-  home=$(getent passwd "$user" | cut -d: -f6)
-  [[ -d $template && -n $home && -d $home ]] || exit 1
+for previous in "$TEMPLATE_ROOT"/*.previous; do
+  [[ -d $previous ]] || continue
+  username=${previous##*/}
+  username=${username%.previous}
+  [[ $username =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || continue
+  if [[ ! -e $TEMPLATE_ROOT/$username ]]; then
+    mv "$previous" "$TEMPLATE_ROOT/$username"
+  fi
+done
+
+for template in "$TEMPLATE_ROOT"/*; do
+  [[ -d $template ]] || continue
+  username=${template##*/}
+  [[ $username =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || continue
+  home=$(getent passwd "$username" | cut -d: -f6)
+  [[ -n $home && -d $home ]] || continue
   rsync -aHAX --delete "$template/" "$home/"
-  chown -R "$user:$user" "$home"
+  chown -R "$username:$username" "$home"
 done

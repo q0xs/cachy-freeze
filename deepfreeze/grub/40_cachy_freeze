@@ -26,7 +26,12 @@ emit_entry() {
   fi
 
   cat <<EOF
-if [ "\${cachy_mode}" = "thawed" ]; then
+if [ "\${cachy_once}" = "thawed" ]; then
+    set cachy_effective_mode="thawed"
+else
+    set cachy_effective_mode="\${cachy_mode}"
+fi
+if [ "\${cachy_effective_mode}" = "thawed" ]; then
     set cachy_title="THAWED"
     set cachy_subvol="$MAINTENANCE_SUBVOL"
     set cachy_freeze_arg="cachy.freeze=0"
@@ -37,7 +42,7 @@ else
 fi
 
 menuentry "\${cachy_title}" --class cachyos --class gnu-linux --class os --id 'cachyos-current' --unrestricted {
-    if [ "\${cachy_mode}" = "thawed" ]; then
+    if [ "\${cachy_effective_mode}" = "thawed" ]; then
         authenticate
     fi
     insmod gzio

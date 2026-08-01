@@ -43,9 +43,16 @@ cat >"$INSTALLED_CONFIG" <<EOF
 ROOT_UUID=$(findmnt -n -o UUID /)
 MAINTENANCE_SUBVOL=@
 GOLDEN_SUBVOL=@golden
+GOLDEN_PREVIOUS_SUBVOL=@golden.previous
+GOLDEN_NEXT_SUBVOL=@golden.next
+GOLDEN_PENDING_SUBVOL=@golden.previous.pending
+FAILED_GOLDEN_SUBVOL=@golden.failed
 ACTIVE_SUBVOL=@active
 PREVIOUS_SUBVOL=@active.previous
 NEXT_SUBVOL=@active.next
+ACTIVE_PENDING_SUBVOL=@active.previous.pending
+STATE_SUBVOL=@cachy-state
+BOOT_FAILURE_LIMIT=3
 EOF
 chmod 0600 "$INSTALLED_CONFIG"
 

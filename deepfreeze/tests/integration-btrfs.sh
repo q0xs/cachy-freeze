@@ -44,6 +44,7 @@ mkdir -p "$TOP"
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 
 btrfs subvolume create "$TOP/@maintenance" >/dev/null
+btrfs subvolume create "$TOP/@cachy-state" >/dev/null
 printf '%s\n' golden-v1 >"$TOP/@maintenance/version"
 btrfs subvolume snapshot -r "$TOP/@maintenance" "$TOP/@golden" >/dev/null
 umount "$TOP"
@@ -53,15 +54,23 @@ ROOT_UUID=test-only
 ROOT_DEVICE=$LOOP_DEVICE
 MAINTENANCE_SUBVOL=@maintenance
 GOLDEN_SUBVOL=@golden
+GOLDEN_PREVIOUS_SUBVOL=@golden.previous
+GOLDEN_NEXT_SUBVOL=@golden.next
+GOLDEN_PENDING_SUBVOL=@golden.previous.pending
+FAILED_GOLDEN_SUBVOL=@golden.failed
 ACTIVE_SUBVOL=@active
 PREVIOUS_SUBVOL=@active.previous
 NEXT_SUBVOL=@active.next
+ACTIVE_PENDING_SUBVOL=@active.previous.pending
+STATE_SUBVOL=@cachy-state
+BOOT_FAILURE_LIMIT=3
 EOF
 
 # First frozen boot.
 run_reset
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 assert_file "$TOP/@active/version"
+printf '0\n' >"$TOP/@cachy-state/boot-attempts"
 printf '%s\n' user-change >"$TOP/@active/unwanted"
 umount "$TOP"
 
@@ -70,6 +79,30 @@ run_reset
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 [[ ! -e $TOP/@active/unwanted ]] || fail "Kullanıcı değişikliği sıfırlanmadı."
 assert_file "$TOP/@active/version"
+
+printf '0\n' >"$TOP/@cachy-state/boot-attempts"
+
+# Simulate a power loss after Golden moved aside but before the candidate was
+# promoted. At initramfs time, subvolume names must be enough for recovery.
+printf '%s\n' golden-v2 >"$TOP/@maintenance/version"
+btrfs subvolume snapshot -r "$TOP/@maintenance" "$TOP/@golden.next" >/dev/null
+mv "$TOP/@golden" "$TOP/@golden.previous.pending"
+printf '%s\n' '{"schema":1,"kind":"publish","phase":"prepared"}' \
+  >"$TOP/@cachy-state/transaction.json"
+umount "$TOP"
+
+run_reset
+mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
+[[ $(<"$TOP/@active/version") == golden-v2 ]] ||
+  fail "Power-loss recovery did not publish the Golden candidate."
+printf '0\n' >"$TOP/@cachy-state/boot-attempts"
+[[ ! -e $TOP/@cachy-state/transaction.json ]] ||
+  fail "Initramfs recovered transaction journal is still active."
+[[ -s $TOP/@cachy-state/transaction.initramfs-recovered.json ]] ||
+  fail "Recovered transaction journal was not preserved for diagnostics."
+for transient in @golden.next @golden.previous.pending @active.next @active.previous.pending; do
+  [[ ! -e $TOP/$transient ]] || fail "Transient subvolume was not cleaned: $transient"
+done
 
 # Simulate a power loss between active->previous and next->active.
 btrfs subvolume delete "$TOP/@active.previous" >/dev/null
@@ -80,7 +113,20 @@ umount "$TOP"
 run_reset
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 assert_file "$TOP/@active/version"
-[[ $(<"$TOP/@active/version") == golden-v1 ]] ||
+[[ $(<"$TOP/@active/version") == golden-v2 ]] ||
   fail "Kurtarılan active yanlış golden sürümünde."
+
+# Three consecutive unconfirmed boots automatically restore the previous
+# known-good Golden before the root filesystem is mounted.
+printf '2\n' >"$TOP/@cachy-state/boot-attempts"
+umount "$TOP"
+run_reset
+mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
+[[ $(<"$TOP/@active/version") == golden-v1 ]] ||
+  fail "Automatic failed-boot rollback did not restore the previous Golden."
+[[ $(<"$TOP/@golden.failed/version") == golden-v2 ]] ||
+  fail "Failed Golden was not preserved for diagnostics."
+[[ $(<"$TOP/@cachy-state/recovery-event") == automatic-rollback ]] ||
+  fail "Automatic recovery event was not persisted."
 
 printf '%s\n' "Btrfs entegrasyon testleri başarılı."
