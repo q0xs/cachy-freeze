@@ -68,6 +68,9 @@ repo klonundan başlayacaksan VM durumunu fiziksel sisteme taşınmış varsayma
 7. README içindeki kullanıcıya yönelik kabuk kurulum yolu kaldırıldı. Desteklenen
    kurulum girişi yalnızca `CachyOS-Kurulum-Uygulamasi.desktop` ve uygulamanın
    **Kurulum** sayfasıdır.
+8. GitHub Ubuntu runner'ında PyQt6 için `libEGL.so.1` eksikliği yakalandı.
+   Workflow'a `libegl1` sistem paketi eklendi ve GUI testinin taşınabilirliği
+   düzeltildi.
 
 Gerçek VM’de doğrulanan paketler:
 
