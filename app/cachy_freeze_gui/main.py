@@ -33,3 +33,7 @@ def main() -> int:
     if arguments.setup_source is not None:
         window.open_setup_page()
     return application.exec()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

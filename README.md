@@ -9,10 +9,16 @@ every reboot.
 > For the complete installation procedure in Turkish, read
 > **[KURULUM-TR.md](KURULUM-TR.md)**.
 
+> [!TIP]
+> Codex CLI should start the physical CachyOS acceptance from
+> **[CODEX-CLI-DEVAM-TALIMATI.md](CODEX-CLI-DEVAM-TALIMATI.md)**. It records the
+> verified VirtualBox checkpoint, remaining tests, safety gates, and exact
+> continuation order.
+
 > [!CAUTION]
-> These scripts modify the boot chain, initramfs, GRUB configuration, and Btrfs
-> subvolumes. Perform the first installation on a backed-up pilot device while
-> you have physical access to it.
+> The application modifies the boot chain, initramfs, GRUB configuration, and
+> Btrfs subvolumes. Perform the first installation on a backed-up pilot device
+> while you have physical access to it.
 
 ## Overview
 
@@ -66,10 +72,10 @@ instead of redesigning the project:
 3. Before installation, make a recoverable backup and confirm **UEFI + Btrfs +
    GRUB**, `/boot/efi`, and no separate `/boot`. Stop if preflight rejects the
    layout; do not bypass it.
-4. Start `CachyOS-Kurulum-Uygulamasi.desktop` for normal deployment and keep
-   the entire preflight/provision/test/finalize flow in its **Kurulum** page.
-   Numbered scripts are compatibility and recovery entry points only.
-5. Test all six GUI pages, both `localadm` and a standard user, FROZEN/THAWED
+4. Start `CachyOS-Kurulum-Uygulamasi.desktop` and keep the entire
+   preflight/provision/test/finalize flow in its **Kurulum** page. This desktop
+   launcher is the only supported user-facing installation entry point.
+5. Test all seven GUI pages, both `localadm` and a standard user, FROZEN/THAWED
    and one-time THAWED boots, snapshot create/full verify/rollback, updates,
    autologin, home reset, audio devices, and a real MicroSIP call.
 6. Exercise unexpected shutdown and boot rollback only after a healthy Golden
@@ -96,8 +102,7 @@ FROZEN boots without a GRUB password. THAWED requires the `cachyadmin` GRUB
 user and the password configured during installation.
 
 Changes made in THAWED mode do not automatically become the new Frozen
-baseline. Publish them with **Golden yayınla ve FROZEN yap** in the application;
-the numbered equivalent is reserved for recovery.
+baseline. Publish them with **Golden yayınla ve FROZEN yap** in the application.
 
 ## Requirements
 
@@ -116,8 +121,8 @@ The installer stops when it detects an unsupported disk or boot layout.
 
 ![CachyOS single-application setup wizard](docs/images/cachy-freeze-setup-preview.png)
 
-The normal installation no longer requires running numbered scripts or using
-a terminal. On the clean CachyOS laptop:
+Installation is performed only through the graphical application. On the clean
+CachyOS laptop:
 
 1. Sign in to GitHub in the web browser, download this private repository as a
    ZIP, and extract it. A Git clone is also acceptable, but is not required.
@@ -155,10 +160,8 @@ seven wired pages:
 - **Installation:** preflight, workstation provisioning, acceptance checklist,
   GRUB protection, Golden publication, Frozen scheduling, and recovery status.
 
-The numbered shell entry points remain available only for recovery,
-diagnostics, and compatibility with earlier deployments. They call the same
-validated implementation used by the GUI; they are not the normal installation
-path. See **[KURULUM-TR.md](KURULUM-TR.md)** for the complete Turkish checklist.
+The desktop launcher and its **Kurulum** page cover the complete installation.
+See **[KURULUM-TR.md](KURULUM-TR.md)** for the Turkish application checklist.
 
 ## Maintenance
 
@@ -168,20 +171,14 @@ prompt, then use the Updates page. A protected update creates a rollback
 snapshot before pacman and publishes a new Golden after verification. Return
 to FROZEN from Dashboard or Settings and accept the reboot prompt.
 
-The same application remains the normal interface for installation and daily
-management. Numbered shell entry points are reserved for recovery and backward
-compatibility.
+The same application is the only user-facing interface for installation and
+daily management.
 
 ## Repository layout
 
 ```text
 .
 ├── CachyOS-Kurulum-Uygulamasi.desktop  # Terminal-free setup launcher
-├── 01-TAM-KURULUMU-BASLAT.sh
-├── 02-TAM-KURULUMU-TAMAMLA.sh
-├── 03-ALTERNATIF-SADECE-FREEZE-UYGULAMASI.sh
-├── 10-BAKIM-ERIT.sh
-├── 11-BAKIM-YAYINLA-VE-DONDUR.sh
 ├── app/           # Graphical freeze/thaw manager and Polkit policy
 ├── KURULUM-TR.md  # Complete Turkish installation guide
 ├── deepfreeze/    # Btrfs, initramfs, and GRUB infrastructure
@@ -193,20 +190,10 @@ compatibility.
 
 ## Validation
 
-Run the repository's static checks:
-
-```bash
-bash ./deepfreeze/tests/static.sh
-bash ./deepfreeze/tests/grub-generation.sh
-sudo bash ./deepfreeze/tests/integration-btrfs.sh
-sudo bash ./deepfreeze/tests/integration-engine.sh
-sudo bash ./deepfreeze/tests/integration-users.sh
-bash ./deepfreeze/tests/ui-smoke.sh
-```
-
-The static suite checks Bash syntax, core configuration, desktop entries, JSON,
-and—when available—ShellCheck and systemd units. Run boot-chain and Btrfs
-integration tests only on a dedicated test device.
+The automated validation suite checks syntax, core configuration, desktop
+entries, JSON, systemd units, the graphical interface, Btrfs transactions,
+users, snapshots, and recovery behavior. Boot-chain and Btrfs integration tests
+must run only on a dedicated test device or disposable virtual machine.
 
 ## Additional documentation
 

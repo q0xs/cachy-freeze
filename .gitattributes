@@ -8,6 +8,13 @@
 *.json text eol=lf
 *.md text eol=lf
 *.txt text eol=lf
+*.toml text eol=lf
+*.html text eol=lf
+*.install text eol=lf
+*.patch text eol=lf
+PKGBUILD text eol=lf
+.SRCINFO text eol=lf
+.gitignore text eol=lf
 
 /deepfreeze/bin/* text eol=lf
 /deepfreeze/grub/* text eol=lf

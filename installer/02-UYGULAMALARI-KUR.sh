@@ -14,8 +14,10 @@ pacman -Syu --needed --noconfirm \
   curl \
   file \
   git \
-  gtk2 \
+  glib2-devel \
+  gobject-introspection \
   gtk3 \
+  gtk-doc \
   libcups \
   libappindicator-gtk3 \
   libnotify \
@@ -24,6 +26,7 @@ pacman -Syu --needed --noconfirm \
   libxtst \
   libreoffice-fresh \
   libreoffice-fresh-tr \
+  lsb-release \
   kdialog \
   kwallet \
   nss \
@@ -43,6 +46,10 @@ pacman -Syu --needed --noconfirm \
 
 aur_install google-chrome
 aur_install slack-desktop
+# GTK 2 was moved from the official Arch repositories to AUR. Zoiper still
+# links against it, so resolve the legacy runtime through the same unprivileged
+# and verified makepkg path used for the other AUR packages.
+aur_install gtk2
 aur_install zoiper-bin
 aur_install anydesk-bin
 if systemctl list-unit-files anydesk.service >/dev/null 2>&1; then
@@ -126,4 +133,4 @@ unzip -t "$microsip_zip"
 
 printf '%s\n' \
   "Kurumsal uygulamalar kuruldu ve dogrulandi." \
-  "MicroSIP kullanici prefix'i 03-CALISAN-KULLANICI-OLUSTUR.sh ile olusacak."
+  "MicroSIP kullanici prefix'i hesap hazirlama adiminda olusacak."

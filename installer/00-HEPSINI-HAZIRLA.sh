@@ -40,5 +40,5 @@ bash "$INSTALLER_DIR/06-GOLDEN-YAYINLA.sh"
 printf '%s\n' \
   "Tum hazirliklar tamamlandi." \
   "Sistem guvenlik icin Maintenance modunda birakildi." \
-  "Fiziksel boot testi icin 04-DONDUR.sh daha sonra calistirilmalidir." \
+  "Canli kontrollerden sonra Kurulum sayfasindan tamamlayip FROZEN yapin." \
   "Log: $LOG"

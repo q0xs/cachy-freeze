@@ -5,4 +5,4 @@ set -Eeuo pipefail
   exit 1
 }
 /usr/local/sbin/cachy-freeze publish
-printf '%s\n' "Yeni Golden yayinlandi. Dondurmak icin 04-DONDUR.sh calistir."
+printf '%s\n' "Yeni Golden yayinlandi. Hazir oldugunuzda uygulamadan FROZEN moda gecin."

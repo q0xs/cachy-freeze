@@ -10,7 +10,7 @@ permissions:
 jobs:
   static-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Depoyu indir
@@ -20,7 +20,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes shellcheck
-          python -m pip install --disable-pip-version-check ruff==0.12.4
+          python -m pip install --disable-pip-version-check ruff==0.12.4 PyQt6==6.9.1
 
       - name: Servis hedeflerini test ortamına yerleştir
         run: |
@@ -40,8 +40,10 @@ jobs:
 
       - name: Python kalite ve birim testleri
         env:
-          PYTHONPATH: src
+          PYTHONPATH: src:app
+          QT_QPA_PLATFORM: offscreen
         run: |
           ruff check src app/cachy_freeze_gui tests
           ruff format --check src app/cachy_freeze_gui tests
           python -m unittest discover -s tests -v
+          bash ./deepfreeze/tests/ui-smoke.sh

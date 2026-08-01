@@ -494,7 +494,7 @@ class MainWindow(QMainWindow):
         provision_group = QGroupBox("2. İş istasyonunu hazırla")
         provision_form = QFormLayout(provision_group)
         self.setup_username = QLineEdit()
-        self.setup_username.setPlaceholderText("ornek.kullanici")
+        self.setup_username.setPlaceholderText("ornek_kullanici")
         self.setup_display_name = QLineEdit()
         self.setup_display_name.setPlaceholderText("Ad Soyad")
         self.setup_password = QLineEdit()

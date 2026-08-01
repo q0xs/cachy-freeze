@@ -189,7 +189,7 @@ systemctl is-enabled --quiet cachy-employee-reset.service ||
 
 if ! grep -Eq '^HOOKS=.*\bcachy-freeze\b' /etc/mkinitcpio.conf; then
   sed -i -E \
-    '/^HOOKS=/s/[[:space:]]+filesystems([[:space:]]*\))/ cachy-freeze filesystems\1/' \
+    '/^HOOKS=/s/(^|[[:space:]])filesystems([[:space:]]|\))/\1cachy-freeze filesystems\2/' \
     /etc/mkinitcpio.conf
 fi
 grep -Eq '^HOOKS=.*\bsystemd\b.*\bcachy-freeze\b.*\bfilesystems\b' \
