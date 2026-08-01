@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Cachy Freeze Yöneticisi
-GenericName=Dondurma ve Bakım Modu
-Comment=Sistemi erit veya dondur
+Name=Cachy Freeze Yönetim Merkezi
+GenericName=CachyOS Workstation Yönetimi
+Comment=Freeze, snapshot, kullanıcı ve güncellemeleri yönet
 Exec=/usr/bin/cachy-freeze-manager
 Icon=drive-harddisk
 Terminal=false

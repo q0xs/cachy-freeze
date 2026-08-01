@@ -1,0 +1,13 @@
+[Unit]
+Description=Persistent Cachy Freeze state
+Before=local-fs.target
+
+[Mount]
+What=/dev/disk/by-uuid/__ROOT_UUID__
+Where=/var/lib/cachy-freeze
+Type=btrfs
+Options=rw,noatime,compress=zstd,subvol=@cachy-state
+TimeoutSec=30
+
+[Install]
+WantedBy=local-fs.target

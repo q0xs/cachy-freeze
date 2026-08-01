@@ -57,3 +57,43 @@ aur_install() {
   pacman -Q "$package" >/dev/null 2>&1 ||
     die "AUR paketi kurulamadi: $package"
 }
+
+download_https() {
+  local url=$1 destination=$2
+  [[ $url == https://* ]] || die "Yalnizca HTTPS indirmeye izin verilir: $url"
+  [[ $destination == /* ]] || die "Indirme hedefi mutlak yol olmali: $destination"
+  local temporary="${destination}.download.$$"
+  rm -f -- "$temporary"
+  if ! curl \
+    --fail \
+    --location \
+    --proto '=https' \
+    --tlsv1.2 \
+    --retry 5 \
+    --retry-all-errors \
+    --retry-delay 2 \
+    --connect-timeout 20 \
+    --max-time 600 \
+    --output "$temporary" \
+    "$url"; then
+    rm -f -- "$temporary"
+    die "Indirme basarisiz: $url"
+  fi
+  [[ -s $temporary ]] || {
+    rm -f -- "$temporary"
+    die "Indirilen dosya bos: $url"
+  }
+  mv -f -- "$temporary" "$destination"
+}
+
+validate_zip_paths() {
+  local archive=$1 entry
+  while IFS= read -r entry; do
+    [[ -n $entry ]] || continue
+    [[ $entry != /* && $entry != \\* ]] ||
+      die "ZIP mutlak yol iceriyor: $entry"
+    [[ /$entry/ != */../* && /$entry/ != */./* ]] ||
+      die "ZIP guvensiz yol iceriyor: $entry"
+    [[ $entry != *\\* ]] || die "ZIP ters egik cizgili yol iceriyor: $entry"
+  done < <(unzip -Z1 "$archive")
+}
