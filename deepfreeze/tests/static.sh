@@ -37,11 +37,15 @@ fi
 grep -q '^MAINTENANCE_SUBVOL=@$' "$ROOT/etc/cachy-freeze.conf"
 grep -q '^GOLDEN_SUBVOL=@golden$' "$ROOT/etc/cachy-freeze.conf"
 grep -q '^ACTIVE_SUBVOL=@active$' "$ROOT/etc/cachy-freeze.conf"
+grep -q '^STATE_SUBVOL=@cachy-state$' "$ROOT/etc/cachy-freeze.conf"
+grep -q '^SNAPSHOT_SUBVOL=@cachy-snapshots$' "$ROOT/etc/cachy-freeze.conf"
 grep -q 'ConditionKernelCommandLine=cachy.freeze=1' \
   "$ROOT/initcpio/cachy-freeze-reset.service"
+grep -q '^BOOT_FAILURE_LIMIT=3$' "$ROOT/etc/cachy-freeze.conf"
 grep -q 'ConditionKernelCommandLine=cachy.freeze=1' \
   "$ROOT/../user/files/cachy-frozen-admin-restrict.service"
-grep -q 'ensure_boot_layout' "$ROOT/bin/cachy-freeze"
+grep -q 'def preflight' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
+grep -q 'begin_transaction' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'AUTH_ADMIN_KEEP' \
   "$ROOT/../user/files/49-company-employee-auth.rules"
 grep -q 'cachy-user-template' \
@@ -70,9 +74,13 @@ done
 
 if command -v python >/dev/null; then
   python -m json.tool "$PROJECT_ROOT/policies/chrome/managed.json" >/dev/null
-  python -c \
-    'compile(open(__import__("sys").argv[1], encoding="utf-8").read(), __import__("sys").argv[1], "exec")' \
-    "$PROJECT_ROOT/app/cachy-freeze-manager"
+  while IFS= read -r -d '' python_file; do
+    python -m py_compile "$python_file"
+  done < <(
+    find "$PROJECT_ROOT/src" "$PROJECT_ROOT/app/cachy_freeze_gui" \
+      "$PROJECT_ROOT/tests" -type f -name '*.py' -print0
+  )
+  python -m py_compile "$PROJECT_ROOT/app/cachy-freeze-manager"
 fi
 
 if command -v xmllint >/dev/null; then
@@ -82,6 +90,9 @@ fi
 if command -v systemd-analyze >/dev/null; then
   if ! verify_output=$(systemd-analyze verify \
     "$ROOT/initcpio/cachy-freeze-reset.service" \
+    "$ROOT/systemd/cachy-freeze-boot-health.service" \
+    "$ROOT/systemd/cachy-freeze-auto-snapshot.service" \
+    "$ROOT/systemd/cachy-freeze-auto-snapshot.timer" \
     "$PROJECT_ROOT/user/files/cachy-employee-reset.service" \
     "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict.service" 2>&1); then
     unexpected_output=$(grep -Ev 'SO_PASSRIGHTS|SO_PASSCRED' \

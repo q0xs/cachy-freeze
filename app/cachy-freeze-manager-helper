@@ -3,6 +3,10 @@ set -Eeuo pipefail
 
 readonly BACKEND=/usr/local/sbin/cachy-freeze
 
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin
+unset CDPATH ENV BASH_ENV PYTHONHOME PYTHONPATH CACHY_FREEZE_CONFIG
+unset CACHY_FREEZE_ROOT_SUBVOLUME CACHY_FREEZE_INITRD_CONFIG CACHY_FREEZE_TOP
+
 (( EUID == 0 )) || {
   printf '%s\n' "HATA: Yönetici yetkisi gerekli." >&2
   exit 1
@@ -13,17 +17,132 @@ readonly BACKEND=/usr/local/sbin/cachy-freeze
 }
 
 case ${1:-} in
+  status)
+    exec "$BACKEND" status
+    ;;
   thaw)
     exec "$BACKEND" thaw
     ;;
+  thaw-once)
+    exec "$BACKEND" thaw-once
+    ;;
   freeze)
     if [[ $(findmnt -n -o SOURCE /) == *'[/@]' ]]; then
-      "$BACKEND" publish
+      "$BACKEND" publish --description "GUI üzerinden Golden yayınlama"
     fi
     exec "$BACKEND" freeze
     ;;
   reboot)
     exec /usr/bin/systemctl reboot
+    ;;
+  snapshot-list)
+    exec "$BACKEND" snapshot list
+    ;;
+  snapshot-create)
+    [[ -n ${2:-} ]] || {
+      printf '%s\n' "HATA: Snapshot açıklaması gerekli." >&2
+      exit 2
+    }
+    exec "$BACKEND" snapshot create --description "$2"
+    ;;
+  snapshot-verify)
+    [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
+    exec "$BACKEND" snapshot verify "$2" --full
+    ;;
+  snapshot-compare)
+    [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
+    [[ ${3:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
+    exec "$BACKEND" snapshot compare "$2" "$3"
+    ;;
+  snapshot-delete)
+    [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
+    exec "$BACKEND" snapshot delete "$2"
+    ;;
+  snapshot-rollback)
+    [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
+    exec "$BACKEND" snapshot rollback "$2"
+    ;;
+  snapshot-export)
+    [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
+    exec "$BACKEND" snapshot export "$2"
+    ;;
+  snapshot-import)
+    [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}\.btrfs$ ]] || exit 2
+    exec "$BACKEND" snapshot import "$2"
+    ;;
+  health)
+    exec "$BACKEND" health
+    ;;
+  updates-check)
+    exec "$BACKEND" updates check
+    ;;
+  updates-apply)
+    exec "$BACKEND" updates apply
+    ;;
+  applications-status)
+    exec "$BACKEND" applications status
+    ;;
+  applications-install)
+    exec "$BACKEND" applications install
+    ;;
+  settings-get)
+    exec "$BACKEND" settings get
+    ;;
+  settings-set)
+    (( $# == 10 )) || exit 2
+    [[ $2 =~ ^[0-9]+$ && $4 =~ ^[0-9]+$ && $7 =~ ^[0-9]+$ && $8 =~ ^[0-9]+$ ]] || exit 2
+    [[ $3 == true || $3 == false ]] || exit 2
+    [[ $5 == true || $5 == false ]] || exit 2
+    [[ $6 == true || $6 == false ]] || exit 2
+    [[ $9 == tr ]] || exit 2
+    [[ ${10} == dark || ${10} == light ]] || exit 2
+    exec "$BACKEND" settings set \
+      --retention-count "$2" \
+      --auto-snapshot-enabled "$3" \
+      --auto-snapshot-interval "$4" \
+      --update-checks-enabled "$5" \
+      --network-online-checks "$6" \
+      --boot-failure-limit "$7" \
+      --log-retention-lines "$8" \
+      --language "$9" \
+      --theme "${10}"
+    ;;
+  logs)
+    exec "$BACKEND" logs --limit 200
+    ;;
+  user-list)
+    exec "$BACKEND" user list
+    ;;
+  user-create)
+    [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ && -n ${3:-} ]] || exit 2
+    exec "$BACKEND" user create "$2" --display-name "$3"
+    ;;
+  user-delete)
+    [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
+    exec "$BACKEND" user delete "$2"
+    ;;
+  user-restore)
+    [[ ${2:-} =~ ^[0-9]{8}T[0-9]{6}Z-[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
+    exec "$BACKEND" user restore "$2"
+    ;;
+  user-password)
+    [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
+    exec "$BACKEND" user password "$2"
+    ;;
+  user-lock)
+    [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
+    exec "$BACKEND" user lock "$2"
+    ;;
+  user-unlock)
+    [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
+    exec "$BACKEND" user unlock "$2"
+    ;;
+  user-autologin)
+    [[ -z ${2:-} || ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
+    if [[ -n ${2:-} ]]; then
+      exec "$BACKEND" user autologin "$2"
+    fi
+    exec "$BACKEND" user autologin
     ;;
   *)
     printf '%s\n' "HATA: Geçersiz işlem." >&2

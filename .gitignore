@@ -12,6 +12,8 @@
 *.bak
 *.swp
 *~
+__pycache__/
+*.py[cod]
 
 # İşletim sistemi ve editör dosyaları
 .DS_Store

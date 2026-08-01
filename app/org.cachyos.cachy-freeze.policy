@@ -7,10 +7,10 @@
   <vendor_url>https://cachyos.org/</vendor_url>
 
   <action id="org.cachyos.cachy-freeze.manage">
-    <description>Manage Cachy Freeze boot mode</description>
-    <message>Authentication is required to change the freeze mode</message>
-    <description xml:lang="tr">Cachy Freeze açılış modunu yönet</description>
-    <message xml:lang="tr">Dondurma modunu değiştirmek için kimlik doğrulaması gerekli</message>
+    <description>Manage the CachyOS workstation platform</description>
+    <message>Administrator authentication is required for this management operation</message>
+    <description xml:lang="tr">CachyOS iş istasyonu platformunu yönet</description>
+    <message xml:lang="tr">Bu yönetim işlemi için yönetici doğrulaması gerekli</message>
     <defaults>
       <allow_any>no</allow_any>
       <allow_inactive>no</allow_inactive>

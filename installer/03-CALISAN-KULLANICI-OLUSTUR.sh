@@ -108,8 +108,18 @@ done
 
 prefix="$home/.local/share/company-wine/microsip"
 install -d -o "$employee_user" -g "$employee_user" -m 0700 "$prefix"
+set +e
+timeout --signal=TERM --kill-after=10s 120s \
+  runuser -u "$employee_user" -- \
+  env WINEPREFIX="$prefix" WINEARCH=win64 WINEDEBUG=-all xvfb-run -a wineboot -u
+wineboot_rc=$?
+set -e
 runuser -u "$employee_user" -- \
-  env WINEPREFIX="$prefix" WINEDEBUG=-all xvfb-run -a wineboot -u
+  env WINEPREFIX="$prefix" wineserver -k >/dev/null 2>&1 || true
+if (( wineboot_rc != 0 && wineboot_rc != 124 )); then
+  die "MicroSIP Wine prefix olusturma testi basarisiz (kod: $wineboot_rc)."
+fi
+[[ -s $prefix/system.reg ]] || die "MicroSIP Wine prefix olusturulamadi."
 microsip_target="$prefix/drive_c/Program Files/MicroSIP"
 microsip_stage=$(mktemp -d)
 trap 'rm -rf --one-file-system "$microsip_stage"' EXIT
@@ -136,6 +146,28 @@ chown -R "$employee_user:$employee_user" "$microsip_target"
 chmod 0755 "$microsip_target/microsip.exe"
 rm -rf --one-file-system "$microsip_stage"
 trap - EXIT
+
+# File existence alone is not a successful application install. Launch the
+# portable binary in an isolated display and accept either a clean exit or a
+# process that remains healthy until the smoke-test timeout.
+microsip_smoke_log=$(mktemp /tmp/cachy-microsip-smoke.XXXXXX.log)
+set +e
+timeout --signal=TERM --kill-after=5s 15s \
+  runuser -u "$employee_user" -- \
+  env WINEPREFIX="$prefix" WINEARCH=win64 WINEDEBUG=-all \
+  xvfb-run -a wine "$microsip_target/microsip.exe" /minimized \
+  >"$microsip_smoke_log" 2>&1
+microsip_smoke_rc=$?
+set -e
+runuser -u "$employee_user" -- \
+  env WINEPREFIX="$prefix" wineserver -k >/dev/null 2>&1 || true
+if (( microsip_smoke_rc != 0 && microsip_smoke_rc != 124 )); then
+  sed -n '1,120p' "$microsip_smoke_log" >&2
+  rm -f -- "$microsip_smoke_log"
+  die "MicroSIP Wine smoke testi basarisiz (kod: $microsip_smoke_rc)."
+fi
+rm -f -- "$microsip_smoke_log"
+[[ -s $prefix/system.reg ]] || die "MicroSIP Wine prefix dogrulanamadi."
 
 cat >"$home/.config/mimeapps.list" <<'EOF'
 [Default Applications]

@@ -14,6 +14,9 @@
 /deepfreeze/initcpio/* text eol=lf
 /installer/lib/* text eol=lf
 /user/files/* text eol=lf
+/app/* text eol=lf
+/src/**/*.py text eol=lf
+/tests/**/*.py text eol=lf
 
 *.png binary
 *.zip binary

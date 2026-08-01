@@ -28,16 +28,88 @@ delete_subvol() {
   btrfs subvolume delete "$TOP/$1"
 }
 
-recover_interrupted_rotation() {
-  if ! subvol_exists "$ACTIVE_SUBVOL" && subvol_exists "$NEXT_SUBVOL"; then
-    log "Yarım kalan işlem bulundu; next active yapılıyor"
-    mv "$TOP/$NEXT_SUBVOL" "$TOP/$ACTIVE_SUBVOL"
+# Recover one transaction pair using only durable subvolume names. The state
+# journal is intentionally stored outside the frozen root and is not mounted
+# this early in boot, so each rename has to be self-describing.
+recover_pair() {
+  current=$1
+  candidate=$2
+  previous=$3
+  pending=$4
+  required=$5
+
+  if ! subvol_exists "$current" && subvol_exists "$candidate"; then
+    log "Yarım kalan işlem bulundu; $candidate -> $current"
+    mv "$TOP/$candidate" "$TOP/$current"
+  fi
+  if ! subvol_exists "$current" && subvol_exists "$pending"; then
+    log "Yarım kalan işlem bulundu; $pending -> $current"
+    mv "$TOP/$pending" "$TOP/$current"
+  fi
+  if subvol_exists "$current" && subvol_exists "$pending"; then
+    delete_subvol "$previous"
+    mv "$TOP/$pending" "$TOP/$previous"
+  fi
+  if subvol_exists "$current" && subvol_exists "$candidate"; then
+    delete_subvol "$candidate"
+  fi
+  if [ "$required" = yes ] && ! subvol_exists "$current"; then
+    fail "Yarım kalan işlem $current alt birimini kurtaramadı"
+  fi
+}
+
+read_attempts() {
+  attempts=0
+  if [ -r "$TOP/$STATE_SUBVOL/boot-attempts" ]; then
+    IFS= read -r attempts <"$TOP/$STATE_SUBVOL/boot-attempts" || attempts=0
+  fi
+  case $attempts in
+    '' | *[!0-9]*) attempts=0 ;;
+  esac
+}
+
+write_attempts() {
+  temporary="$TOP/$STATE_SUBVOL/.boot-attempts.$$"
+  printf '%s\n' "$1" >"$temporary"
+  mv "$temporary" "$TOP/$STATE_SUBVOL/boot-attempts"
+}
+
+finalize_transaction_journal() {
+  journal="$TOP/$STATE_SUBVOL/transaction.json"
+  [ -f "$journal" ] || return 0
+  mv "$journal" "$TOP/$STATE_SUBVOL/transaction.initramfs-recovered.json"
+  printf '%s\n' transaction-recovery >"$TOP/$STATE_SUBVOL/recovery-event"
+  log "Kalıcı transaction günlüğü initramfs kurtarmasıyla kapatıldı"
+}
+
+register_boot_attempt() {
+  subvol_exists "$STATE_SUBVOL" || fail "$STATE_SUBVOL durum alt birimi bulunamadı"
+  limit=$BOOT_FAILURE_LIMIT
+  if [ -r "$TOP/$STATE_SUBVOL/boot-failure-limit" ]; then
+    IFS= read -r configured_limit <"$TOP/$STATE_SUBVOL/boot-failure-limit" ||
+      configured_limit=
+    case $configured_limit in
+      2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) limit=$configured_limit ;;
+    esac
   fi
 
-  if ! subvol_exists "$ACTIVE_SUBVOL" && subvol_exists "$PREVIOUS_SUBVOL"; then
-    log "Yarım kalan işlem bulundu; previous active yapılıyor"
-    mv "$TOP/$PREVIOUS_SUBVOL" "$TOP/$ACTIVE_SUBVOL"
+  read_attempts
+  attempts=$((attempts + 1))
+  if [ "$attempts" -ge "$limit" ]; then
+    if subvol_exists "$GOLDEN_PREVIOUS_SUBVOL" &&
+      [ "$(btrfs property get -ts "$TOP/$GOLDEN_PREVIOUS_SUBVOL" ro)" = "ro=true" ]; then
+      log "$attempts başarısız boot algılandı; önceki Golden otomatik geri yükleniyor"
+      delete_subvol "$FAILED_GOLDEN_SUBVOL"
+      mv "$TOP/$GOLDEN_SUBVOL" "$TOP/$FAILED_GOLDEN_SUBVOL"
+      mv "$TOP/$GOLDEN_PREVIOUS_SUBVOL" "$TOP/$GOLDEN_SUBVOL"
+      printf '%s\n' automatic-rollback >"$TOP/$STATE_SUBVOL/recovery-event"
+      attempts=1
+    else
+      log "UYARI: Boot hata sınırına ulaşıldı fakat önceki Golden yok"
+    fi
   fi
+  write_attempts "$attempts"
+  sync
 }
 
 main() {
@@ -63,11 +135,24 @@ main() {
   trap cleanup EXIT INT TERM
   mount -t btrfs -o rw,subvolid=5 "$device" "$TOP"
 
-  subvol_exists "$GOLDEN_SUBVOL" || fail "$GOLDEN_SUBVOL bulunamadı"
+  recover_pair \
+    "$GOLDEN_SUBVOL" \
+    "$GOLDEN_NEXT_SUBVOL" \
+    "$GOLDEN_PREVIOUS_SUBVOL" \
+    "$GOLDEN_PENDING_SUBVOL" \
+    yes
+  recover_pair \
+    "$ACTIVE_SUBVOL" \
+    "$NEXT_SUBVOL" \
+    "$PREVIOUS_SUBVOL" \
+    "$ACTIVE_PENDING_SUBVOL" \
+    no
+
+  finalize_transaction_journal
+  register_boot_attempt
+
   [ "$(btrfs property get -ts "$TOP/$GOLDEN_SUBVOL" ro)" = "ro=true" ] ||
     fail "$GOLDEN_SUBVOL salt-okunur değil"
-
-  recover_interrupted_rotation
   delete_subvol "$NEXT_SUBVOL"
 
   log "$GOLDEN_SUBVOL üzerinden yeni çalışma snapshot'ı oluşturuluyor"
