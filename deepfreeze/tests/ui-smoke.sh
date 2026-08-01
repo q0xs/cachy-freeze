@@ -35,7 +35,7 @@ launcher_log="$TEST_ROOT/setup-launcher.log"
 QT_QPA_PLATFORM=offscreen \
 XDG_CONFIG_HOME="$TEST_ROOT/config-launcher" \
 PYTHONPATH="$PROJECT_ROOT/src:$PROJECT_ROOT/app" \
-  timeout 2s python -s -m cachy_freeze_gui.main \
+  timeout 2s python -m cachy_freeze_gui.main \
     --setup-source "$PROJECT_ROOT" >"$launcher_log" 2>&1
 launcher_rc=$?
 set -e
