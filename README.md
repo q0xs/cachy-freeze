@@ -33,6 +33,14 @@ changes. It then:
   templates during every Frozen boot;
 - maintains a Golden Btrfs snapshot from which the active Frozen system is
   recreated;
+- records snapshot metadata, checksums, history, health, exports, imports,
+  comparisons, cleanup, and rollback counters;
+- recovers interrupted Golden/Active transactions and automatically restores
+  the previous known-good Golden after repeated failed boots;
+- provides GUI pages for dashboards, snapshots, standard users, updates,
+  audit logs, boot policy, automatic snapshots, network policy, and settings;
+- performs privileged work only through a PolicyKit-authenticated allow-list
+  helper; passwords use stdin and never appear in process lists;
 - displays one GRUB entry whose title reflects the selected mode: **FROZEN**
   or **THAWED**.
 
@@ -137,11 +145,16 @@ bash ./03-ALTERNATIF-SADECE-FREEZE-UYGULAMASI.sh
 
 The installer detects that computer's Btrfs UUID and installs a
 Polkit-authenticated **Cachy Freeze Manager** PyQt6 desktop application. The
-window shows the current mode and provides two primary actions:
+management center includes six wired pages:
 
-- **Thaw:** schedule the next boot in persistent maintenance mode.
-- **Freeze:** publish the current maintenance system as the new Golden
-  snapshot, then schedule Frozen mode.
+- **Dashboard:** running/scheduled mode, disk, snapshot and boot health.
+- **Snapshots:** create, verify, compare, export, import, delete and rollback.
+- **Users:** standard account lifecycle, password, lock and autologin policy.
+- **Updates:** read-only checks, corporate application verification/repair,
+  and snapshot-protected THAWED updates.
+- **Audit logs:** structured INFO/WARNING/ERROR operation history.
+- **Settings:** freeze, snapshot, update, theme, language, boot, log, network,
+  and automatic snapshot policy.
 
 Both actions show confirmation and progress feedback and offer to reboot when
 finished. The repository does not embed machine-specific identifiers. The
@@ -150,20 +163,14 @@ supported layout is UEFI + Btrfs + GRUB, with the EFI partition mounted at
 
 ## Maintenance
 
-Schedule the next boot as THAWED:
+Daily maintenance does not require a terminal. In **Cachy Freeze Management
+Center**, schedule persistent or one-time THAWED boot, accept its reboot
+prompt, then use the Updates page. A protected update creates a rollback
+snapshot before pacman and publishes a new Golden after verification. Return
+to FROZEN from Dashboard or Settings and accept the reboot prompt.
 
-```bash
-bash ./10-BAKIM-ERIT.sh
-sudo reboot
-```
-
-After completing maintenance, publish the updated Golden snapshot and return
-to FROZEN:
-
-```bash
-bash ./11-BAKIM-YAYINLA-VE-DONDUR.sh
-sudo reboot
-```
+The numbered shell entry points remain deployment/bootstrap tools for the
+technician performing the first installation.
 
 ## Repository layout
 
@@ -190,6 +197,10 @@ Run the repository's static checks:
 ```bash
 bash ./deepfreeze/tests/static.sh
 bash ./deepfreeze/tests/grub-generation.sh
+sudo bash ./deepfreeze/tests/integration-btrfs.sh
+sudo bash ./deepfreeze/tests/integration-engine.sh
+sudo bash ./deepfreeze/tests/integration-users.sh
+bash ./deepfreeze/tests/ui-smoke.sh
 ```
 
 The static suite checks Bash syntax, core configuration, desktop entries, JSON,
@@ -202,6 +213,7 @@ integration tests only on a dedicated test device.
 - [Pilot-device checklist](PILOT-NOTLARI.md)
 - [GitHub workflow on Linux](GITHUB-ILE-CALISMA.md)
 - [Boot recovery notes](KURTARMA-EKRAN-GELMEZSE.txt)
+- [Platform architecture and recovery model](MIMARI-TR.md)
 - [Optional legacy USB workflow](USB-KURULUM.txt)
 
 ## Safety and backups
