@@ -44,6 +44,44 @@ changes. It then:
 - displays one GRUB entry whose title reflects the selected mode: **FROZEN**
   or **THAWED**.
 
+## Application preview
+
+![Cachy Freeze Management Center dashboard](docs/images/cachy-freeze-management-center-preview.png)
+
+The preview is rendered from the real PyQt6 application with representative,
+non-production status data. The installed application reads the actual Btrfs,
+boot-health, snapshot, update, and audit state from the workstation.
+
+## Codex quick handoff — live CachyOS laptop test
+
+When this repository is reopened for the physical laptop test, start here
+instead of redesigning the project:
+
+1. Read `MIMARI-TR.md`, `KURULUM-TR.md`, and `PILOT-NOTLARI.md`; then inspect
+   `git status --short` and the latest three commits.
+2. Keep the Windows host and CachyOS target strictly separate. Btrfs, GRUB,
+   initramfs, snapshot, freeze, and rollback commands may run only on the
+   dedicated CachyOS laptop or a disposable CachyOS VM.
+3. Before installation, make a recoverable backup and confirm **UEFI + Btrfs +
+   GRUB**, `/boot/efi`, and no separate `/boot`. Stop if preflight rejects the
+   layout; do not bypass it.
+4. Use only the numbered top-level installers for normal deployment. Daily
+   operation after bootstrap must use **Cachy Freeze Management Center**.
+5. Test all six GUI pages, both `localadm` and a standard user, FROZEN/THAWED
+   and one-time THAWED boots, snapshot create/full verify/rollback, updates,
+   autologin, home reset, audio devices, and a real MicroSIP call.
+6. Exercise unexpected shutdown and boot rollback only after a healthy Golden
+   exists. Never cut power during Golden publication or package installation.
+7. On failure, preserve evidence before changing anything: application audit
+   logs, `journalctl -b`, `findmnt`, `btrfs subvolume list /`, boot mode, and the
+   exact failed step. Do not run `btrfs check --repair`.
+
+Previous acceptance covered real Btrfs loop-device transactions, power-loss
+recovery, 25-snapshot stress, Linux user lifecycle, PyQt6 smoke testing,
+MicroSIP 3.22.12 under Wine, and initramfs builds for two CachyOS kernels. The
+remaining production acceptance is the physical **UEFI/GRUB reboot chain** on
+the backed-up pilot laptop.
+
 ## Boot modes
 
 | Mode | Purpose | Persistence |
