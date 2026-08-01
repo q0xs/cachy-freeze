@@ -26,19 +26,55 @@ root_options=$(findmnt -n -o OPTIONS /)
 [[ ,$root_options, == *,rw,* ]] ||
   die "Maintenance @ koku salt-okunur bagli; Deep Freeze kurulumu yapilamaz."
 
-backup_dir="/var/lib/cachy-freeze/install-backup/$(date -u +%Y%m%dT%H%M%SZ)"
+backup_dir="/var/backups/cachy-freeze/$(date -u +%Y%m%dT%H%M%SZ)"
 install -d -m 0700 "$backup_dir"
 cp -a /etc/mkinitcpio.conf /etc/default/grub /boot/grub/grub.cfg "$backup_dir/"
 cp -a /etc/grub.d "$backup_dir/"
+
+rollback_boot_configuration() {
+  rc=$?
+  trap - ERR
+  set +e
+  cp -a "$backup_dir/mkinitcpio.conf" /etc/mkinitcpio.conf
+  cp -a "$backup_dir/grub" /etc/default/grub
+  cp -a "$backup_dir/grub.cfg" /boot/grub/grub.cfg
+  cp -a "$backup_dir/grub.d/." /etc/grub.d/
+  systemctl daemon-reload
+  printf 'HATA: Boot yapılandırması %s yedeğinden geri alındı.\n' "$backup_dir" >&2
+  exit "$rc"
+}
+trap rollback_boot_configuration ERR
 
 install -d -m 0755 \
   /usr/lib/cachy-freeze \
   /etc/initcpio/install \
   /etc/grub.d \
+  /etc/systemd/system \
   /usr/local/sbin \
   /usr/share/applications \
   /usr/share/polkit-1/actions
 install -m 0755 "$DF_ROOT/bin/cachy-freeze" /usr/local/sbin/cachy-freeze
+install -d -m 0755 /usr/lib/cachy-freeze/python
+cp -a "$PROJECT_ROOT/src/cachy_freeze" /usr/lib/cachy-freeze/python/
+cp -a "$PROJECT_ROOT/app/cachy_freeze_gui" /usr/lib/cachy-freeze/python/
+find /usr/lib/cachy-freeze/python/cachy_freeze -type d -name __pycache__ \
+  -prune -exec rm -rf --one-file-system {} +
+chown -R root:root /usr/lib/cachy-freeze/python
+
+deployment=/usr/lib/cachy-freeze/deployment
+deployment_next=/usr/lib/cachy-freeze/deployment.next
+deployment_previous=/usr/lib/cachy-freeze/deployment.previous
+rm -rf --one-file-system "$deployment_next"
+install -d -m 0755 "$deployment_next"
+cp -a "$PROJECT_ROOT/installer" "$deployment_next/"
+cp -a "$PROJECT_ROOT/policies" "$deployment_next/"
+cp -a "$PROJECT_ROOT/vendor" "$deployment_next/"
+chown -R root:root "$deployment_next"
+rm -rf --one-file-system "$deployment_previous"
+if [[ -d $deployment ]]; then
+  mv "$deployment" "$deployment_previous"
+fi
+mv "$deployment_next" "$deployment"
 install -m 0755 \
   "$PROJECT_ROOT/app/cachy-freeze-manager" \
   /usr/bin/cachy-freeze-manager
@@ -57,6 +93,22 @@ install -m 0755 \
 install -m 0644 \
   "$DF_ROOT/initcpio/cachy-freeze-reset.service" \
   /usr/lib/systemd/system/cachy-freeze-reset.service
+install -m 0644 \
+  "$DF_ROOT/systemd/cachy-freeze-boot-health.service" \
+  /usr/lib/systemd/system/cachy-freeze-boot-health.service
+install -m 0644 \
+  "$DF_ROOT/systemd/cachy-freeze-auto-snapshot.service" \
+  /usr/lib/systemd/system/cachy-freeze-auto-snapshot.service
+install -m 0644 \
+  "$DF_ROOT/systemd/cachy-freeze-auto-snapshot.timer" \
+  /usr/lib/systemd/system/cachy-freeze-auto-snapshot.timer
+install -m 0755 \
+  "$PROJECT_ROOT/user/files/cachy-employee-reset" \
+  /usr/local/sbin/cachy-employee-reset
+install -m 0644 \
+  "$PROJECT_ROOT/user/files/cachy-employee-reset.service" \
+  /usr/lib/systemd/system/cachy-employee-reset.service
+install -d -m 0700 /var/lib/cachy-user-template
 install -m 0644 "$DF_ROOT/initcpio/install-hook" /etc/initcpio/install/cachy-freeze
 install -m 0755 "$DF_ROOT/grub/40_cachy_freeze" /etc/grub.d/40_cachy_freeze
 install -m 0755 "$DF_ROOT/grub/01_cachy_auth" /etc/grub.d/01_cachy_auth
@@ -65,15 +117,73 @@ sed "s/^ROOT_UUID=.*/ROOT_UUID=$root_uuid/" \
   "$DF_ROOT/etc/cachy-freeze.conf" >/etc/cachy-freeze.conf
 chmod 0600 /etc/cachy-freeze.conf
 
+# Metadata and transaction journals must survive both Golden rollback and
+# Frozen root recreation. Keep them in a dedicated top-level Btrfs subvolume.
+state_mount=/var/lib/cachy-freeze
+state_stage=/run/cachy-freeze/state-install
+state_unit=$(systemd-escape --path --suffix=mount "$state_mount")
+top_stage=/run/cachy-freeze/install-btrfs
+install -d -m 0700 "$state_mount" "$state_stage" "$top_stage"
+
+cleanup_state_install() {
+  if mountpoint -q "$state_stage"; then
+    umount "$state_stage" || true
+  fi
+  if mountpoint -q "$top_stage"; then
+    umount "$top_stage" || true
+  fi
+}
+trap cleanup_state_install EXIT
+
+mount -o subvolid=5 "$(findmnt -n -o SOURCE / | sed 's/\[.*$//')" "$top_stage"
+if ! btrfs subvolume show "$top_stage/@cachy-state" >/dev/null 2>&1; then
+  btrfs subvolume create "$top_stage/@cachy-state"
+fi
+umount "$top_stage"
+
+mount -o subvol=@cachy-state "/dev/disk/by-uuid/$root_uuid" "$state_stage"
+chmod 0755 "$state_stage"
+if ! mountpoint -q "$state_mount" &&
+  find "$state_mount" -mindepth 1 -print -quit | grep -q .; then
+  rsync -aHAX "$state_mount/" "$state_stage/"
+fi
+umount "$state_stage"
+trap - EXIT
+
+sed "s/__ROOT_UUID__/$root_uuid/g" \
+  "$DF_ROOT/systemd/cachy-freeze-state.mount.in" \
+  >"/etc/systemd/system/$state_unit"
+chmod 0644 "/etc/systemd/system/$state_unit"
+
 cat >/etc/cachy-freeze-initrd.conf <<EOF
 ROOT_UUID=$root_uuid
 MAINTENANCE_SUBVOL=@
 GOLDEN_SUBVOL=@golden
+GOLDEN_PREVIOUS_SUBVOL=@golden.previous
+GOLDEN_NEXT_SUBVOL=@golden.next
+GOLDEN_PENDING_SUBVOL=@golden.previous.pending
+FAILED_GOLDEN_SUBVOL=@golden.failed
 ACTIVE_SUBVOL=@active
 PREVIOUS_SUBVOL=@active.previous
 NEXT_SUBVOL=@active.next
+ACTIVE_PENDING_SUBVOL=@active.previous.pending
+STATE_SUBVOL=@cachy-state
+BOOT_FAILURE_LIMIT=3
 EOF
 chmod 0600 /etc/cachy-freeze-initrd.conf
+
+systemctl daemon-reload
+systemctl enable --now "$state_unit"
+systemctl enable cachy-freeze-boot-health.service
+systemctl enable --now cachy-freeze-auto-snapshot.timer
+systemctl enable cachy-employee-reset.service
+mountpoint -q "$state_mount" || die "Kalici Cachy Freeze state alt birimi baglanamadi."
+systemctl is-enabled --quiet cachy-freeze-boot-health.service ||
+  die "Boot saglik servisi etkinlestirilemedi."
+systemctl is-enabled --quiet cachy-freeze-auto-snapshot.timer ||
+  die "Otomatik snapshot zamanlayicisi etkinlestirilemedi."
+systemctl is-enabled --quiet cachy-employee-reset.service ||
+  die "Yonetilen kullanici reset servisi etkinlestirilemedi."
 
 if ! grep -Eq '^HOOKS=.*\bcachy-freeze\b' /etc/mkinitcpio.conf; then
   sed -i -E \
@@ -128,9 +238,13 @@ grep -q -- "--id 'cachyos-current'" /boot/grub/grub.cfg ||
 [[ -x /usr/lib/cachy-freeze/cachy-freeze-manager-helper ]] ||
   die "Cachy Freeze yetkili yardimcisi kurulamadi."
 [[ -r /usr/share/applications/cachy-freeze-manager.desktop ]] ||
-  die "Cachy Freeze uygulama menu girdisi kurulamadi."
+    die "Cachy Freeze uygulama menu girdisi kurulamadi."
+[[ -r /usr/lib/cachy-freeze/python/cachy_freeze/cli.py ]] ||
+  die "Cachy Freeze Python backend kurulamadi."
 
 /usr/local/sbin/cachy-freeze thaw
+
+trap - ERR
 
 printf '%s\n' \
   "Deep Freeze kuruldu ve test edildi." \

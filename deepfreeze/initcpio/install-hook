@@ -11,7 +11,9 @@ build() {
 
   add_file /usr/lib/cachy-freeze/cachy-freeze-reset
   add_file /etc/cachy-freeze-initrd.conf
-  add_systemd_unit cachy-freeze-reset.service
+  # mkinitcpio 41 no longer exposes add_systemd_unit to third-party hooks.
+  # Install the unit explicitly, then wire it into the initrd target below.
+  add_file /usr/lib/systemd/system/cachy-freeze-reset.service
 
   add_symlink \
     /usr/lib/systemd/system/initrd-root-fs.target.requires/cachy-freeze-reset.service \

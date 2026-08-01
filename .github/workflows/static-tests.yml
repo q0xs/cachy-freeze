@@ -20,11 +20,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes shellcheck
+          python -m pip install --disable-pip-version-check ruff==0.12.4
 
       - name: Servis hedeflerini test ortamına yerleştir
         run: |
           sudo install -Dm755 deepfreeze/initcpio/cachy-freeze-reset \
             /usr/lib/cachy-freeze/cachy-freeze-reset
+          sudo install -Dm755 deepfreeze/bin/cachy-freeze \
+            /usr/local/sbin/cachy-freeze
           sudo install -Dm755 user/files/cachy-employee-reset \
             /usr/local/sbin/cachy-employee-reset
           sudo install -Dm755 user/files/cachy-frozen-admin-restrict \
@@ -34,3 +37,11 @@ jobs:
         env:
           SHELLCHECK_OPTS: --severity=error
         run: bash ./deepfreeze/tests/static.sh
+
+      - name: Python kalite ve birim testleri
+        env:
+          PYTHONPATH: src
+        run: |
+          ruff check src app/cachy_freeze_gui tests
+          ruff format --check src app/cachy_freeze_gui tests
+          python -m unittest discover -s tests -v
