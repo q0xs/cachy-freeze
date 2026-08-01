@@ -16,11 +16,16 @@ from cachy_freeze_gui.window import MainWindow
 
 application = QApplication([])
 window = MainWindow(BackendClient())
-assert window.pages.count() == 6
+assert window.pages.count() == 7
 assert window.snapshot_table.columnCount() == 9
 assert window.user_table.columnCount() == 6
 assert window.update_apply_button.text()
 assert window.settings_save_button.text()
+assert window.setup_preflight_button.text()
+assert window.setup_start_button.text()
+assert window.setup_finish_button.text()
+assert window._password_is_strong("Correct-Horse-42")
+assert not window._password_is_strong("short")
 window.close()
 application.quit()
 PY

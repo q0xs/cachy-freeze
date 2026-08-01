@@ -16,6 +16,7 @@ done < <(
       -path "$PROJECT_ROOT/deepfreeze/grub/01_cachy_auth" -o \
       -path "$PROJECT_ROOT/deepfreeze/grub/40_cachy_freeze" -o \
       -path "$PROJECT_ROOT/app/cachy-freeze-manager-helper" -o \
+      -path "$PROJECT_ROOT/app/cachy-freeze-setup" -o \
       -path "$PROJECT_ROOT/user/files/cachy-employee-reset" -o \
       -path "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict" -o \
       -path "$PROJECT_ROOT/user/files/cachy-kurulum-oturum-kapat" -o \
@@ -64,6 +65,14 @@ grep -q 'auth_admin_keep' \
   "$PROJECT_ROOT/app/org.cachyos.cachy-freeze.policy"
 grep -q '^Exec=/usr/bin/cachy-freeze-manager$' \
   "$PROJECT_ROOT/app/cachy-freeze-manager.desktop"
+grep -q '^Name=CachyOS Kurulum Uygulaması$' \
+  "$PROJECT_ROOT/CachyOS-Kurulum-Uygulamasi.desktop"
+grep -q '^Terminal=false$' \
+  "$PROJECT_ROOT/CachyOS-Kurulum-Uygulamasi.desktop"
+grep -q 'setup-provision)' \
+  "$PROJECT_ROOT/app/cachy-freeze-manager-helper"
+grep -q 'CACHY_SETUP_NONINTERACTIVE' \
+  "$PROJECT_ROOT/installer/03-CALISAN-KULLANICI-OLUSTUR.sh"
 
 [[ $(find "$PROJECT_ROOT" -maxdepth 1 -type f -name '*.sh' | wc -l) -eq 5 ]]
 for desktop in "$PROJECT_ROOT"/user/desktop/*.desktop; do

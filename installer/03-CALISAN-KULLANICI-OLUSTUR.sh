@@ -19,14 +19,19 @@ if getent group nopasswdlogin >/dev/null; then
   gpasswd -d "$ADMIN_USER" nopasswdlogin 2>/dev/null || true
 fi
 
-[[ -r /dev/tty && -w /dev/tty ]] ||
-  die "Kullanici bilgilerini girmek icin etkilesimli terminal gerekli."
-
-printf '%s\n' \
-  "Calisan hesabi bilgileri" \
-  "Kullanici adi kucuk harf, rakam, _ ve - icerebilir." >/dev/tty
-
-read -r -p "Kullanici adi (ornek: ahmet): " employee_user </dev/tty
+if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
+  IFS= read -r employee_user || die "Kullanici adi GUI kanalindan alinamadi."
+  IFS= read -r employee_full_name || die "Gorunen ad GUI kanalindan alinamadi."
+  IFS= read -r employee_password || die "Parola GUI kanalindan alinamadi."
+  employee_password_again=$employee_password
+else
+  [[ -r /dev/tty && -w /dev/tty ]] ||
+    die "Kullanici bilgilerini girmek icin etkilesimli terminal gerekli."
+  printf '%s\n' \
+    "Calisan hesabi bilgileri" \
+    "Kullanici adi kucuk harf, rakam, _ ve - icerebilir." >/dev/tty
+  read -r -p "Kullanici adi (ornek: ahmet): " employee_user </dev/tty
+fi
 employee_user=${employee_user,,}
 [[ $employee_user =~ ^[a-z][a-z0-9_-]{2,31}$ ]] ||
   die "Gecersiz kullanici adi: $employee_user"
@@ -40,13 +45,15 @@ if id "$employee_user" >/dev/null 2>&1; then
     die "Bu kullanici zaten var ve yonetilen calisan hesabi degil: $employee_user"
 fi
 
-read -r -p "Gorunen ad ve soyad: " employee_full_name </dev/tty
+if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} != 1 ]]; then
+  read -r -p "Gorunen ad ve soyad: " employee_full_name </dev/tty
+fi
 [[ -n ${employee_full_name//[[:space:]]/} ]] ||
   die "Gorunen ad bos olamaz."
 [[ $employee_full_name != *:* && $employee_full_name != *$'\n'* ]] ||
   die "Gorunen ad ':' karakteri iceremez."
 
-while :; do
+while [[ ${CACHY_SETUP_NONINTERACTIVE:-0} != 1 ]]; do
   read -r -s -p "Calisan parolasi: " employee_password </dev/tty
   printf '\n' >/dev/tty
   read -r -s -p "Parolayi tekrar gir: " employee_password_again </dev/tty
@@ -65,6 +72,11 @@ while :; do
   }
   break
 done
+[[ -n $employee_password && $employee_password == "$employee_password_again" ]] ||
+  die "Calisan parolasi bos veya tekrariyla uyusmuyor."
+[[ $employee_password != *:* && $employee_password != *$'\n'* && \
+  $employee_password != *$'\r'* ]] ||
+  die "Calisan parolasi desteklenmeyen bir karakter iceriyor."
 
 for command in wine unzip rsync google-chrome-stable slack libreoffice zoiper \
   anydesk; do

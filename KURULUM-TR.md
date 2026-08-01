@@ -3,9 +3,9 @@
 Bu belge ayrıntılı Türkçe kurulum sırasıdır. Projenin İngilizce genel
 açıklaması ve güvenlik uyarıları için `README.md` dosyasını da oku.
 
-Önerilen yöntem projeyi GitHub'dan almaktır. USB ile kopyalama yalnızca internet
-erişimi olmayan kurulumlar için isteğe bağlı bir alternatiftir. Klasör içindeki
-betikleri tek tek seçmek yerine aşağıdaki sırayı kullan.
+Önerilen yöntem projeyi GitHub'dan alıp tek grafik kurulum uygulamasını açmaktır.
+USB ile kopyalama yalnızca internet erişimi olmayan kurulumlar için isteğe bağlı
+bir alternatiftir. Normal akışta terminal veya numaralı betikler kullanılmaz.
 
 ## 1. CachyOS'u temiz kur
 
@@ -18,122 +18,96 @@ CachyOS kurulumunda:
 - Ayrı bir `/boot` bölümü oluşturma.
 - Yönetici hesabını oluştur ve internete bağlan.
 
-## Yalnızca Cachy Freeze masaüstü uygulamasını kurmak
+## 2. Projeyi terminal kullanmadan al
 
-Kurumsal uygulamalar ve çalışan hesabı olmadan yalnızca grafik dondurma
-yöneticisini birden fazla CachyOS bilgisayara kurmak için depoyu klonladıktan
-sonra çalıştır:
+Depo özel olduğundan erişim izni olan GitHub hesabıyla web tarayıcısında oturum
+aç. Depo sayfasından **Code → Download ZIP** seçeneğini kullan ve ZIP dosyasını
+normal bir klasöre çıkar. İnternet olmayan pilotta aynı proje klasörünün tamamını
+USB'den kopyalayabilirsin.
 
-```bash
-bash ./03-ALTERNATIF-SADECE-FREEZE-UYGULAMASI.sh
-```
+Git bilen teknisyenler isterse klonlama kullanabilir; ancak normal kurulumda
+terminal açmak veya `git`, `gh`, `sudo` komutları yazmak gerekmez.
 
-Bu dosya tam kurulumun `01` ve `02` adımlarına alternatiftir; tam kurulumdan
-sonra ayrıca çalıştırılmaz.
+## 3. Tek kurulum uygulamasını aç
 
-Kurucu her bilgisayarın Btrfs UUID'sini kendisi algılar. İşlem yalnızca UEFI,
-Btrfs ve GRUB kullanan, EFI bölümü `/boot/efi` konumunda bağlı olan ve ayrı
-`/boot` bölümü bulunmayan CachyOS kurulumlarında devam eder. Uygulama menüsünde
-**Cachy Freeze Yöneticisi** adıyla görünür:
+Çıkardığın proje klasöründeki **`CachyOS-Kurulum-Uygulamasi.desktop`** dosyasına
+çift tıkla. Plasma dosyaya güvenilip güvenilmediğini sorarsa **Çalıştır / Güven**
+seçeneğini onayla.
 
-- **Erit:** Sonraki açılışı kalıcı bakım moduna geçirir.
-- **Dondur:** Bakım sistemini önce yeni Golden snapshot olarak kaydeder,
-  ardından sonraki açılışı sıfırlanan Frozen moda geçirir.
+İlk açılışta yalnızca PyQt6 grafik çalışma zamanı eksikse yüklenir. Bu işlem ve
+sonraki ayrıcalıklı adımlar standart PolicyKit penceresinde `localadm` parolasını
+ister. Parolalar terminalde, süreç argümanlarında veya loglarda gösterilmez.
 
-PyQt6 arayüzü mevcut modu bir durum kartında gösterir; işlem sırasında ilerleme
-göstergesi sunar. Her iki işlem yönetici parolası ister, sonucunu gösterir ve
-ardından yeniden başlatmayı teklif eder.
+Uygulama açılınca soldaki **Kurulum** sayfasına gelir. Bundan sonraki ilk kurulum,
+test, Golden yayınlama, FROZEN ayarı ve yeniden başlatma aynı uygulama üzerinden
+yapılır.
 
-Kurulum tamamlanıp yeni sistem açıldıktan sonra günlük yönetimi uygulama
-menüsündeki **Cachy Freeze Yönetim Merkezi** üzerinden yap.
+## 4. Ön kontrolü çalıştır
 
-## 2. Projeyi GitHub'dan al
+**1. Sistem ön kontrolünü çalıştır** düğmesine bas. Uygulama aşağıdaki düzeni
+doğrulamadan kurulum başlatmaz:
 
-```bash
-sudo pacman -S --needed git github-cli
-gh auth login
-mkdir -p ~/Projeler
-cd ~/Projeler
-gh repo clone q0xs/CachyOS-USB-Kurulum
-cd CachyOS-USB-Kurulum
-```
+- CachyOS UEFI modunda açılmış olmalı.
+- Kök dosya sistemi Btrfs ve kök alt birimi `@` olmalı.
+- GRUB ve gerekli initramfs dosyaları bulunmalı.
+- EFI bölümü `/boot/efi` konumuna bağlı olmalı.
+- Ayrı bir `/boot` dosya sistemi bulunmamalı.
 
-Depo özel olduğundan GitHub hesabının erişim izni olmalıdır. İnternet
-kullanılamıyorsa proje klasörünün tamamını USB'den kopyalayıp terminali o
-klasörde açabilirsin.
+Ön kontrol hata verirse atlama veya betiği elle zorla çalıştırma. Uygulamadaki
+hata ayrıntısını ve `/var/log/cachyos-workstation-install.log` dosyasını koru.
 
-Doğru klasörde olduğunu kontrol et:
+## 5. İş istasyonunu uygulamadan hazırla
 
-```bash
-pwd
-```
+Önyüklenebilir kurtarma medyası ve geri alınabilir yedek hazır kutusunu
+işaretle. Aynı ekranda çalışan kullanıcı adını, görünen adını ve güçlü parolasını
+gir; ardından **Tam kurulumu başlat** düğmesine bas.
 
-Çıktının sonu `CachyOS-USB-Kurulum` olmalıdır.
+Uygulama mevcut doğrulanmış kurulum motorunu kullanarak:
 
-## 3. Ana kurulumu çalıştır
+1. sistem paketlerini ve kurumsal uygulamaları kurar;
+2. standart çalışan hesabını oluşturur ve `wheel`/`sudo` dışında tutar;
+3. Chrome, Slack, AnyDesk, LibreOffice, MicroSIP ve Zoiper'i doğrular;
+4. Btrfs, initramfs, GRUB, boot-health ve rollback altyapısını kurar;
+5. yönetim uygulamasını sisteme yerleştirir;
+6. ilk Golden snapshot'ı oluşturur ve sistemi test için THAWED bırakır.
 
-```bash
-bash ./01-TAM-KURULUMU-BASLAT.sh
-```
+İlerleme ve hatalar **Kurulum ilerlemesi ve hata ayrıntıları** alanında görünür.
+İşlem sürerken bilgisayarı kapatma.
 
-Bu adım internetten sistem güncellemelerini ve uygulamaları kurar. Ardından
-çalışan hesabı için sırasıyla şunları sorar:
+## 6. Uygulamaları ve hesabı canlı test et
 
-1. Kullanıcı adı
-2. Görünen ad ve soyad
-3. Parola ve parola tekrarı
+Çalışan hesabına geçip özellikle şunları kontrol et:
 
-Parola yazılırken ekranda görünmez. Çalışan hesabı yönetici olmaz fakat Chrome,
-Slack, AnyDesk, LibreOffice, MicroSIP ve Zoiper'i normal şekilde açabilir.
-Plasma ilk girişten itibaren Breeze Dark koyu temayla açılır. Çalışan hesabı
-Windows'taki standart kullanıcı gibi kendi masaüstünü ve kullanıcı ayarlarını
-değiştirebilir; terminal ve normal uygulama özellikleri yapay olarak
-kapatılmaz. Sistem paketi kurma veya yönetim ayarı değiştirme gibi ayrıcalıklı
-işlemler `localadm` yönetici parolasını ister.
-Frozen modda `localadm` grafik oturum ekranında görünmez. Yönetici onayı
-gereken masaüstü işlemleri “yetkisiz” diye kapanmak yerine mevcut `localadm`
-parolasını ister. Çalışan ve `localadm` ev dizinleri her Frozen açılışta temiz
-şablonlarına döner. THAWED modda `localadm` normal tam yetkili hesabıdır.
-
-## 4. Bilgisayarı yeniden başlatmadan uygulamaları kontrol et
-
-Ana kurulum bitince sistem Maintenance modunda kalır. Çalışan hesabına geçip
-özellikle şunları kontrol et:
-
-- Google Chrome açılıyor ve internet sitelerine giriyor.
-- Slack açılıyor.
-- AnyDesk açılıyor.
-- LibreOffice açılıyor.
-- MicroSIP ve Zoiper açılıyor.
+- Google Chrome internete çıkıyor.
+- Slack, AnyDesk, LibreOffice, MicroSIP ve Zoiper açılıyor.
 - Mikrofon, hoparlör ve kulaklık giriş/çıkışları çalışıyor.
+- Gerçek bir MicroSIP görüşmesi yapılabiliyor.
 - Ayrıcalıklı bir masaüstü işlemi `localadm` parolasını soruyor.
-- Çalışan hesabı doğrudan `sudo` grubunda bulunmuyor.
+- Çalışan hesabı `wheel` veya `sudo` grubunda bulunmuyor.
 - Plasma ve uygulamalar koyu temayla açılıyor.
-- Çalışan kendi kullanıcı ayarlarını değiştirebiliyor.
 
-Bir sorun varsa henüz dondurma yapma.
+Bir sorun varsa FROZEN aşamasına geçme. `localadm` hesabına dön, **Cachy Freeze
+Yönetim Merkezi → Kurulum** sayfasını aç ve hata kaydını koru.
 
-Kontroller bitince çalışan masaüstündeki **Kurulumu Tamamlamak İçin Çıkış Yap**
-kısayoluna tıkla. Giriş ekranından `localadm` hesabını seç ve kendi yönetici
-parolanla giriş yap.
+## 7. Aynı uygulamada kurulumu tamamla
 
-## 5. Kurulumu tamamla
+Kurulum sayfasındaki üç canlı-test kutusunu onayla. Güçlü GRUB bakım parolasını
+iki kez gir ve **Kurulumu tamamla ve FROZEN yap** düğmesine bas.
 
-Maintenance hesabına dön ve çalıştır:
+Uygulama çalışan ile `localadm` ev şablonlarını günceller, GRUB bakım hesabını
+`cachyadmin` olarak korur, yeni Golden'ı yayınlar ve sonraki açılışı FROZEN yapar.
+Sonunda çıkan yeniden başlatma sorusunu onayla; ayrıca terminalden `sudo reboot`
+yazmak gerekmez.
 
-```bash
-bash ./02-TAM-KURULUMU-TAMAMLA.sh
-```
+İlk FROZEN açılışta çalışan hesabında geçici bir dosya oluştur, uygulamadaki
+**Yeniden başlat** düğmesini kullan ve dosyanın silindiğini doğrula.
 
-Dosya önce onay ister; ardından GRUB parolasını ayarlar, çalışan hesabında test
-edilen ayarları sıfırlama şablonuna aktarır, Golden'ı yayınlar ve sonraki açılışı
-Frozen yapar. GRUB kullanıcı adı `cachyadmin` olur. Belirlediğin parolayı güvenli
-bir yerde sakla. GRUB moda göre tek bir **FROZEN** veya **THAWED** girişi
-gösterir. FROZEN parola istemez; THAWED kullanıcı adı/parola ister. İşlem
-bitince `sudo reboot` komutunu elle çalıştır.
+## Eski numaralı dosyalar ne için?
 
-GRUB'da Frozen açılmalı. Çalışan hesabında küçük bir deneme dosyası oluştur,
-yeniden başlat ve dosyanın silindiğini doğrula.
+`01`, `02`, `03`, `10` ve `11` numaralı kabuk girişleri geriye uyumluluk,
+kurtarma ve uzman teşhisi için korunur. Normal ilk kurulumun veya günlük bakımın
+parçası değildir. `installer/` ve `deepfreeze/` altındaki dosyaları tek tek
+çalıştırma.
 
 ## Sonradan bakım yapmak
 
@@ -150,7 +124,7 @@ Günlük yönetimde terminal gerekmez. **Cachy Freeze Yönetim Merkezi** içinde
 
 Kullanıcı oluşturma, parola sıfırlama, kilitleme, otomatik giriş, snapshot
 rollback/export/import, audit logları ve saklama politikası da aynı GUI içinden
-yönetilir. Bootstrap betikleri yalnızca ilk teknisyen kurulumunun parçasıdır.
+yönetilir. İlk kurulum ve sonraki bakım aynı uygulamada kalır.
 
 ## Önemli
 

@@ -10,6 +10,12 @@ readonly LOG=/var/log/cachyos-workstation-install.log
   exit 1
 }
 
+if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
+  IFS= read -r setup_employee_user || exit 2
+  IFS= read -r setup_employee_name || exit 2
+  IFS= read -r setup_employee_password || exit 2
+fi
+
 exec > >(tee -a "$LOG") 2>&1
 trap 'rc=$?; printf "HATA: Kurulum satir %s civarinda durdu (kod: %s). Log: %s\n" "$LINENO" "$rc" "$LOG" >&2' ERR
 printf 'Kurulum basladi: %s\n' "$(date --iso-8601=seconds)"
@@ -19,7 +25,15 @@ CACHY_FREEZE_CONFIG="$PROJECT_ROOT/deepfreeze/etc/cachy-freeze.conf" \
   bash "$PROJECT_ROOT/deepfreeze/bin/cachy-freeze" preflight
 
 bash "$INSTALLER_DIR/02-UYGULAMALARI-KUR.sh"
-bash "$INSTALLER_DIR/03-CALISAN-KULLANICI-OLUSTUR.sh"
+if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
+  printf '%s\n%s\n%s\n' \
+    "$setup_employee_user" "$setup_employee_name" "$setup_employee_password" |
+    CACHY_SETUP_NONINTERACTIVE=1 \
+      bash "$INSTALLER_DIR/03-CALISAN-KULLANICI-OLUSTUR.sh"
+  unset setup_employee_password
+else
+  bash "$INSTALLER_DIR/03-CALISAN-KULLANICI-OLUSTUR.sh"
+fi
 bash "$INSTALLER_DIR/01-DEEPFREEZE-KUR.sh"
 bash "$INSTALLER_DIR/06-GOLDEN-YAYINLA.sh"
 

@@ -37,8 +37,9 @@ changes. It then:
   comparisons, cleanup, and rollback counters;
 - recovers interrupted Golden/Active transactions and automatically restores
   the previous known-good Golden after repeated failed boots;
-- provides GUI pages for dashboards, snapshots, standard users, updates,
-  audit logs, boot policy, automatic snapshots, network policy, and settings;
+- provides one GUI for first installation, dashboards, snapshots, standard
+  users, updates, audit logs, boot policy, automatic snapshots, network policy,
+  and settings;
 - performs privileged work only through a PolicyKit-authenticated allow-list
   helper; passwords use stdin and never appear in process lists;
 - displays one GRUB entry whose title reflects the selected mode: **FROZEN**
@@ -65,8 +66,9 @@ instead of redesigning the project:
 3. Before installation, make a recoverable backup and confirm **UEFI + Btrfs +
    GRUB**, `/boot/efi`, and no separate `/boot`. Stop if preflight rejects the
    layout; do not bypass it.
-4. Use only the numbered top-level installers for normal deployment. Daily
-   operation after bootstrap must use **Cachy Freeze Management Center**.
+4. Start `CachyOS-Kurulum-Uygulamasi.desktop` for normal deployment and keep
+   the entire preflight/provision/test/finalize flow in its **Kurulum** page.
+   Numbered scripts are compatibility and recovery entry points only.
 5. Test all six GUI pages, both `localadm` and a standard user, FROZEN/THAWED
    and one-time THAWED boots, snapshot create/full verify/rollback, updates,
    autologin, home reset, audio devices, and a real MicroSIP call.
@@ -94,7 +96,8 @@ FROZEN boots without a GRUB password. THAWED requires the `cachyadmin` GRUB
 user and the password configured during installation.
 
 Changes made in THAWED mode do not automatically become the new Frozen
-baseline. Publish them with `11-BAKIM-YAYINLA-VE-DONDUR.sh`.
+baseline. Publish them with **Golden yayınla ve FROZEN yap** in the application;
+the numbered equivalent is reserved for recovery.
 
 ## Requirements
 
@@ -109,81 +112,37 @@ baseline. Publish them with `11-BAKIM-YAYINLA-VE-DONDUR.sh`.
 
 The installer stops when it detects an unsupported disk or boot layout.
 
-## Clone the repository
+## Install everything from one application
 
-Run this from a clean CachyOS installation or while the system is in THAWED
-mode:
+![CachyOS single-application setup wizard](docs/images/cachy-freeze-setup-preview.png)
 
-```bash
-sudo pacman -S --needed git github-cli
-gh auth login
-mkdir -p ~/Projeler
-cd ~/Projeler
-gh repo clone q0xs/CachyOS-USB-Kurulum
-cd CachyOS-USB-Kurulum
-```
+The normal installation no longer requires running numbered scripts or using
+a terminal. On the clean CachyOS laptop:
 
-The repository is private, so the authenticated GitHub account must have
-access.
+1. Sign in to GitHub in the web browser, download this private repository as a
+   ZIP, and extract it. A Git clone is also acceptable, but is not required.
+2. Double-click **`CachyOS-Kurulum-Uygulamasi.desktop`** in the extracted
+   project folder. If Plasma asks whether to trust or launch the file, approve
+   it. The first start installs only the PyQt6 runtime and uses the graphical
+   PolicyKit password dialog.
+3. In the application's **Kurulum** page, run the UEFI/Btrfs/GRUB preflight.
+   The installation is blocked if the disk layout is unsupported.
+4. Confirm that recovery media and a recoverable backup exist; enter the
+   standard employee account details and select **Tam kurulumu başlat**.
+5. Test Chrome, Slack, AnyDesk, LibreOffice, MicroSIP, Zoiper, audio devices,
+   and a privileged desktop action from the employee account.
+6. Return to the same **Kurulum** page, approve the three test checkboxes, set
+   the GRUB maintenance password, and select **Kurulumu tamamla ve FROZEN yap**.
+7. Accept the application's reboot prompt and perform the first Frozen reset
+   test.
 
-## Installation file order
+Both account and GRUB passwords are sent through the helper's standard input;
+they are not placed in process arguments, installation logs, or repository
+files. Progress and errors are displayed inside the application and retained
+in `/var/log/cachyos-workstation-install.log`.
 
-Use the top-level entry scripts. Do not run scripts under `installer/` or
-`deepfreeze/` individually during a normal installation. The filenames are
-numbered in their intended order:
-
-| File | When to use it |
-| --- | --- |
-| `01-TAM-KURULUMU-BASLAT.sh` | Starts the complete corporate workstation installation |
-| `02-TAM-KURULUMU-TAMAMLA.sh` | Run after testing the employee applications |
-| `03-ALTERNATIF-SADECE-FREEZE-UYGULAMASI.sh` | Alternative to 01–02; installs only the graphical Freeze Manager |
-| `10-BAKIM-ERIT.sh` | Schedules the next boot in persistent maintenance mode |
-| `11-BAKIM-YAYINLA-VE-DONDUR.sh` | Publishes maintenance changes and returns to Frozen mode |
-
-Do not run `03` after a complete `01`–`02` installation. It is a standalone
-alternative for computers that need only the Freeze Manager.
-
-## Complete workstation installation
-
-1. Start provisioning:
-
-   ```bash
-   bash ./01-TAM-KURULUMU-BASLAT.sh
-   ```
-
-2. Sign in to the employee account and verify:
-
-   - Chrome, Slack, AnyDesk, LibreOffice, MicroSIP, and Zoiper;
-   - microphone, speaker, and headset input/output;
-   - an administrative desktop action asks for the `localadm` password;
-   - the employee account is not a direct member of `wheel` or `sudo`.
-
-3. Return to `localadm`, complete the installation, and publish the Golden
-   snapshot:
-
-   ```bash
-   bash ./02-TAM-KURULUMU-TAMAMLA.sh
-   sudo reboot
-   ```
-
-4. During the first FROZEN test, create a temporary file in both managed
-   accounts when practical, reboot, and confirm that it is removed.
-
-See **[KURULUM-TR.md](KURULUM-TR.md)** for the full Turkish procedure and
-expected prompts.
-
-## Standalone freeze manager
-
-To install only the reusable graphical freeze/thaw manager on a compatible
-CachyOS computer:
-
-```bash
-bash ./03-ALTERNATIF-SADECE-FREEZE-UYGULAMASI.sh
-```
-
-The installer detects that computer's Btrfs UUID and installs a
-Polkit-authenticated **Cachy Freeze Manager** PyQt6 desktop application. The
-management center includes six wired pages:
+After bootstrap, the installed **Cachy Freeze Management Center** contains
+seven wired pages:
 
 - **Dashboard:** running/scheduled mode, disk, snapshot and boot health.
 - **Snapshots:** create, verify, compare, export, import, delete and rollback.
@@ -193,11 +152,13 @@ management center includes six wired pages:
 - **Audit logs:** structured INFO/WARNING/ERROR operation history.
 - **Settings:** freeze, snapshot, update, theme, language, boot, log, network,
   and automatic snapshot policy.
+- **Installation:** preflight, workstation provisioning, acceptance checklist,
+  GRUB protection, Golden publication, Frozen scheduling, and recovery status.
 
-Both actions show confirmation and progress feedback and offer to reboot when
-finished. The repository does not embed machine-specific identifiers. The
-supported layout is UEFI + Btrfs + GRUB, with the EFI partition mounted at
-`/boot/efi` and no separate `/boot` filesystem.
+The numbered shell entry points remain available only for recovery,
+diagnostics, and compatibility with earlier deployments. They call the same
+validated implementation used by the GUI; they are not the normal installation
+path. See **[KURULUM-TR.md](KURULUM-TR.md)** for the complete Turkish checklist.
 
 ## Maintenance
 
@@ -207,13 +168,15 @@ prompt, then use the Updates page. A protected update creates a rollback
 snapshot before pacman and publishes a new Golden after verification. Return
 to FROZEN from Dashboard or Settings and accept the reboot prompt.
 
-The numbered shell entry points remain deployment/bootstrap tools for the
-technician performing the first installation.
+The same application remains the normal interface for installation and daily
+management. Numbered shell entry points are reserved for recovery and backward
+compatibility.
 
 ## Repository layout
 
 ```text
 .
+├── CachyOS-Kurulum-Uygulamasi.desktop  # Terminal-free setup launcher
 ├── 01-TAM-KURULUMU-BASLAT.sh
 ├── 02-TAM-KURULUMU-TAMAMLA.sh
 ├── 03-ALTERNATIF-SADECE-FREEZE-UYGULAMASI.sh

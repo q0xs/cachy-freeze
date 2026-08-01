@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+
+show_error() {
+  local message=$1
+  if command -v kdialog >/dev/null 2>&1; then
+    kdialog --title "CachyOS Kurulum Uygulaması" --error "$message"
+  elif command -v zenity >/dev/null 2>&1; then
+    zenity --error --title="CachyOS Kurulum Uygulaması" --text="$message"
+  else
+    printf 'HATA: %s\n' "$message" >&2
+  fi
+}
+
+command -v python >/dev/null 2>&1 || {
+  show_error "Python bulunamadı. Temiz CachyOS kurulumunu doğrulayın."
+  exit 1
+}
+command -v pkexec >/dev/null 2>&1 || {
+  show_error "PolicyKit bulunamadı. Temiz CachyOS KDE kurulumu gerekli."
+  exit 1
+}
+
+# GitHub ZIP extraction can drop Unix execute bits. The desktop launcher itself
+# uses bash, then restores the helper bit before PolicyKit executes it.
+chmod u+x "$PROJECT_ROOT/app/cachy-freeze-manager-helper"
+
+if ! python -s -c 'import PyQt6' >/dev/null 2>&1; then
+  if ! pkexec /usr/bin/pacman -S --needed --noconfirm python-pyqt6; then
+    show_error "Grafik kurulum bileşeni yüklenemedi. İnternet bağlantısını kontrol edin."
+    exit 1
+  fi
+fi
+
+export PYTHONPATH="$PROJECT_ROOT/src:$PROJECT_ROOT/app"
+export PYTHONNOUSERSITE=1
+unset PYTHONHOME
+exec /usr/bin/python -s -m cachy_freeze_gui.main --setup-source "$PROJECT_ROOT"

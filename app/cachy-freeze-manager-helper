@@ -2,6 +2,12 @@
 set -Eeuo pipefail
 
 readonly BACKEND=/usr/local/sbin/cachy-freeze
+readonly SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+if [[ -d $SCRIPT_DIR/deployment/installer ]]; then
+  readonly PROJECT_ROOT=$SCRIPT_DIR/deployment
+else
+  readonly PROJECT_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
+fi
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin
 unset CDPATH ENV BASH_ENV PYTHONHOME PYTHONPATH CACHY_FREEZE_CONFIG
@@ -11,10 +17,140 @@ unset CACHY_FREEZE_ROOT_SUBVOLUME CACHY_FREEZE_INITRD_CONFIG CACHY_FREEZE_TOP
   printf '%s\n' "HATA: Yönetici yetkisi gerekli." >&2
   exit 1
 }
-[[ -x $BACKEND ]] || {
-  printf '%s\n' "HATA: Cachy Freeze altyapısı kurulu değil." >&2
+
+die() {
+  printf '%s\n' "HATA: $*" >&2
   exit 1
 }
+
+read_secret() {
+  IFS= read -r SETUP_SECRET || die "Parola güvenli giriş kanalından alınamadı."
+  (( ${#SETUP_SECRET} >= 12 && ${#SETUP_SECRET} <= 256 )) ||
+    die "Parola 12-256 karakter olmalıdır."
+  [[ $SETUP_SECRET != *:* && $SETUP_SECRET != *$'\r'* && $SETUP_SECRET != *$'\n'* ]] ||
+    die "Parola desteklenmeyen bir karakter içeriyor."
+  local classes=0
+  [[ $SETUP_SECRET =~ [a-z] ]] && ((classes += 1))
+  [[ $SETUP_SECRET =~ [A-Z] ]] && ((classes += 1))
+  [[ $SETUP_SECRET =~ [0-9] ]] && ((classes += 1))
+  [[ $SETUP_SECRET =~ [^A-Za-z0-9] ]] && ((classes += 1))
+  (( classes >= 3 )) || die "Parola en az üç karakter sınıfı içermelidir."
+}
+
+setup_status() {
+  local manager_installed=false employee_configured=false grub_protected=false
+  local employee_user= backend_status=
+  [[ -x $BACKEND ]] && manager_installed=true
+  if [[ -r /etc/cachy-employee.conf ]]; then
+    employee_user=$(sed -n 's/^EMPLOYEE_USER=//p' /etc/cachy-employee.conf)
+    if [[ $employee_user =~ ^[a-z][a-z0-9_-]{2,31}$ ]]; then
+      employee_configured=true
+    else
+      employee_user=
+    fi
+  fi
+  [[ -s /etc/cachy-freeze-grub-auth.conf ]] && grub_protected=true
+  if [[ $manager_installed == true && -r /etc/cachy-freeze.conf ]]; then
+    backend_status=$($BACKEND status 2>/dev/null || true)
+  fi
+  MANAGER_INSTALLED=$manager_installed \
+  EMPLOYEE_CONFIGURED=$employee_configured \
+  EMPLOYEE_USER=$employee_user \
+  GRUB_PROTECTED=$grub_protected \
+  BACKEND_STATUS=$backend_status \
+    /usr/bin/python - <<'PY'
+import json
+import os
+
+manager = os.environ["MANAGER_INSTALLED"] == "true"
+employee = os.environ["EMPLOYEE_CONFIGURED"] == "true"
+grub = os.environ["GRUB_PROTECTED"] == "true"
+status = {}
+try:
+    document = json.loads(os.environ.get("BACKEND_STATUS", ""))
+    if document.get("ok") is True and isinstance(document.get("result"), dict):
+        status = document["result"]
+except (json.JSONDecodeError, AttributeError):
+    pass
+
+golden = bool(status.get("golden_present"))
+scheduled_frozen = status.get("scheduled_mode") == "frozen"
+if manager and employee and golden and grub and scheduled_frozen:
+    phase = "complete"
+elif manager and employee and golden:
+    phase = "provisioned"
+elif not manager and not employee and not grub:
+    phase = "ready"
+else:
+    phase = "partial"
+
+print(json.dumps({
+    "ok": True,
+    "result": {
+        "phase": phase,
+        "manager_installed": manager,
+        "employee_configured": employee,
+        "employee_user": os.environ.get("EMPLOYEE_USER", ""),
+        "golden_present": golden,
+        "grub_protected": grub,
+        "scheduled_frozen": scheduled_frozen,
+    },
+}, ensure_ascii=False, sort_keys=True))
+PY
+}
+
+case ${1:-} in
+  setup-status)
+    (( $# == 1 )) || exit 2
+    setup_status
+    exit 0
+    ;;
+  setup-preflight)
+    (( $# == 1 )) || exit 2
+    if [[ -x $BACKEND && -r /etc/cachy-freeze.conf ]]; then
+      exec "$BACKEND" preflight
+    fi
+    [[ -r $PROJECT_ROOT/deepfreeze/bin/cachy-freeze ]] ||
+      die "Proje içindeki ön kontrol motoru bulunamadı."
+    exec env CACHY_FREEZE_CONFIG="$PROJECT_ROOT/deepfreeze/etc/cachy-freeze.conf" \
+      bash "$PROJECT_ROOT/deepfreeze/bin/cachy-freeze" preflight
+    ;;
+  setup-provision)
+    (( $# == 3 )) || exit 2
+    [[ $2 =~ ^[a-z][a-z0-9_-]{2,31}$ ]] || die "Geçersiz çalışan kullanıcı adı."
+    [[ -n ${3//[[:space:]]/} && $3 != *:* && $3 != *$'\n'* && $3 != *$'\r'* ]] ||
+      die "Geçersiz görünen ad."
+    [[ ! -s /etc/cachy-freeze-grub-auth.conf ]] ||
+      die "Kurulum zaten tamamlanmış; yeniden hazırlama engellendi."
+    [[ -r $PROJECT_ROOT/installer/00-HEPSINI-HAZIRLA.sh ]] ||
+      die "Doğrulanmış kurulum paketi bulunamadı."
+    read_secret
+    printf '%s\n%s\n%s\n' "$2" "$3" "$SETUP_SECRET" |
+      CACHY_SETUP_NONINTERACTIVE=1 \
+        bash "$PROJECT_ROOT/installer/00-HEPSINI-HAZIRLA.sh" >&2
+    unset SETUP_SECRET
+    printf '%s\n' '{"ok":true,"result":{"phase":"provisioned"}}'
+    exit 0
+    ;;
+  setup-finalize)
+    (( $# == 1 )) || exit 2
+    [[ -x $BACKEND && -r /etc/cachy-employee.conf ]] ||
+      die "Önce iş istasyonu hazırlama adımını tamamlayın."
+    [[ ! -s /etc/cachy-freeze-grub-auth.conf ]] ||
+      die "Kurulum zaten tamamlanmış; yeniden tamamlama engellendi."
+    [[ -r $PROJECT_ROOT/installer/08-KURULUMU-TAMAMLA.sh ]] ||
+      die "Doğrulanmış tamamlama paketi bulunamadı."
+    read_secret
+    printf '%s\n' "$SETUP_SECRET" |
+      CACHY_SETUP_NONINTERACTIVE=1 \
+        bash "$PROJECT_ROOT/installer/08-KURULUMU-TAMAMLA.sh" >&2
+    unset SETUP_SECRET
+    printf '%s\n' '{"ok":true,"result":{"phase":"complete"}}'
+    exit 0
+    ;;
+esac
+
+[[ -x $BACKEND ]] || die "Cachy Freeze altyapısı kurulu değil."
 
 case ${1:-} in
   status)

@@ -9,9 +9,10 @@ from typing import Any
 
 from PyQt6.QtCore import QObject, QProcess, pyqtSignal
 
-HELPER = "/usr/lib/cachy-freeze/cachy-freeze-manager-helper"
+INSTALLED_HELPER = Path("/usr/lib/cachy-freeze/cachy-freeze-manager-helper")
 STATUS_CACHE = Path("/var/lib/cachy-freeze/status.json")
 SNAPSHOT_CATALOG = Path("/var/lib/cachy-freeze/snapshots.json")
+MAX_ERROR_OUTPUT_BYTES = 64 * 1024
 
 
 class BackendClient(QObject):
@@ -22,9 +23,11 @@ class BackendClient(QObject):
     users_changed = pyqtSignal(list)
     result_ready = pyqtSignal(str, object)
     operation_finished = pyqtSignal(str, bool, str)
+    operation_output = pyqtSignal(str, str)
 
-    def __init__(self) -> None:
+    def __init__(self, setup_root: Path | None = None) -> None:
         super().__init__()
+        self.setup_root = setup_root.resolve() if setup_root is not None else None
         self.process: QProcess | None = None
         self.pending_action = ""
         self.status: dict[str, Any] = {}
@@ -32,6 +35,7 @@ class BackendClient(QObject):
         self.logs: list[dict[str, Any]] = []
         self.users: list[dict[str, Any]] = []
         self.pending_secret: str | None = None
+        self.stderr_buffer = bytearray()
 
     @property
     def busy(self) -> bool:
@@ -90,22 +94,47 @@ class BackendClient(QObject):
                 action, False, "Başka bir Cachy Freeze işlemi devam ediyor."
             )
             return False
-        if not os.access(HELPER, os.X_OK):
+        helper = self._helper_for(action)
+        if not os.access(helper, os.X_OK):
             self.operation_finished.emit(
-                action, False, "Yetkili Cachy Freeze yardımcısı bulunamadı."
+                action,
+                False,
+                "Yetkili Cachy Freeze yardımcısı bulunamadı. Kurulum uygulamasını "
+                "proje klasöründeki masaüstü başlatıcısından açın.",
             )
             return False
         self.pending_action = action
         self.pending_secret = secret
+        self.stderr_buffer.clear()
         self.process = QProcess(self)
         self.process.setProgram("/usr/bin/pkexec")
-        self.process.setArguments([HELPER, action, *arguments])
+        self.process.setArguments([str(helper), action, *arguments])
         self.process.finished.connect(self._finished)
         self.process.errorOccurred.connect(self._process_error)
         self.process.started.connect(self._send_secret)
+        self.process.readyReadStandardError.connect(self._read_stderr)
         self.busy_changed.emit(True)
         self.process.start()
         return True
+
+    def _helper_for(self, action: str) -> Path:
+        if action.startswith("setup-") and self.setup_root is not None:
+            return self.setup_root / "app" / "cachy-freeze-manager-helper"
+        return INSTALLED_HELPER
+
+    def _read_stderr(self) -> None:
+        if self.process is None:
+            return
+        chunk = bytes(self.process.readAllStandardError())
+        if not chunk:
+            return
+        self.stderr_buffer.extend(chunk)
+        if len(self.stderr_buffer) > MAX_ERROR_OUTPUT_BYTES:
+            del self.stderr_buffer[:-MAX_ERROR_OUTPUT_BYTES]
+        self.operation_output.emit(
+            self.pending_action,
+            chunk.decode("utf-8", errors="replace"),
+        )
 
     def _send_secret(self) -> None:
         if self.process is None or self.pending_secret is None:
@@ -119,11 +148,15 @@ class BackendClient(QObject):
             return
         action = self.pending_action
         stdout = bytes(self.process.readAllStandardOutput()).decode("utf-8", errors="replace")
-        stderr = bytes(self.process.readAllStandardError()).decode("utf-8", errors="replace")
+        self.stderr_buffer.extend(bytes(self.process.readAllStandardError()))
+        if len(self.stderr_buffer) > MAX_ERROR_OUTPUT_BYTES:
+            del self.stderr_buffer[:-MAX_ERROR_OUTPUT_BYTES]
+        stderr = self.stderr_buffer.decode("utf-8", errors="replace")
         self.process.deleteLater()
         self.process = None
         self.pending_action = ""
         self.pending_secret = None
+        self.stderr_buffer.clear()
         self.busy_changed.emit(False)
         if exit_code in (126, 127):
             self.operation_finished.emit(action, False, "Kimlik doğrulama iptal edildi.")
@@ -167,6 +200,7 @@ class BackendClient(QObject):
         self.process = None
         self.pending_action = ""
         self.pending_secret = None
+        self.stderr_buffer.clear()
         self.busy_changed.emit(False)
         self.operation_finished.emit(action, False, "Yetkili işlem başlatılamadı.")
 
@@ -200,6 +234,10 @@ class BackendClient(QObject):
             "settings-set": "Ayarlar doğrulanarak kaydedildi.",
             "applications-status": "Kurumsal uygulamalar doğrulandı.",
             "applications-install": "Uygulamalar kuruldu ve yeni Golden yayınlandı.",
+            "setup-status": "Kurulum durumu yenilendi.",
+            "setup-preflight": "CachyOS, UEFI, Btrfs ve GRUB ön kontrolü başarılı.",
+            "setup-provision": "İş istasyonu hazırlandı; uygulama testleri bekleniyor.",
+            "setup-finalize": "Kurulum tamamlandı ve sonraki açılış FROZEN olarak ayarlandı.",
             "reboot": "Sistem yeniden başlatılıyor.",
         }
         return messages.get(action, "İşlem başarıyla tamamlandı.")

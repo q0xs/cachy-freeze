@@ -69,6 +69,8 @@ install -d -m 0755 "$deployment_next"
 cp -a "$PROJECT_ROOT/installer" "$deployment_next/"
 cp -a "$PROJECT_ROOT/policies" "$deployment_next/"
 cp -a "$PROJECT_ROOT/vendor" "$deployment_next/"
+cp -a "$PROJECT_ROOT/deepfreeze" "$deployment_next/"
+cp -a "$PROJECT_ROOT/user" "$deployment_next/"
 chown -R root:root "$deployment_next"
 rm -rf --one-file-system "$deployment_previous"
 if [[ -d $deployment ]]; then

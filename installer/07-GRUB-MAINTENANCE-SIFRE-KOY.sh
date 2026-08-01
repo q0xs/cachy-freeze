@@ -17,14 +17,28 @@ command -v grub-mkpasswd-pbkdf2 >/dev/null ||
 command -v grub-mkconfig >/dev/null || die "grub-mkconfig bulunamadi."
 [[ -r $AUTH_GENERATOR ]] || die "GRUB yetkilendirme dosyasi eksik."
 
-printf '%s\n' \
-  "GRUB Maintenance kullanicisi: $AUTH_USER" \
-  "Simdi iki kez girilecek parola ekranda gorunmez."
-
-hash=$(
-  grub-mkpasswd-pbkdf2 |
-    sed -n 's/.*\(grub\.pbkdf2\.[^[:space:]]*\).*/\1/p'
-)
+if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
+  IFS= read -r grub_password || die "GRUB parolasi GUI kanalindan alinamadi."
+  (( ${#grub_password} >= 12 && ${#grub_password} <= 256 )) ||
+    die "GRUB parolasi 12-256 karakter olmalidir."
+  [[ $grub_password != *:* && $grub_password != *$'\n'* && \
+    $grub_password != *$'\r'* ]] ||
+    die "GRUB parolasi desteklenmeyen bir karakter iceriyor."
+  hash=$(
+    printf '%s\n%s\n' "$grub_password" "$grub_password" |
+      grub-mkpasswd-pbkdf2 |
+      sed -n 's/.*\(grub\.pbkdf2\.[^[:space:]]*\).*/\1/p'
+  )
+  unset grub_password
+else
+  printf '%s\n' \
+    "GRUB Maintenance kullanicisi: $AUTH_USER" \
+    "Simdi iki kez girilecek parola ekranda gorunmez."
+  hash=$(
+    grub-mkpasswd-pbkdf2 |
+      sed -n 's/.*\(grub\.pbkdf2\.[^[:space:]]*\).*/\1/p'
+  )
+fi
 [[ $hash == grub.pbkdf2.* ]] || die "Parola ozeti olusturulamadi."
 
 install -m 0755 "$AUTH_GENERATOR" /etc/grub.d/01_cachy_auth

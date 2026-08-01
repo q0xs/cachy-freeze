@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 from datetime import datetime
 from typing import Any
@@ -27,6 +28,7 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QStackedWidget,
     QTableWidget,
@@ -104,6 +106,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.backend = backend
         self.settings = QSettings("CachyOS Workstation", "Cachy Freeze")
+        self.setup_preflight_ok = False
         self.setWindowTitle("Cachy Freeze Yönetim Merkezi")
         self.setMinimumSize(980, 640)
         self.resize(1180, 740)
@@ -127,14 +130,16 @@ class MainWindow(QMainWindow):
         brand.setObjectName("brand")
         side_layout.addWidget(brand)
         self.nav_buttons: list[QPushButton] = []
-        for title in (
+        self.page_titles = (
             "Genel Bakış",
             "Snapshotlar",
             "Kullanıcılar",
             "Güncellemeler",
             "Audit Logları",
             "Ayarlar",
-        ):
+            "Kurulum",
+        )
+        for title in self.page_titles:
             button = QPushButton(title)
             button.setObjectName("nav")
             button.setCheckable(True)
@@ -177,12 +182,18 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self._updates_page())
         self.pages.addWidget(self._logs_page())
         self.pages.addWidget(self._settings_page())
+        self.pages.addWidget(self._setup_page())
         content_layout.addWidget(self.pages, 1)
 
         shell.addWidget(sidebar)
         shell.addWidget(content, 1)
         self.setCentralWidget(central)
         self.statusBar().showMessage("Hazır")
+
+    def open_setup_page(self) -> None:
+        index = len(self.page_titles) - 1
+        self.nav_buttons[index].setChecked(True)
+        self._select_page(index, self.page_titles[index])
 
     def _dashboard_page(self) -> QWidget:
         page = QWidget()
@@ -454,6 +465,86 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         return page
 
+    def _setup_page(self) -> QWidget:
+        page = QScrollArea()
+        page.setWidgetResizable(True)
+        page.setFrameShape(QFrame.Shape.NoFrame)
+        body = QWidget()
+        layout = QVBoxLayout(body)
+        layout.setContentsMargins(0, 4, 8, 0)
+        layout.setSpacing(14)
+
+        state_card = QFrame()
+        state_card.setObjectName("card")
+        state_layout = QVBoxLayout(state_card)
+        state_title = QLabel("Tek uygulamalı kurulum")
+        state_title.setObjectName("cardValue")
+        self.setup_state_label = QLabel("Kurulum durumu denetleniyor…")
+        self.setup_state_label.setObjectName("muted")
+        self.setup_state_label.setWordWrap(True)
+        self.setup_preflight_button = QPushButton("1. Sistem ön kontrolünü çalıştır")
+        state_layout.addWidget(state_title)
+        state_layout.addWidget(self.setup_state_label)
+        state_layout.addWidget(self.setup_preflight_button)
+        layout.addWidget(state_card)
+
+        stages = QGridLayout()
+        stages.setSpacing(14)
+
+        provision_group = QGroupBox("2. İş istasyonunu hazırla")
+        provision_form = QFormLayout(provision_group)
+        self.setup_username = QLineEdit()
+        self.setup_username.setPlaceholderText("ornek.kullanici")
+        self.setup_display_name = QLineEdit()
+        self.setup_display_name.setPlaceholderText("Ad Soyad")
+        self.setup_password = QLineEdit()
+        self.setup_password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.setup_password_confirm = QLineEdit()
+        self.setup_password_confirm.setEchoMode(QLineEdit.EchoMode.Password)
+        self.setup_backup_check = QCheckBox("Kurtarma medyası ve geri alınabilir yedek hazır")
+        self.setup_start_button = QPushButton("Tam kurulumu başlat")
+        self.setup_start_button.setObjectName("primary")
+        provision_form.addRow("Kullanıcı adı", self.setup_username)
+        provision_form.addRow("Görünen ad", self.setup_display_name)
+        provision_form.addRow("Kullanıcı parolası", self.setup_password)
+        provision_form.addRow("Parola tekrar", self.setup_password_confirm)
+        provision_form.addRow("", self.setup_backup_check)
+        provision_form.addRow("", self.setup_start_button)
+        stages.addWidget(provision_group, 0, 0)
+
+        finalize_group = QGroupBox("3. Test et, Golden yayınla ve dondur")
+        finalize_form = QFormLayout(finalize_group)
+        self.setup_apps_check = QCheckBox("Kurumsal uygulamalar açıldı")
+        self.setup_audio_check = QCheckBox("Mikrofon, hoparlör ve görüşme test edildi")
+        self.setup_admin_check = QCheckBox("Yönetici işlemi localadm parolası istedi")
+        self.setup_grub_password = QLineEdit()
+        self.setup_grub_password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.setup_grub_confirm = QLineEdit()
+        self.setup_grub_confirm.setEchoMode(QLineEdit.EchoMode.Password)
+        self.setup_finish_button = QPushButton("Kurulumu tamamla ve FROZEN yap")
+        self.setup_finish_button.setObjectName("primary")
+        finalize_form.addRow("", self.setup_apps_check)
+        finalize_form.addRow("", self.setup_audio_check)
+        finalize_form.addRow("", self.setup_admin_check)
+        finalize_form.addRow("GRUB parolası", self.setup_grub_password)
+        finalize_form.addRow("Parola tekrar", self.setup_grub_confirm)
+        finalize_form.addRow("", self.setup_finish_button)
+        stages.addWidget(finalize_group, 0, 1)
+        layout.addLayout(stages)
+
+        output_title = QLabel("Kurulum ilerlemesi ve hata ayrıntıları")
+        output_title.setObjectName("cardCaption")
+        self.setup_output = QPlainTextEdit()
+        self.setup_output.setReadOnly(True)
+        self.setup_output.setMaximumBlockCount(2000)
+        self.setup_output.setMinimumHeight(140)
+        self.setup_output.setPlaceholderText("Ön kontrol ve kurulum çıktısı burada gösterilecek.")
+        layout.addWidget(output_title)
+        layout.addWidget(self.setup_output)
+        layout.addStretch()
+        page.setWidget(body)
+        return page
+
     def _logs_page(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -473,20 +564,12 @@ class MainWindow(QMainWindow):
         return page
 
     def _connect(self) -> None:
-        titles = (
-            "Genel Bakış",
-            "Snapshotlar",
-            "Kullanıcılar",
-            "Güncellemeler",
-            "Audit Logları",
-            "Ayarlar",
-        )
         for index, button in enumerate(self.nav_buttons):
             button.clicked.connect(
-                lambda _checked, page=index: self._select_page(page, titles[page])
+                lambda _checked, page=index: self._select_page(page, self.page_titles[page])
             )
         self.theme_button.clicked.connect(self._toggle_theme)
-        self.refresh_button.clicked.connect(lambda: self.backend.run("status"))
+        self.refresh_button.clicked.connect(self._refresh_current_page)
         self.thaw_button.clicked.connect(self._confirm_thaw)
         self.freeze_button.clicked.connect(self._confirm_freeze)
         self.reboot_button.clicked.connect(self._confirm_reboot)
@@ -516,6 +599,9 @@ class MainWindow(QMainWindow):
         self.thaw_once_button.clicked.connect(self._confirm_thaw_once)
         self.boot_frozen_button.clicked.connect(self._confirm_freeze)
         self.boot_thawed_button.clicked.connect(self._confirm_thaw)
+        self.setup_preflight_button.clicked.connect(lambda: self.backend.run("setup-preflight"))
+        self.setup_start_button.clicked.connect(self._start_setup)
+        self.setup_finish_button.clicked.connect(self._finish_setup)
         self.backend.busy_changed.connect(self._busy_changed)
         self.backend.status_changed.connect(self._status_changed)
         self.backend.snapshots_changed.connect(self._snapshots_changed)
@@ -523,6 +609,11 @@ class MainWindow(QMainWindow):
         self.backend.users_changed.connect(self._users_changed)
         self.backend.result_ready.connect(self._result_ready)
         self.backend.operation_finished.connect(self._operation_finished)
+        self.backend.operation_output.connect(self._operation_output)
+
+    def _refresh_current_page(self) -> None:
+        action = "setup-status" if self.pages.currentIndex() == 6 else "status"
+        self.backend.run(action)
 
     def _select_page(self, index: int, title: str) -> None:
         self.pages.setCurrentIndex(index)
@@ -537,6 +628,8 @@ class MainWindow(QMainWindow):
             self.backend.run("logs")
         elif index == 5:
             self.backend.run("settings-get")
+        elif index == 6:
+            self.backend.run("setup-status")
 
     def _busy_changed(self, busy: bool) -> None:
         self.progress.setVisible(busy)
@@ -571,6 +664,9 @@ class MainWindow(QMainWindow):
             self.thaw_once_button,
             self.boot_frozen_button,
             self.boot_thawed_button,
+            self.setup_preflight_button,
+            self.setup_start_button,
+            self.setup_finish_button,
         ):
             button.setDisabled(busy)
         self.statusBar().showMessage("İşlem devam ediyor…" if busy else "Hazır")
@@ -899,6 +995,116 @@ class MainWindow(QMainWindow):
         if accepted and filename.strip():
             self.backend.run("snapshot-import", filename.strip())
 
+    @staticmethod
+    def _password_is_strong(password: str) -> bool:
+        classes = sum(
+            bool(re.search(pattern, password))
+            for pattern in (r"[a-z]", r"[A-Z]", r"[0-9]", r"[^A-Za-z0-9]")
+        )
+        return (
+            12 <= len(password) <= 256
+            and classes >= 3
+            and not any(character in password for character in ("\n", "\r", "\x00", ":"))
+        )
+
+    def _start_setup(self) -> None:
+        username = self.setup_username.text().strip().lower()
+        display_name = self.setup_display_name.text().strip()
+        password = self.setup_password.text()
+        if not self.setup_preflight_ok:
+            QMessageBox.warning(
+                self,
+                "Ön kontrol gerekli",
+                "Kuruluma başlamadan önce sistem ön kontrolünü başarıyla çalıştırın.",
+            )
+            return
+        if not self.setup_backup_check.isChecked():
+            QMessageBox.warning(
+                self,
+                "Yedek gerekli",
+                "Önyüklenebilir kurtarma medyasını ve geri alınabilir yedeği hazırladığınızı "
+                "onaylayın.",
+            )
+            return
+        if re.fullmatch(r"[a-z][a-z0-9_-]{2,31}", username) is None:
+            QMessageBox.warning(
+                self,
+                "Geçersiz kullanıcı adı",
+                "Kullanıcı adı küçük harfle başlamalı; 3-32 karakter olmalı ve yalnızca "
+                "küçük harf, rakam, _ veya - içermelidir.",
+            )
+            return
+        if not display_name or ":" in display_name or "\n" in display_name:
+            QMessageBox.warning(self, "Geçersiz görünen ad", "Geçerli bir ad ve soyad girin.")
+            return
+        if password != self.setup_password_confirm.text():
+            QMessageBox.warning(self, "Parola hatası", "Kullanıcı parolaları aynı değil.")
+            return
+        if not self._password_is_strong(password):
+            QMessageBox.warning(
+                self,
+                "Zayıf parola",
+                "Parola 12-256 karakter olmalı ve küçük harf, büyük harf, rakam ve sembol "
+                "sınıflarından en az üçünü içermelidir.",
+            )
+            return
+        answer = QMessageBox.warning(
+            self,
+            "Tam kurulumu başlat",
+            "Paketler kurulacak; Btrfs, initramfs ve GRUB yapılandırılacak. İşlem boyunca "
+            "gücü kesmeyin. Devam edilsin mi?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.setup_output.clear()
+        if self.backend.run("setup-provision", username, display_name, secret=password):
+            self.setup_password.clear()
+            self.setup_password_confirm.clear()
+
+    def _finish_setup(self) -> None:
+        checks = (
+            self.setup_apps_check,
+            self.setup_audio_check,
+            self.setup_admin_check,
+        )
+        if not all(check.isChecked() for check in checks):
+            QMessageBox.warning(
+                self,
+                "Canlı test eksik",
+                "Kurulumu dondurmadan önce üç uygulama ve donanım testini de onaylayın.",
+            )
+            return
+        password = self.setup_grub_password.text()
+        if password != self.setup_grub_confirm.text():
+            QMessageBox.warning(self, "Parola hatası", "GRUB parolaları aynı değil.")
+            return
+        if not self._password_is_strong(password):
+            QMessageBox.warning(
+                self,
+                "Zayıf GRUB parolası",
+                "GRUB parolası 12-256 karakter olmalı ve en az üç karakter sınıfı içermelidir.",
+            )
+            return
+        answer = QMessageBox.warning(
+            self,
+            "Golden yayınla ve FROZEN yap",
+            "Kullanıcı şablonları güncellenecek, Golden yayınlanacak ve sonraki açılış "
+            "FROZEN yapılacak. İşlem sırasında bilgisayarı kapatmayın.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        if self.backend.run("setup-finalize", secret=password):
+            self.setup_grub_password.clear()
+            self.setup_grub_confirm.clear()
+
+    def _operation_output(self, action: str, output: str) -> None:
+        if action.startswith("setup-") and output.rstrip():
+            self.setup_output.appendPlainText(output.rstrip())
+
     def _confirm_thaw(self) -> None:
         if (
             QMessageBox.question(
@@ -996,6 +1202,16 @@ class MainWindow(QMainWindow):
             self.settings.remove("pending_autologin")
         if not success and "iptal edildi" not in message.lower():
             QMessageBox.critical(self, "Cachy Freeze Hatası", message)
+        elif success and action == "setup-finalize":
+            answer = QMessageBox.question(
+                self,
+                "Kurulum tamamlandı",
+                f"{message}\n\nİlk FROZEN testi için şimdi yeniden başlatılsın mı?",
+            )
+            if answer == QMessageBox.StandardButton.Yes:
+                self.backend.run("reboot")
+            else:
+                self.backend.run("setup-status")
         elif success and action in {
             "freeze",
             "thaw",
@@ -1011,6 +1227,15 @@ class MainWindow(QMainWindow):
             )
             if answer == QMessageBox.StandardButton.Yes:
                 self.backend.run("reboot")
+        if success and action == "setup-provision":
+            QMessageBox.information(
+                self,
+                "İlk aşama tamamlandı",
+                "Çalışan hesabında kurumsal uygulamaları, ses aygıtlarını ve yönetici "
+                "parolası isteğini test edin. Sonra Kurulum sayfasına dönüp üçüncü adımı "
+                "tamamlayın.",
+            )
+            self.backend.run("setup-status")
         if success and action == "user-create":
             pending = str(self.settings.value("pending_autologin", ""))
             self.settings.remove("pending_autologin")
@@ -1023,7 +1248,41 @@ class MainWindow(QMainWindow):
     def _result_ready(self, action: str, result: object) -> None:
         if not isinstance(result, dict):
             return
-        if action == "snapshot-compare":
+        if action == "setup-preflight":
+            self.setup_preflight_ok = True
+            self.setup_state_label.setText(
+                "Ön kontrol başarılı: UEFI + Btrfs + GRUB düzeni destekleniyor."
+            )
+            self.setup_output.appendPlainText(
+                "Ön kontrol başarılı\n"
+                f"Kök aygıt: {result.get('root_device', '—')}\n"
+                f"Kök alt birimi: {result.get('current_subvolume', '—')}\n"
+                f"Firmware: {result.get('firmware', '—')} / "
+                f"Dosya sistemi: {result.get('filesystem', '—')}"
+            )
+        elif action == "setup-status":
+            phase = str(result.get("phase", "unknown"))
+            labels = {
+                "ready": (
+                    "Kuruluma hazır. Ön kontrolü çalıştırın, çalışan hesabını girin ve "
+                    "tam kurulumu başlatın."
+                ),
+                "partial": (
+                    "Yarım kalmış bir kurulum algılandı. Logu koruyun; ön kontrol sonrası "
+                    "aynı bilgilerle kurulumu güvenle yeniden başlatabilirsiniz."
+                ),
+                "provisioned": (
+                    "Altyapı, çalışan hesabı ve Golden hazır. Canlı uygulama testlerinden "
+                    "sonra üçüncü adımı tamamlayın."
+                ),
+                "complete": ("Kurulum tamamlandı. Sistem sonraki açılış için FROZEN olarak hazır."),
+            }
+            employee = str(result.get("employee_user", ""))
+            detail = labels.get(phase, "Kurulum durumu belirlenemedi; logları inceleyin.")
+            if employee:
+                detail += f" Yönetilen kullanıcı: {employee}."
+            self.setup_state_label.setText(detail)
+        elif action == "snapshot-compare":
             paths = result.get("changed_paths", [])
             preview = "\n".join(str(path) for path in paths[:30])
             if result.get("truncated"):

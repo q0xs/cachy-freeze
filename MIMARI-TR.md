@@ -7,8 +7,12 @@ Yönetim Merkezi** üzerinden yapılır; normal kullanıcı terminal kullanmaz.
 ## Bileşenler
 
 - `app/cachy_freeze_gui`: PyQt6 yönetim arayüzü. Ayrıcalıksız çalışır.
+- `CachyOS-Kurulum-Uygulamasi.desktop` ve `app/cachy-freeze-setup`: Temiz
+  CachyOS üzerinde terminal göstermeden aynı GUI'yi Kurulum sayfasında açan,
+  eksikse yalnızca PyQt6 çalışma zamanını PolicyKit ile hazırlayan bootstrap.
 - `app/cachy-freeze-manager-helper`: PolicyKit tarafından yalnızca izin verilen
-  işlemleri ve doğrulanmış argümanları root backend'e ileten dar güven sınırı.
+  işlemleri ve doğrulanmış argümanları root backend'e ileten dar güven sınırı;
+  ön kontrol, hazırlama ve kurulum tamamlama eylemleri de aynı allow-list'tedir.
 - `src/cachy_freeze`: Snapshot, freeze, boot, kullanıcı, ayar, güncelleme,
   metadata, audit ve transaction katmanları.
 - `deepfreeze/initcpio`: Kök bağlanmadan önce Active'i Golden'dan yeniden
@@ -19,6 +23,15 @@ Yönetim Merkezi** üzerinden yapılır; normal kullanıcı terminal kullanmaz.
 GUI hiçbir shell komutu oluşturmaz. Ayrıcalıklı süreçler argüman dizileriyle
 çalıştırılır; parola yalnızca kapalı standart giriş kanalı üzerinden taşınır ve
 komut satırına, JSON yanıtına veya audit loguna girmez.
+
+İlk kurulumda GUI mevcut doğrulanmış installer zincirini yeniden kullanır.
+Çalışan ve GRUB parolaları helper'a stdin üzerinden gelir; helper bunları yine
+stdin üzerinden etkileşimsiz installer kipine aktarır. Kurulum çıktısı GUI'de
+canlı gösterilir ve `/var/log/cachyos-workstation-install.log` içinde tutulur.
+Kurulumla birlikte `installer`, `deepfreeze`, `user`, `policies` ve `vendor`
+payload'ları `/usr/lib/cachy-freeze/deployment` altına kopyalanır; böylece aynı
+Kurulum sayfası yeniden açıldığında yarım kalan durum belirlenebilir ve ikinci
+aşama repo klasörüne bağlı kalmadan tamamlanabilir.
 
 ## Btrfs alt birim düzeni
 
