@@ -44,8 +44,8 @@ PyQt6 arayüzü mevcut modu bir durum kartında gösterir; işlem sırasında il
 göstergesi sunar. Her iki işlem yönetici parolası ister, sonucunu gösterir ve
 ardından yeniden başlatmayı teklif eder.
 
-Kurulum tamamlanıp yeni sistem açıldıktan sonra `localadm` hesabında terminali
-aç.
+Kurulum tamamlanıp yeni sistem açıldıktan sonra günlük yönetimi uygulama
+menüsündeki **Cachy Freeze Yönetim Merkezi** üzerinden yap.
 
 ## 2. Projeyi GitHub'dan al
 
@@ -137,22 +137,20 @@ yeniden başlat ve dosyanın silindiğini doğrula.
 
 ## Sonradan bakım yapmak
 
-GRUB'dan THAWED seçip `cachyadmin` ve GRUB parolasıyla açabilirsin.
-Güncelleme veya ayar değişikliğinden sonra:
+Günlük yönetimde terminal gerekmez. **Cachy Freeze Yönetim Merkezi** içinden:
 
-```bash
-bash ./11-BAKIM-YAYINLA-VE-DONDUR.sh
-sudo reboot
-```
+1. Ayarlar sayfasında kalıcı THAWED veya yalnızca bir kez THAWED seç.
+2. Uygulamanın sunduğu yeniden başlatma onayını kullan.
+3. Bakım kökünde Güncellemeler sayfasından denetim ve güncellemeyi çalıştır.
+   Uygulama önce geri dönüş snapshotı alır ve başarılı sonuçta Golden'ı yayınlar.
+4. Snapshot sayfasından istersen açıklamalı ek snapshot oluştur, karşılaştır veya
+   doğrula.
+5. Dashboard/Ayarlar üzerinden FROZEN seçip uygulamanın yeniden başlatma
+   onayını kullan.
 
-Bu bakım dosyası hem Golden'ı yayınlar hem sonraki açılışı Frozen yapar.
-
-Frozen içindeyken sonraki açılışları kalıcı olarak Maintenance yapmak istersen:
-
-```bash
-bash ./10-BAKIM-ERIT.sh
-sudo reboot
-```
+Kullanıcı oluşturma, parola sıfırlama, kilitleme, otomatik giriş, snapshot
+rollback/export/import, audit logları ve saklama politikası da aynı GUI içinden
+yönetilir. Bootstrap betikleri yalnızca ilk teknisyen kurulumunun parçasıdır.
 
 ## Önemli
 
