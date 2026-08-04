@@ -10,10 +10,11 @@ every reboot.
 > **[KURULUM-TR.md](KURULUM-TR.md)**.
 
 > [!TIP]
-> Codex CLI should start the physical CachyOS acceptance from
-> **[CODEX-CLI-DEVAM-TALIMATI.md](CODEX-CLI-DEVAM-TALIMATI.md)**. It records the
-> verified VirtualBox checkpoint, remaining tests, safety gates, and exact
-> continuation order.
+> Codex CLI must read **[AGENTS.md](AGENTS.md)** first and then continue from
+> **[CODEX-CLI-DEVAM-TALIMATI.md](CODEX-CLI-DEVAM-TALIMATI.md)**. The handoff
+> records the current VirtualBox checkpoint, physical-device test matrix,
+> safety gates, and exact continuation order. Checkpoint data is informational;
+> Codex must revalidate the real target before changing it.
 
 > [!CAUTION]
 > The application modifies the boot chain, initramfs, GRUB configuration, and
@@ -29,7 +30,9 @@ changes. It then:
 - creates the managed employee account;
 - enables microphone, speaker, headset, video, input, and realtime access;
 - requests the `localadm` administrator password for privileged desktop
-  actions instead of immediately denying them;
+  actions instead of immediately denying them, while preserving the upstream
+  allow policy for a small exact list of Plasma login-time hardware and network
+  actions so harmless probes do not show administrator prompts;
 - gives the employee a normal Windows-standard-user-like desktop experience:
   user settings remain available, while system changes require Polkit
   authentication with the `localadm` password;
@@ -64,8 +67,9 @@ boot-health, snapshot, update, and audit state from the workstation.
 When this repository is reopened for the physical laptop test, start here
 instead of redesigning the project:
 
-1. Read `MIMARI-TR.md`, `KURULUM-TR.md`, and `PILOT-NOTLARI.md`; then inspect
-   `git status --short` and the latest three commits.
+1. Read `AGENTS.md`, `CODEX-CLI-DEVAM-TALIMATI.md`, `MIMARI-TR.md`,
+   `KURULUM-TR.md`, `GITHUB-ILE-CALISMA.md`, and `PILOT-NOTLARI.md`; then
+   inspect `git status --short`, the remotes, and the latest three commits.
 2. Keep the Windows host and CachyOS target strictly separate. Btrfs, GRUB,
    initramfs, snapshot, freeze, and rollback commands may run only on the
    dedicated CachyOS laptop or a disposable CachyOS VM.
@@ -84,11 +88,16 @@ instead of redesigning the project:
    logs, `journalctl -b`, `findmnt`, `btrfs subvolume list /`, boot mode, and the
    exact failed step. Do not run `btrfs check --repair`.
 
-Previous acceptance covered real Btrfs loop-device transactions, power-loss
-recovery, 25-snapshot stress, Linux user lifecycle, PyQt6 smoke testing,
-MicroSIP 3.22.12 under Wine, and initramfs builds for two CachyOS kernels. The
-remaining production acceptance is the physical **UEFI/GRUB reboot chain** on
-the backed-up pilot laptop.
+The 4 August 2026 clean VirtualBox checkpoint reached `phase=provisioned` in a
+real UEFI/Btrfs/GRUB guest. All six employee applications opened, the employee
+remained outside wheel/sudo, and GitHub Actions passed. Finalize was deliberately
+not run because the VM exposed no real microphone/headset and no real call was
+verified. The VM was later observed in VirtualBox's `aborted` state, so its next
+use also requires fresh boot-health, transaction, subvolume, and journal checks;
+this is not a passed power-loss test. Physical audio, finalize, FROZEN/THAWED
+reboot behavior, snapshot, update, user-lifecycle, stress, and destructive-gate
+acceptance therefore remain open. Do not report an older VM snapshot or
+loop-device result as physical acceptance.
 
 ## Boot modes
 
@@ -114,6 +123,8 @@ baseline. Publish them with **Golden yayınla ve FROZEN yap** in the application
 - no separate `/boot` filesystem
 - internet access
 - local `localadm` account with `sudo` privileges and an active password
+- AC power, bootable recovery media, and a recoverable external backup before
+  any physical-device boot-chain change
 
 The installer stops when it detects an unsupported disk or boot layout.
 
@@ -145,6 +156,12 @@ Both account and GRUB passwords are sent through the helper's standard input;
 they are not placed in process arguments, installation logs, or repository
 files. Progress and errors are displayed inside the application and retained
 in `/var/log/cachyos-workstation-install.log`.
+
+The employee login must not request administrator authentication merely to
+probe QMK/VIA devices, detect a discrete GPU, control the active user's network
+connection, or read battery thresholds. An unrelated privileged operation must
+still request the `localadm` password. Treat either opposite result as a policy
+regression and stop before finalize.
 
 After bootstrap, the installed **Cachy Freeze Management Center** contains
 seven wired pages:
@@ -178,8 +195,11 @@ daily management.
 
 ```text
 .
+├── AGENTS.md      # Repository-wide Codex safety and validation rules
 ├── CachyOS-Kurulum-Uygulamasi.desktop  # Terminal-free setup launcher
 ├── app/           # Graphical freeze/thaw manager and Polkit policy
+├── CODEX-CLI-DEVAM-TALIMATI.md  # Current QA handoff and physical test order
+├── CODEX-CLI-FIZIKSEL-GOREV-METNI.md  # Paste-ready physical acceptance task
 ├── KURULUM-TR.md  # Complete Turkish installation guide
 ├── deepfreeze/    # Btrfs, initramfs, and GRUB infrastructure
 ├── installer/     # Provisioning and publishing steps
@@ -192,12 +212,19 @@ daily management.
 
 The automated validation suite checks syntax, core configuration, desktop
 entries, JSON, systemd units, the graphical interface, Btrfs transactions,
-users, snapshots, and recovery behavior. Boot-chain and Btrfs integration tests
-must run only on a dedicated test device or disposable virtual machine.
+users, snapshots, secret transport, and recovery behavior. The minimum
+pre-push gate is Ruff check and format, all Python unit tests, Bash syntax,
+ShellCheck, systemd verification, desktop-file validation, and the Qt offscreen
+smoke test. Boot-chain and Btrfs integration tests must run only on a dedicated
+test device or disposable virtual machine. The full physical matrix is in
+`CODEX-CLI-DEVAM-TALIMATI.md`.
 
 ## Additional documentation
 
 - [Turkish installation guide](KURULUM-TR.md)
+- [Codex repository rules](AGENTS.md)
+- [Codex CLI continuation and physical acceptance](CODEX-CLI-DEVAM-TALIMATI.md)
+- [Paste-ready Codex CLI physical task](CODEX-CLI-FIZIKSEL-GOREV-METNI.md)
 - [Pilot-device checklist](PILOT-NOTLARI.md)
 - [GitHub workflow on Linux](GITHUB-ILE-CALISMA.md)
 - [Boot recovery notes](KURTARMA-EKRAN-GELMEZSE.txt)
@@ -209,6 +236,8 @@ must run only on a dedicated test device or disposable virtual machine.
 - GitHub protects the project files; it is not a disk image or a replacement
   for bootable recovery media.
 - Never commit passwords, access tokens, device UUIDs, or real user data.
+- Never put a password or reusable password hash in a process argument; use the
+  existing stdin secret channel.
 - Unpushed changes made in FROZEN mode disappear after reboot.
 - Do not manually delete the `@`, `@golden`, or `@active` Btrfs subvolumes.
 - Do not run `btrfs check --repair` without expert guidance.

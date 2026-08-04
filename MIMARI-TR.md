@@ -10,6 +10,8 @@ Yönetim Merkezi** üzerinden yapılır; normal kullanıcı terminal kullanmaz.
 - `CachyOS-Kurulum-Uygulamasi.desktop` ve `app/cachy-freeze-setup`: Temiz
   CachyOS üzerinde terminal göstermeden aynı GUI'yi Kurulum sayfasında açan,
   eksikse yalnızca PyQt6 çalışma zamanını PolicyKit ile hazırlayan bootstrap.
+  Masaüstü girdisi Dolphin'in `%k` değerini güvenli biçimde çözümler; boşluklu
+  veya `file://` kaynak yolları kabuk parçalarına dönüşmeden başlatıcıya iletilir.
 - `app/cachy-freeze-manager-helper`: PolicyKit tarafından yalnızca izin verilen
   işlemleri ve doğrulanmış argümanları root backend'e ileten dar güven sınırı;
   ön kontrol, hazırlama ve kurulum tamamlama eylemleri de aynı allow-list'tedir.
@@ -86,16 +88,29 @@ ve alınan salt-okunur nesneden yerel salt-okunur snapshot oluşturur.
 
 ## Yönetim arayüzü
 
-Arayüz Dashboard, Snapshotlar, Kullanıcılar, Güncellemeler, Audit Logları ve
-Ayarlar sayfalarından oluşur. Dark/light tema, disk ve boot sağlığı, uyarılar,
-snapshot geçmişi/karşılaştırma/export/import/rollback, standart hesap
-oluşturma-silme-kilitleme-parola-otomatik giriş, güncelleme kontrolü ve politika
-ayarları GUI içinden yönetilir.
+Arayüz Dashboard, Snapshotlar, Kullanıcılar, Güncellemeler, Audit Logları,
+Ayarlar ve Kurulum olmak üzere yedi sayfadan oluşur. Dark/light tema, disk ve
+boot sağlığı, uyarılar, snapshot geçmişi/karşılaştırma/export/import/rollback,
+standart hesap oluşturma-silme-kilitleme-parola-otomatik giriş, güncelleme
+kontrolü, politika ayarları ve iki aşamalı kurulum/finalize GUI içinden yönetilir.
 
 `localadm` korumalı yönetici hesabıdır. Yeni hesaplar wheel ve sudo gruplarına
 eklenmez. Kullanıcı silinmeden önce kimlik bilgisi ve ev dizini root erişimli
 bir geri yükleme yedeğine alınır. PolicyKit yükseltmesi yalnızca yönetim
 uygulamasının izin listeli yardımcısı için geçerlidir.
+
+Çalışan oturumundaki genel PolicyKit kuralı listede olmayan eylemler için
+`AUTH_ADMIN_KEEP` döndürür. Plasma'nın oturum açılışında kullandığı ve dağıtımın
+aktif yerel kullanıcıya zaten izin verdiği altı tam eylem kimliği bunun dar
+istisnasıdır: QMK/VIA aygıt sorgusu ve renk uygulama, ayrık GPU varlık sorgusu,
+NetworkManager bağlantı kontrolü ile pil conservation/threshold okuma eylemleri.
+İzin önek veya wildcard ile verilmez. Farklı kullanıcı, pasif oturum ve listede
+olmayan işlem bu istisnadan yararlanamaz.
+
+Kullanıcı ve GRUB parolaları süreç argümanına yazılmaz. Aynı kural kullanıcı
+yedeğindeki yeniden kullanılabilir parola hash'i için de geçerlidir. Parola
+değişimi `chpasswd`, hash geri yükleme ise `chpasswd --encrypted` stdin
+kanalıyla yapılır.
 
 ## Güncelleme ve MicroSIP güvenliği
 
@@ -118,6 +133,8 @@ Wine üzerinden izole ekran smoke testi doğrulanmadan kurulum başarılı sayı
   geri yükleme ve root yetkisi reddi.
 - İki gerçek CachyOS kerneliyle mkinitcpio üretimi ve `lsinitcpio` içerik testi.
 - Qt offscreen arayüz smoke testi.
+- PolicyKit dar izin listesinde izinli/izinsiz eylem ayrımı ve parola/hash
+  verisinin süreç argümanına taşınmaması.
 
 Loop aygıt ve initramfs testleri CachyOS sanal makinesinde güvenle çalışır.
 EFI firmware ve gerçek GRUB reboot zincirinin son kabul testi, UEFI olarak

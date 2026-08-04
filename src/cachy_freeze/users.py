@@ -118,6 +118,16 @@ class UserManager:
         payload = f"{username}:{password}\n".encode()
         self.runner.run(["chpasswd"], input_data=payload)
 
+    @staticmethod
+    def _encrypted_password_payload(username: str, password_hash: str) -> bytes:
+        if (
+            not password_hash
+            or len(password_hash) > 4096
+            or any(character in password_hash for character in (":", "\n", "\r", "\x00"))
+        ):
+            raise CachyFreezeError("Kullanıcı yedeğindeki parola hash'i geçersiz.")
+        return f"{username}:{password_hash}\n".encode()
+
     def _refresh_template(self, username: str, home: Path) -> None:
         self.template_root.mkdir(parents=True, mode=0o700, exist_ok=True)
         template = self.template_root / username
@@ -281,6 +291,9 @@ class UserManager:
         try:
             metadata = json.loads((backup_dir / "account.json").read_text(encoding="utf-8"))
             username = self.validate_username(str(metadata["username"]))
+            password_payload = self._encrypted_password_payload(
+                username, str(metadata["password_hash"])
+            )
         except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
             raise CachyFreezeError(f"Kullanıcı yedeği okunamadı: {error}") from error
         with ProcessLock(self.lock_file):
@@ -302,12 +315,11 @@ class UserManager:
                     str(metadata["shell"]),
                     "--comment",
                     str(metadata["gecos"]),
-                    "--password",
-                    str(metadata["password_hash"]),
                     username,
                 ]
             )
             try:
+                self.runner.run(["chpasswd", "--encrypted"], input_data=password_payload)
                 archive = backup_dir / "home.tar"
                 if archive.is_file():
                     self.runner.run(["tar", "--acls", "--xattrs", "-xpf", str(archive), "-C", "/"])

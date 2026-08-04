@@ -38,6 +38,13 @@ seçeneğini onayla.
 sonraki ayrıcalıklı adımlar standart PolicyKit penceresinde `localadm` parolasını
 ister. Parolalar terminalde, süreç argümanlarında veya loglarda gösterilmez.
 
+Çalışan oturumu açılırken QMK/VIA klavye sorgusu, ayrık GPU algılama, etkin
+kullanıcının ağ bağlantısı veya pil sınırı okuma gibi Plasma başlangıç işlemleri
+`localadm` parolası sormamalıdır. Bunlar için uyarı çıkarsa parolayı otomatik
+girmek yerine kurulumu durdur ve politika regresyonunu kaydet. Paket yönetimi,
+sistem ayarı veya genel bir `pkexec` işlemi ise hâlâ `localadm` doğrulaması
+istemelidir.
+
 Uygulama açılınca soldaki **Kurulum** sayfasına gelir. Bundan sonraki ilk kurulum,
 test, Golden yayınlama, FROZEN ayarı ve yeniden başlatma aynı uygulama üzerinden
 yapılır.
@@ -89,10 +96,19 @@ Uygulama mevcut doğrulanmış kurulum motorunu kullanarak:
 Bir sorun varsa FROZEN aşamasına geçme. `localadm` hesabına dön, **Cachy Freeze
 Yönetim Merkezi → Kurulum** sayfasını aç ve hata kaydını koru.
 
+Uygulama dosyasının veya komutunun varlığı yeterli değildir; her uygulamanın
+gerçek penceresi çalışan hesabında açılmalıdır. Sanal makinedeki dummy/monitor
+ses kaynağı gerçek mikrofon, hoparlör veya kulaklık kabulü değildir. Fiziksel
+aygıt ve mümkünse gerçek arama doğrulanmadan ses kabul kutusunu işaretleme.
+
 ## 7. Aynı uygulamada kurulumu tamamla
 
 Kurulum sayfasındaki üç canlı-test kutusunu onayla. Güçlü GRUB bakım parolasını
 iki kez gir ve **Kurulumu tamamla ve FROZEN yap** düğmesine bas.
+
+Bu üç kutu yalnız uygulama pencereleri, fiziksel ses/arama ve yönetici/standart
+kullanıcı ayrımı gerçekten geçtiyse işaretlenir. Bir testi atlamak, VM sonucunu
+fiziksel test saymak veya yalnız dosya varlığını kabul etmek desteklenmez.
 
 Uygulama çalışan ile `localadm` ev şablonlarını günceller, GRUB bakım hesabını
 `cachyadmin` olarak korur, yeni Golden'ı yayınlar ve sonraki açılışı FROZEN yapar.
@@ -134,4 +150,8 @@ yönetilir. İlk kurulum ve sonraki bakım aynı uygulamada kalır.
   kurtarma medyasının yerini tutmaz.
 - GRUB parolasını unutma.
 - Btrfs snapshot disk arızasına karşı yedek değildir.
+- Fiziksel cihazda boot zinciri değişmeden önce AC güç, kurtarma USB'si, harici
+  yedek ve geri dönüş noktası hazır olmalıdır.
+- Golden yayını, pacman, mkinitcpio veya GRUB yazımı sırasında gücü kesme.
+- `btrfs check --repair` çalıştırma; Golden/Active alt birimlerini elle silme.
 - Ekran açılmazsa `KURTARMA-EKRAN-GELMEZSE.txt` dosyasını oku.

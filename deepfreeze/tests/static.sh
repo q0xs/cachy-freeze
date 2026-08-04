@@ -61,6 +61,23 @@ grep -q 'org.kde.powerdevil.chargethresholdhelper.getconservationmode' \
   "$ROOT/../user/files/49-company-employee-auth.rules"
 grep -q 'org.kde.powerdevil.chargethresholdhelper.getthreshold' \
   "$ROOT/../user/files/49-company-employee-auth.rules"
+grep -q 'chpasswd", "--encrypted"' \
+  "$PROJECT_ROOT/src/cachy_freeze/users.py"
+! grep -q '"--password"' \
+  "$PROJECT_ROOT/src/cachy_freeze/users.py"
+grep -q 'test_encrypted_password_hash_uses_stdin_safe_payload' \
+  "$PROJECT_ROOT/tests/test_users.py"
+for agent_rules in \
+  "$PROJECT_ROOT/AGENTS.md" \
+  "$PROJECT_ROOT/app/AGENTS.md" \
+  "$PROJECT_ROOT/installer/AGENTS.md" \
+  "$PROJECT_ROOT/deepfreeze/AGENTS.md"; do
+  [[ -s $agent_rules ]]
+done
+grep -q 'Fiziksel CachyOS ayrıntılı kabul matrisi' \
+  "$PROJECT_ROOT/CODEX-CLI-DEVAM-TALIMATI.md"
+grep -q 'Fiziksel, yedekli CachyOS pilot laptop' \
+  "$PROJECT_ROOT/CODEX-CLI-FIZIKSEL-GOREV-METNI.md"
 grep -q 'cachy-user-template' \
   "$ROOT/../user/files/cachy-employee-reset"
 grep -q '^ColorScheme=BreezeDark$' \
@@ -86,6 +103,10 @@ if command -v desktop-file-validate >/dev/null; then
     "$PROJECT_ROOT/CachyOS-Kurulum-Uygulamasi.desktop" \
     "$PROJECT_ROOT/app/cachy-freeze-manager.desktop" \
     "$PROJECT_ROOT"/user/desktop/*.desktop
+fi
+if command -v node >/dev/null; then
+  node "$ROOT/tests/polkit-rules.js" \
+    "$PROJECT_ROOT/user/files/49-company-employee-auth.rules"
 fi
 grep -q 'setup-provision)' \
   "$PROJECT_ROOT/app/cachy-freeze-manager-helper"

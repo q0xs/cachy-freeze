@@ -1,52 +1,88 @@
 # Codex CLI devam talimatı
 
-Bu dosya, fiziksel CachyOS laptopta yapılacak canlı kabul ve stres testinin
-tek başlangıç kaynağıdır. Önce bu dosyanın tamamını, ardından `MIMARI-TR.md`,
-`KURULUM-TR.md` ve `PILOT-NOTLARI.md` dosyalarını oku. Mevcut mimariyi analiz
-etmeden kod değiştirme.
+Bu dosya Codex CLI için operasyonel devam kaynağıdır. Önce kök `AGENTS.md`
+dosyasını, sonra bu dosyanın tamamını, `README.md`, `MIMARI-TR.md`,
+`KURULUM-TR.md`, `GITHUB-ILE-CALISMA.md` ve `PILOT-NOTLARI.md` dosyalarını oku.
+Bir alt dizinde çalışırken o dizindeki daha özel `AGENTS.md` kurallarını da
+uygula. Mevcut mimariyi ve çalışma ağacını incelemeden kod değiştirme.
 
-## Doğrulanmış durum — 1 Ağustos 2026
+## Her yeni Codex oturumunda başlangıç protokolü
 
-Windows host üzerinde yalnızca projeye ayrılmış
-`CachyFreeze-QA-20260801` VirtualBox sanal makinesi kullanıldı. Kullanıcının
-önceden var olan sanal makinelerine ve host disk düzenine dokunulmadı.
+1. `git status --short`, `git remote -v` ve `git log -3 --oneline` çıktısını
+   incele. Kullanıcı değişikliklerini silme, stash etme veya ezme.
+2. Hedefi açıkça sınıflandır: Windows host, VirtualBox VM veya fiziksel CachyOS
+   laptop. Bir hedefteki snapshot, UUID, boot veya test sonucunu diğer hedefe
+   taşınmış kabul etme.
+3. Aşağıdaki doğrulanmış durumun yalnız bir devir notu olduğunu kabul et.
+   UEFI/Btrfs/GRUB, kullanıcı, Golden/Active ve çalışma modu durumunu gerçek
+   hedefte salt-okunur olarak yeniden doğrulamadan sistem değişikliği yapma.
+4. Normal kullanıcıya terminal kurulum akışı veya `.sh` dosyası sunma. Kurulum
+   yalnız `CachyOS-Kurulum-Uygulamasi.desktop` ve uygulamanın **Kurulum**
+   sayfasından yürütülür. Terminal yalnız Codex'in repo, geliştirme, test, log ve
+   salt-okunur teşhis işlemleri içindir.
+5. Parola, token veya gizli bilgiyi isteme, tekrar etme, komut argümanına koyma,
+   loglama, ekran görüntüsüne alma ya da repoya yazma. GUI'nin gizli parola
+   alanlarını ve kapalı stdin kanalını kullan.
 
-Doğrulanan VM düzeni:
+## Doğrulanmış durum — 4 Ağustos 2026
 
-- CachyOS 7.1.3-2-cachyos, Plasma 6.7, UEFI64;
-- 80 GiB sanal disk, GPT, 1 GiB FAT32 EFI ve kalan alan Btrfs;
-- kök `@` alt birimi, `/boot` Btrfs kök içinde, `/boot/efi` ayrı EFI bölümü;
-- GRUB normal EFI girdisi ve geri dönüş `EFI/BOOT/BOOTX64.EFI` dosyası;
-- `NetworkManager`, `sshd`, `sddm` ve `vboxservice` aktif;
-- temiz kurulum ISO SHA-256 değeri CachyOS resmî yayın değeriyle eşleşti.
+Güncel yerel QA hedefi `CachyFreeze-Clean-QA-20260804` adlı VirtualBox VM'dir.
+Eski `CachyFreeze-QA-20260801` VM'si, eski snapshot adı/UUID'si veya eski test
+sonucu bu hedefin ya da fiziksel laptopun durumu değildir.
 
-Birleşik masaüstü kurulum uygulaması gerçek Plasma Wayland oturumunda açıldı.
-PolicyKit parola penceresi görüntülendi ve `localadm` ile yetkilendirme
-doğrulandı. Uygulamanın ön kontrolü gerçek sistemde şu sonucu verdi:
+Güncel VM'de yeniden doğrulanan düzen:
 
-- firmware: UEFI;
-- filesystem: Btrfs;
-- current subvolume: `@`;
-- root device: `/dev/sda2`;
-- ayrı `/boot` yok ve `/boot/efi` bağlı.
+- kernel `7.1.5-1-cachyos`, Plasma, UEFI64;
+- 80 GiB sanal disk, GPT, FAT32 EFI ve Btrfs kök;
+- kök `/dev/sda2[/@]`, alt birim `@`;
+- `/boot/efi` bağlı, ayrı `/boot` dosya sistemi yok;
+- bootloader GRUB;
+- `localadm` yönetici ve `wheel` üyesi;
+- uygulamanın grafik ön kontrolü UEFI/Btrfs/`@`/EFI/GRUB kapısını geçti.
 
-İlk hazırlama aşaması gerçek paket indirmeleri ve AUR derlemeleriyle tamamlandı.
-Son durum `phase=provisioned`, Golden mevcut, GRUB parolası henüz ayarlanmamış,
-sonraki mod THAWED ve bekleyen Btrfs işlemi yoktur. Bilerek yapılmayanlar:
+Kurulum yalnız grafik uygulamanın **Tam kurulumu başlat** akışıyla tamamlandı.
+Güncel güvenli ara durum:
 
-- GUI canlı uygulama/ses/yönetici kabul kutuları onaylanmadı;
-- `setup-finalize` çalıştırılmadı;
-- GRUB bakım parolası oluşturulmadı;
-- FROZEN yeniden başlatma, rollback, elektrik kesintisi ve stres testleri
-  başlatılmadı.
+- `phase=provisioned`;
+- yönetilen standart çalışan hesabı oluşturuldu ve `wheel`/`sudo` üyesi değil;
+- Golden ve Active hazır;
+- bekleyen Btrfs işlemi yok;
+- GRUB bakım parolası finalize edilmedi;
+- sistem THAWED bakım durumunda;
+- finalize/FROZEN işlemi başlatılmadı.
 
-VM güvenli biçimde kapalıdır. Yerel geri dönüş noktası:
+Çalışan hesabında Google Chrome, Slack, AnyDesk, LibreOffice, Zoiper5 ve Wine
+üzerinden MicroSIP gerçek pencereleri açıldı. Breeze Dark ve masaüstü
+kısayolları doğrulandı. `sudo -n` reddedildi. Listede olmayan genel ayrıcalıklı
+işlem hâlâ `localadm` doğrulaması istiyor.
 
-- snapshot: `03-provisioned-powered-off`;
-- snapshot UUID: `84dfc083-47f0-4688-87eb-d76f9ddbe36a`.
+VirtualBox yalnız sanal analog çıkış ve bu çıkışın monitor kaynağını sunuyor;
+gerçek mikrofon/kulaklık ve gerçek test araması doğrulanmadı. Bu nedenle üç canlı
+kabul kutusu işaretlenmedi ve finalize güvenlik kapısında bekliyor. Sanal/dummy
+ses sonucunu fiziksel ses kabulü olarak raporlama.
 
-Bu VirtualBox durumu yalnızca yerel Windows test ortamındadır. Fiziksel laptopta
-repo klonundan başlayacaksan VM durumunu fiziksel sisteme taşınmış varsayma.
+Son host kontrolünde VirtualBox VM durumu `aborted` olarak görüldü. Bu durum
+başarılı bir güç-kesintisi veya kurtarma testi değildir ve temiz kapanış kanıtı
+olarak kullanılamaz. VM yeniden kullanılacaksa önce açılış modu, kök alt birimi,
+bekleyen transaction, boot-health ve önceki/current journal hataları incelenmeli;
+sağlık yeniden doğrulanmadan finalize, Golden yayını veya stres testi yapılmamalı.
+
+Bu doküman güncellemesinden önceki repo checkpoint'i `9464b8b` commitiydi ve
+GitHub Actions koşusu `30899113893` başarıyla tamamlanmıştı. Bunlar yalnız tarihî
+devir kanıtıdır; güncel HEAD, Actions ve VM durumu her yeni oturumda yeniden
+kontrol edilmelidir.
+
+## Güncel devam noktası
+
+1. Önce repo, hedef ve Dashboard/preflight durumunu yeniden doğrula. VM hedefi
+   `aborted` görüldüğü için ilk açılışta boot-health ve journal kanıtını ayrıca
+   kaydet.
+2. VM ile devam edilecekse gerçek mikrofon, hoparlör ve kulaklığı VM'ye geçir;
+   MicroSIP/Zoiper ses seçimini ve mümkünse gerçek test aramasını yap.
+3. Fiziksel ses kabulü gerçekten geçmeden uygulamadaki üç kabul kutusunu
+   işaretleme, GRUB bakım parolası alma veya finalize başlatma.
+4. Kabul geçerse aşağıdaki finalize ve boot sırasını uygula. Geçmezse sistemi
+   THAWED bırak, kanıtı raporla ve FROZEN/snapshot/stres adımlarına geçme.
 
 ## Bu turda yakalanıp düzeltilen gerçek hatalar
 
@@ -72,6 +108,21 @@ repo klonundan başlayacaksan VM durumunu fiziksel sisteme taşınmış varsayma
    nedeniyle kullanıcı site paketinin görünmemesi yakalandı. Workflow'a `libegl1`
    eklendi, smoke testi normal modül çağrısına geçirildi ve hata çıktısı görünür
    yapıldı.
+9. Dolphin'den açılan `.desktop` dosyasındaki KDE kaçışları başlatıcı yolunu
+   bozuyordu. `%k`, `file://` ve boşluklu yol güvenli biçimde çözümlendi;
+   `desktop-file-validate` CI kapısına eklendi (`0b73372`).
+10. Çalışan hesabına uygulanan genel PolicyKit kuralı Plasma'nın QMK/VIA,
+    ayrık GPU, ağ ve pil başlangıç sorgularını da yönetici doğrulamasına
+    yükseltiyordu. Dağıtımın aktif yerel kullanıcıya zaten izin verdiği altı tam
+    eylem kimliği dar izin listesine alındı; genel işlem hâlâ `localadm` istiyor
+    (`9b7333f`).
+11. ShellCheck'in `SC2155` değişken bildirimi ve dinamik GRUB config kaynağı
+    uyarıları temizlendi; tam statik test yeniden geçirildi (`9464b8b`).
+12. Kod incelemesinde kullanıcı yedeği geri yüklenirken parola hash'inin
+    `useradd --password` süreç argümanına konduğu bulundu. Hash, doğrulanmış
+    `chpasswd --encrypted` stdin kanalına taşındı ve ayırıcı/enjeksiyon birim
+    testi eklendi. Bu düzeltmenin commit kimliği bu çalışma push edildikten
+    sonra güncel GitHub geçmişinden doğrulanmalıdır.
 
 Gerçek VM’de doğrulanan paketler:
 
@@ -235,6 +286,195 @@ Uygulamanın Snapshotlar sayfasından ve görünür sonuçlarını esas alarak:
    doğrudan `main` dalına push et.
 5. GitHub Actions sonucunu doğrula. Başarısızsa logu incele, düzelt ve yeniden
    çalıştır.
+
+## Fiziksel CachyOS ayrıntılı kabul matrisi
+
+Bu matris fiziksel pilotta uygulanacak asgari kanıt sözleşmesidir. Normal
+kullanıcının bütün kurulum ve bakım işlemleri GUI'de kalır. Aşağıdaki komutlar
+yalnız Codex'in salt-okunur teşhis/test kaydı içindir. Her maddede **hedef**,
+**beklenen sonuç**, **gerçek sonuç**, **kanıt zamanı** ve **durum**
+(`GEÇTİ`/`KALDI`/`BAŞARISIZ`/`ONAY BEKLİYOR`) yazılmalıdır.
+
+### A. Hedef kimliği ve değişiklik öncesi güvenlik kapısı
+
+1. Fiziksel cihazı model/seri numarasını rapora açık hassas değer yazmadan
+   kullanıcıyla doğrula. `systemd-detect-virt` sonucunu kaydet; VM sonucu varsa
+   fiziksel kabulü durdur.
+2. Salt-okunur olarak `uname -a`, CachyOS release, `cat /proc/cmdline`,
+   `findmnt -no SOURCE,FSTYPE,OPTIONS /`, `findmnt /boot/efi`,
+   `findmnt --target /boot`, `lsblk -f`, `id localadm` ve GRUB dosya/araç
+   varlığını kaydet.
+3. Beklenen: UEFI, Btrfs, `/dev/...[/@]`, `/boot/efi` FAT32, `/boot` için ayrı
+   dosya sistemi yok, GRUB, `localadm` wheel ve etkin yönetici hesabı. Herhangi
+   bir uyuşmazlıkta dur; repartition, bootloader dönüşümü veya preflight bypass
+   yapma.
+4. İnternet erişimini HTTPS ile, boş alanı `df`/`btrfs filesystem usage` ile,
+   AC durumunu gerçek güç kaynağından doğrula. Paketler, AUR çalışma alanı,
+   Golden/Active ve snapshot testleri için yeterli alan yoksa dur.
+5. Kullanıcıdan önyüklenebilir kurtarma USB'si ile harici geri yüklenebilir veri
+   yedeğinin gerçekten hazır olduğunu doğrula. Bu iki madde salt komut çıktısı
+   veya varsayımla geçmiş sayılamaz.
+6. `btrfs device stats /` ve mevcut scrub durumunu kaydet. Sıfır olmayan hata
+   sayacında veya tamamlanmamış/başarısız scrub durumunda boot zincirine dokunma.
+
+### B. Repo ve değişiklik öncesi kalite tabanı
+
+1. `git status --short`, remotes, branch, son commit ve `git pull --ff-only`
+   sonucunu kaydet. Kullanıcı değişikliği varsa koru ve kapsamı ayır.
+2. Tarih, kernel, CachyOS sürümü, hedef türü ve commit hash'iyle yeni QA raporu
+   başlat.
+3. Ruff check/format, bütün Python testleri, Bash syntax, ShellCheck,
+   desktop-file validation, JSON/XML, systemd unit verify ve Qt offscreen smoke
+   çalıştır. Başlangıçta hata varsa provisioning yapma; kök nedeni düzelt,
+   diff'i incele ve bütün kapıyı yeniden geçir.
+4. Gizli değer taraması yap; parola/token/hash/log/gerçek kullanıcı verisi
+   repoda veya staged diffte olmamalıdır.
+
+### C. Grafik preflight ve provisioning
+
+1. Plasma/Dolphin'den `CachyOS-Kurulum-Uygulamasi.desktop` dosyasını aç.
+   Başlatıcı terminal göstermemeli; gerekiyorsa yalnız PyQt6 bootstrap için
+   standart PolicyKit penceresi görünmelidir.
+2. **Sistem ön kontrolünü çalıştır** ve GUI sonucunu A bölümündeki gerçek
+   bağlama sonuçlarıyla karşılaştır. Çelişkide dur ve kanıtı koru.
+3. Kurtarma/yedek onayı ancak gerçekten hazırsa işaretlenir. Çalışan adı,
+   görünen ad ve güçlü parola GUI alanlarına girilir; parola Codex çıktısına,
+   komut argümanına, rapora veya ekran görüntüsüne girmez.
+4. **Tam kurulumu başlat** ve paket/AUR, çalışan hesabı, Wine/MicroSIP, Deep
+   Freeze, state alt birimi, initramfs, GRUB ve ilk Golden bitene kadar GUI
+   ilerlemesini izle. Uygulamayı öldürme ve gücü kesme.
+5. Beklenen ara durum: `phase=provisioned`, çalışan mevcut ve wheel/sudo dışı,
+   Golden/Active hazır, transaction beklemiyor, GRUB parolası yok, THAWED bakım
+   modu. Bu altı durumdan biri farklıysa finalize'a geçme.
+
+### D. Finalize öncesi gerçek masaüstü kabulü
+
+1. Önce `localadm`, sonra çalışan hesabında Chrome, Slack, AnyDesk,
+   LibreOffice, Zoiper ve Wine/MicroSIP'i gerçek pencere olarak aç. Dosya,
+   executable, desktop entry veya süreç varlığı tek başına geçmez.
+2. Çalışan masaüstü kısayollarını, Breeze Dark görünümünü, interneti ve uygulama
+   yeniden açılışlarını doğrula.
+3. Gerçek mikrofon, hoparlör ve kulaklığı ayrı aygıtlar olarak seç. Giriş
+   seviyesini, çıkış sesini ve aygıt geçişini doğrula; mümkünse MicroSIP/Zoiper
+   gerçek test araması yap. Monitor/dummy/VirtualBox sanal kaynak fiziksel kabul
+   değildir.
+4. Çalışan hesabında `wheel`/`sudo` bulunmamalı ve parolasız sudo reddedilmeli.
+   Genel ayrıcalıklı masaüstü işlemi `localadm` parolası istemeli; `localadm`
+   yönetici işlemini başarıyla tamamlayabilmelidir.
+5. Çalışan oturum açılışında QMK/VIA, ayrık GPU, NetworkManager bağlantı
+   kontrolü ve pil threshold okuması gereksiz yönetici penceresi göstermemeli.
+   Aynı zamanda listede olmayan genel `pkexec` işlemi parola istemelidir.
+6. Ancak bütün D maddeleri gerçekten geçerse uygulamadaki üç kabul kutusunu
+   işaretle. Bir hesabın veya fiziksel aygıtın testi eksikse finalize yasaktır.
+
+### E. Finalize ve ilk FROZEN açılış
+
+1. Güçlü GRUB bakım parolasını kullanıcı doğrudan uygulamanın iki gizli alanına
+   girer. Codex parolayı sormaz, kopyalamaz, kaydetmez veya tekrar etmez.
+2. **Kurulumu tamamla ve FROZEN yap** akışını çalıştır; ev şablonları, GRUB
+   özeti, Golden yayını ve FROZEN planı tamamlanana kadar güç kesme.
+3. Uygulamanın reboot teklifini kullan. İlk GRUB ekranında tek kurumsal girdi ve
+   FROZEN başlığı görünmeli. FROZEN normal seçim parolasız açılmalıdır.
+4. Ayrı bir bootta THAWED seçiminin `cachyadmin` doğrulaması istediğini, yanlış
+   parolanın reddedildiğini ve parolanın ekranda görünmediğini doğrula.
+5. İlk FROZEN boot sonrası `/proc/cmdline` içinde `cachy.freeze=1`, kök kaynakta
+   `@active`, Golden/Active varlığı, initramfs içinde reset hook'u, boot-attempt
+   sayacı, boot-health ve Dashboard FROZEN durumu kaydedilir.
+6. `journalctl -b -p err`, Cachy Freeze servisleri ve audit logları incelenir.
+   Gerçek hata varsa davranış testine geçilmez.
+
+### F. FROZEN, THAWED ve tek-sefer THAWED davranışı
+
+1. FROZEN çalışan evinde benzersiz dosya ve görünür ayar değişikliği oluştur;
+   uygulamadan reboot et ve ikisinin de kaybolduğunu doğrula.
+2. FROZEN `localadm` yönetilen evinde zararsız, benzersiz test izi oluştur;
+   reboot sonrası şablondan döndüğünü doğrula. Gerçek kullanıcı verisini test
+   için kullanma.
+3. GUI'den kalıcı THAWED planla. Boot sonrası `cachy.freeze=0`, kök `@` ve
+   Dashboard THAWED olmalı. Dosya oluştur; iki reboot sonrasında kalıcı olduğunu
+   doğrula.
+4. GUI'den **yalnızca bir kez THAWED** planla. Sonraki boot THAWED, onu takip
+   eden boot otomatik FROZEN olmalıdır; `cachy_once` başarılı THAWED grafik
+   bootundan sonra temizlenmelidir.
+5. Her bootta süre, GRUB başlığı, cmdline, kök alt birimi, Golden/Active,
+   transaction, boot sayacı, boot-health ve audit olayını aynı rapor satırında
+   kaydet.
+
+### G. Snapshot bütünlük ve rollback kabulü
+
+1. Snapshotlar sayfasından iki benzersiz açıklamalı snapshot oluştur; kontrollü
+   dosya farkı ekle.
+2. İkisinde metadata doğrulaması ve tam `btrfs send` SHA-256 doğrulaması yap;
+   UUID, salt-okunur, checksum, boyut ve sağlık alanlarını kaydet.
+3. Snapshotları karşılaştır; beklenen kontrollü yol görünmeli ve liste
+   sınırlandırma/truncation durumu doğru raporlanmalıdır.
+4. Bir snapshotı export et, manifest/stream boyutunu kaydet, yeniden import et
+   ve import edilen yerel salt-okunur snapshotı tam doğrula.
+5. Export'un yalnız bir test kopyasında kontrollü tek byte boz; import checksum
+   hatasıyla reddedilmeli ve katalogda yarım nesne kalmamalıdır. Golden/Active
+   veya gerçek snapshot alt birimini elle bozma.
+6. Bir test snapshotını GUI'den sil ve katalog/Btrfs nesnesinin kalktığını
+   doğrula. Sağlıklı snapshota rollback planla, uygulamadan reboot et ve hem
+   içerik hem FROZEN modunu doğrula.
+
+### H. Güncelleme ve kullanıcı yaşam döngüsü
+
+1. GUI'den güncelleme kontrolü yap; sonuç ve ağ-politikası durumunu kaydet.
+2. Yalnız THAWED modda korumalı güncelleme çalıştır. Güncelleme öncesi rollback
+   snapshotı, pacman doğrulaması, uygulama yeniden testleri ve yeni Golden'ı
+   doğrula. Güncelleme sırasında reboot/güç kesme yapma.
+3. Geçici standart kullanıcıyı GUI'den oluştur; parola değiştir, kilitle/aç,
+   autologin ayarla/kaldır, yedekleyerek sil ve yedekten geri yükle.
+4. Her aşamada wheel/sudo reddini doğrula. Geri yükleme sırasında düz parola
+   veya parola hash'i süreç argümanında görünmemeli; root-only yedek izinlerini
+   kaydet.
+5. Geçici kullanıcı ve yedeği temizlenmeden önce gereken kanıtı raporla; gerçek
+   çalışan hesabını yaşam döngüsü testi için silme.
+
+### I. Stres, performans ve uzun kullanım
+
+1. Başlamadan sağlıklı Golden, doğrulanmış geri dönüş snapshotı, AC, yedek ve
+   yeterli alanı yeniden doğrula. Başlangıç `btrfs filesystem usage`, device
+   stats, scrub, RAM, süreç sayısı, uygulama RSS/PSS ve disk kullanımını kaydet.
+2. Kontrollü küçük değişikliklerle 25 snapshot oluştur. Hepsinde metadata,
+   ilk/orta/son dahil seçili örneklerde tam Btrfs doğrulaması çalıştır. Retention
+   cleanup sonucunda beklenen sayı ve katalog tutarlılığını kanıtla.
+3. Uzun tam doğrulama sürerken ikinci yazma işlemi başlat; işlem kilidi güvenli
+   biçimde reddetmeli, ilk işlem ve katalog bozulmamalıdır.
+4. FROZEN, kalıcı THAWED ve tek-sefer THAWED içeren 10 boot çevrimi yap. Her
+   çevrimde süre, mod, cmdline, alt birim, boot sayacı, Btrfs ve journal hatası
+   kaydet.
+5. Uygulamayı aç/kapat ve en az 30 yenileme/sayfa geçişi yap. Başlangıç/bitiş
+   RSS/PSS, sistem belleği ve süreç sayısını karşılaştır; zombie, asılı helper,
+   kilit dosyası veya sürekli bellek büyümesi olmamalıdır.
+6. Snapshot apparent/exclusive boyutları ile export gerçek disk tüketimini
+   karşılaştır; test sonu Btrfs usage/device stats/scrub değerlerini başlangıçla
+   kıyasla.
+7. En az iki saat Chrome, Slack, MicroSIP/Zoiper ve yönetim uygulamasını birlikte
+   kullan; otomatik snapshot timer'ının beklenen zamanda ve yalnız THAWED kökte
+   çalıştığını doğrula.
+
+### J. Yıkıcı test onay kapısı
+
+Beklenmeyen güç kesintisi, zorla kapatma, boot başarısızlığı veya otomatik
+rollback testi fiziksel laptopta kendiliğinden başlatılmaz. Önce sağlıklı Golden,
+harici veri yedeği, kurtarma USB'si, AC güç, doğrulanmış geri dönüş snapshotı ve
+kullanıcının o test için ayrıca açık onayı kaydedilir. İlk uygulama disposable
+VM'de yapılır. Golden yayını, pacman, mkinitcpio veya GRUB yazımı sırasında asla
+güç kesilmez; EFI/GRUB dosyaları fiziksel cihazda bilerek bozulmaz.
+
+### K. Son kalite, rapor ve GitHub
+
+1. B bölümündeki bütün statik/Python/GUI testlerini tekrar çalıştır. Ayrıca
+   journal error, boot-health, Btrfs device stats ve scrub sonucunu kaydet.
+2. Geçen, kalan, başarısız, uygulanamaz ve kullanıcı onayı bekleyen testleri
+   ayrı başlıklarda yaz. Yapılmamış testi geçmiş gösterme; VM sonucunu fiziksel
+   sonuçla birleştirme.
+3. Kod değiştiyse yalnız ilgili dosyaları stage et; diff/secret kontrolü yap,
+   kısa commit oluştur ve güncel kullanıcı tercihi değişmediyse doğrudan
+   `main` dalına push et.
+4. GitHub Actions tamamen yeşil olana kadar izle. Koşu URL'si, commit hash'i,
+   tarih, kernel ve hedef türünü QA raporuna ekle.
 
 ## Kesin güvenlik kuralları
 
