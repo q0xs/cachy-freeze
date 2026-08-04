@@ -69,6 +69,12 @@ grep -q '^Name=CachyOS Kurulum Uygulaması$' \
   "$PROJECT_ROOT/CachyOS-Kurulum-Uygulamasi.desktop"
 grep -q '^Terminal=false$' \
   "$PROJECT_ROOT/CachyOS-Kurulum-Uygulamasi.desktop"
+if command -v desktop-file-validate >/dev/null; then
+  desktop-file-validate \
+    "$PROJECT_ROOT/CachyOS-Kurulum-Uygulamasi.desktop" \
+    "$PROJECT_ROOT/app/cachy-freeze-manager.desktop" \
+    "$PROJECT_ROOT"/user/desktop/*.desktop
+fi
 grep -q 'setup-provision)' \
   "$PROJECT_ROOT/app/cachy-freeze-manager-helper"
 grep -q 'CACHY_SETUP_NONINTERACTIVE' \
