@@ -49,6 +49,18 @@ grep -q 'def preflight' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'begin_transaction' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'AUTH_ADMIN_KEEP' \
   "$ROOT/../user/files/49-company-employee-auth.rules"
+grep -q 'org.kde.kameleon.qmk.helper.HasDevices' \
+  "$ROOT/../user/files/49-company-employee-auth.rules"
+grep -q 'org.kde.kameleon.qmk.helper.ApplyColor' \
+  "$ROOT/../user/files/49-company-employee-auth.rules"
+grep -q 'org.kde.powerdevil.discretegpuhelper.hasdualgpu' \
+  "$ROOT/../user/files/49-company-employee-auth.rules"
+grep -q 'org.freedesktop.NetworkManager.network-control' \
+  "$ROOT/../user/files/49-company-employee-auth.rules"
+grep -q 'org.kde.powerdevil.chargethresholdhelper.getconservationmode' \
+  "$ROOT/../user/files/49-company-employee-auth.rules"
+grep -q 'org.kde.powerdevil.chargethresholdhelper.getthreshold' \
+  "$ROOT/../user/files/49-company-employee-auth.rules"
 grep -q 'cachy-user-template' \
   "$ROOT/../user/files/cachy-employee-reset"
 grep -q '^ColorScheme=BreezeDark$' \

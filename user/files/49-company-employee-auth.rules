@@ -2,6 +2,19 @@
 polkit.addRule(function(action, subject) {
     if (subject.user == "__EMPLOYEE_USER__" &&
         subject.local && subject.active) {
+        // Plasma probes user-facing hardware and network state during login.
+        // The vendor policies already allow these narrowly scoped actions for
+        // an active local user; keep that behavior so the managed account is
+        // not shown an administrator prompt merely for logging in.
+        if (action.id == "org.kde.kameleon.qmk.helper.HasDevices" ||
+            action.id == "org.kde.kameleon.qmk.helper.ApplyColor" ||
+            action.id == "org.kde.powerdevil.discretegpuhelper.hasdualgpu" ||
+            action.id == "org.freedesktop.NetworkManager.network-control" ||
+            action.id ==
+                "org.kde.powerdevil.chargethresholdhelper.getconservationmode" ||
+            action.id == "org.kde.powerdevil.chargethresholdhelper.getthreshold") {
+            return polkit.Result.YES;
+        }
         return polkit.Result.AUTH_ADMIN_KEEP;
     }
 });
