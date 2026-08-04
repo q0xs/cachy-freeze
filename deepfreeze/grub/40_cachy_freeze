@@ -4,7 +4,8 @@ set -Eeuo pipefail
 CONFIG=${CACHY_FREEZE_CONFIG:-/etc/cachy-freeze.conf}
 BOOT_DIR=${CACHY_FREEZE_BOOT_DIR:-/boot}
 [[ -r $CONFIG ]] || exit 0
-# shellcheck source=../etc/cachy-freeze.conf
+# CONFIG can point at a deployed or generated file selected at runtime.
+# shellcheck disable=SC1090
 source "$CONFIG"
 
 root_uuid=$(findmnt -n -o UUID /)

@@ -2,9 +2,10 @@
 set -Eeuo pipefail
 
 readonly INSTALLED_PYTHON_ROOT=/usr/lib/cachy-freeze/python
-readonly SOURCE_PYTHON_ROOT="$(
+SOURCE_PYTHON_ROOT="$(
   cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../src" && pwd
 )"
+readonly SOURCE_PYTHON_ROOT
 
 if [[ -d $INSTALLED_PYTHON_ROOT/cachy_freeze ]]; then
   python_root=$INSTALLED_PYTHON_ROOT
