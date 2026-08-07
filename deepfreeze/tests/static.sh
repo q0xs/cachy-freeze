@@ -46,6 +46,8 @@ grep -q 'ConditionKernelCommandLine=cachy.freeze=1' \
   "$ROOT/../user/files/cachy-frozen-admin-restrict.service"
 grep -q 'def preflight' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'begin_transaction' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
+grep -Fq '"$BACKEND" publish --description "GUI üzerinden Golden yayınlama" >&2' \
+  "$PROJECT_ROOT/app/cachy-freeze-manager-helper"
 grep -q 'chpasswd", "--encrypted"' \
   "$PROJECT_ROOT/src/cachy_freeze/users.py"
 ! grep -q '"--password"' \

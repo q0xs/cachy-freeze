@@ -169,7 +169,7 @@ case ${1:-} in
     ;;
   freeze)
     if [[ $(findmnt -n -o SOURCE /) == *'[/@]' ]]; then
-      "$BACKEND" publish --description "GUI üzerinden Golden yayınlama"
+      "$BACKEND" publish --description "GUI üzerinden Golden yayınlama" >&2
     fi
     exec "$BACKEND" freeze
     ;;
