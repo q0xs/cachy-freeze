@@ -34,6 +34,10 @@ kimliği ve hassas log bulunmaz.
 - JSON ve XML doğrulaması geçti.
 - PolicyKit çalışan kuralı semantik testi geçti.
 - Qt/PyQt offscreen GUI smoke testi geçti.
+- PolicyKit yardımcısı üzerinden gerçek fiziksel uygulama preflight'i geçti;
+  UEFI, Btrfs ve `@` bakım kökü doğrulandı.
+- ShellCheck severity=error, araç kurulduktan sonra yeniden çalıştırıldı ve
+  geçti.
 
 ## Kalan / doğrulanması gereken kontroller
 
@@ -45,9 +49,10 @@ kimliği ve hassas log bulunmaz.
   doğrulanmalı.
 - HTTPS internet erişimi sandbox dışındaki gerçek sistem bağlamında
   doğrulanmalı.
-- ShellCheck severity=error çalıştırılmalı; araç mevcut değil.
-- `systemd-analyze verify` sandbox dışında tam çalıştırılmalı; mevcut çalışmada
-  yalnız sandbox izin uyarısı alınarak kısmi doğrulama yapıldı.
+- `systemd-analyze verify` sandbox dışında çalıştırıldı. Provisioning henüz
+  yapılmadığı için unit dosyalarının beklediği `/usr/lib` ve `/usr/local/sbin`
+  executable hedefleri sistemde bulunamadı; kurulum sonrası yeniden
+  çalıştırılmalı.
 - Grafik uygulamanın gerçek Plasma/Dolphin başlatması ve grafik preflight henüz
   yapılmadı.
 
@@ -56,7 +61,8 @@ kimliği ve hassas log bulunmaz.
 - Fiziksel hedef kimliği otomatik olarak kesinleştirilemedi:
   `systemd-detect-virt` yürütme ortamını `container-other` bildirdi.
 - Değişiklik öncesi kod kapısı ShellCheck ve tam systemd verify eksikleri
-  nedeniyle bütünüyle geçmedi.
+  nedeniyle bütünüyle geçmedi. ShellCheck sonradan geçti; systemd hedefleri
+  provisioning öncesinde mevcut olmadığından tam verify hâlâ açık.
 
 ## Uygulanmayan adımlar
 
