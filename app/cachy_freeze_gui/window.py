@@ -1011,6 +1011,12 @@ class MainWindow(QMainWindow):
             and not any(character in password for character in ("\n", "\r", "\x00", ":"))
         )
 
+    @staticmethod
+    def _employee_password_is_valid(password: str) -> bool:
+        return 4 <= len(password) <= 256 and not any(
+            character in password for character in ("\n", "\r", "\x00", ":")
+        )
+
     def _start_setup(self) -> None:
         username = self.setup_username.text().strip().lower()
         display_name = self.setup_display_name.text().strip()
@@ -1058,12 +1064,12 @@ class MainWindow(QMainWindow):
         if password != self.setup_password_confirm.text():
             QMessageBox.warning(self, "Parola hatası", "Kullanıcı parolaları aynı değil.")
             return
-        if not self._password_is_strong(password):
+        if not self._employee_password_is_valid(password):
             QMessageBox.warning(
                 self,
-                "Zayıf parola",
-                "Parola 12-256 karakter olmalı ve küçük harf, büyük harf, rakam ve sembol "
-                "sınıflarından en az üçünü içermelidir.",
+                "Geçersiz parola",
+                "Çalışan parolası 4-256 karakter olmalı; iki nokta, satır sonu veya boş "
+                "karakter içeremez.",
             )
             return
         answer = QMessageBox.warning(

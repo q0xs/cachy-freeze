@@ -58,14 +58,8 @@ class UserManager:
 
     @staticmethod
     def validate_password(password: str) -> None:
-        classes = sum(
-            bool(re.search(pattern, password))
-            for pattern in (r"[a-z]", r"[A-Z]", r"[0-9]", r"[^A-Za-z0-9]")
-        )
-        if not 12 <= len(password) <= 256 or classes < 3:
-            raise CachyFreezeError(
-                "Parola 12-256 karakter ve en az üç karakter sınıfı içermelidir."
-            )
+        if not 4 <= len(password) <= 256:
+            raise CachyFreezeError("Çalışan parolası 4-256 karakter olmalıdır.")
         if "\n" in password or "\r" in password or "\x00" in password or ":" in password:
             raise CachyFreezeError("Parola desteklenmeyen bir karakter içeriyor.")
 

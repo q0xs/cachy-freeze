@@ -32,6 +32,9 @@ class SetupGuiTests(unittest.TestCase):
         self.assertTrue(self.window._password_is_strong("Correct-Horse-42"))
         self.assertFalse(self.window._password_is_strong("short"))
         self.assertFalse(self.window._password_is_strong("Colon:Password42"))
+        self.assertTrue(self.window._employee_password_is_valid("1234"))
+        self.assertFalse(self.window._employee_password_is_valid("123"))
+        self.assertFalse(self.window._employee_password_is_valid("12:34"))
 
     def test_provision_requires_preflight(self) -> None:
         with patch("cachy_freeze_gui.window.QMessageBox.warning") as warning:

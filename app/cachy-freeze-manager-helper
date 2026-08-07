@@ -23,12 +23,17 @@ die() {
   exit 1
 }
 
-read_secret() {
+read_employee_secret() {
   IFS= read -r SETUP_SECRET || die "Parola güvenli giriş kanalından alınamadı."
-  (( ${#SETUP_SECRET} >= 12 && ${#SETUP_SECRET} <= 256 )) ||
-    die "Parola 12-256 karakter olmalıdır."
+  (( ${#SETUP_SECRET} >= 4 && ${#SETUP_SECRET} <= 256 )) ||
+    die "Çalışan parolası 4-256 karakter olmalıdır."
   [[ $SETUP_SECRET != *:* && $SETUP_SECRET != *$'\r'* && $SETUP_SECRET != *$'\n'* ]] ||
     die "Parola desteklenmeyen bir karakter içeriyor."
+}
+
+read_grub_secret() {
+  read_employee_secret
+  (( ${#SETUP_SECRET} >= 12 )) || die "GRUB parolası 12-256 karakter olmalıdır."
   local classes=0
   [[ $SETUP_SECRET =~ [a-z] ]] && ((classes += 1))
   [[ $SETUP_SECRET =~ [A-Z] ]] && ((classes += 1))
@@ -124,7 +129,7 @@ case ${1:-} in
       die "Kurulum zaten tamamlanmış; yeniden hazırlama engellendi."
     [[ -r $PROJECT_ROOT/installer/00-HEPSINI-HAZIRLA.sh ]] ||
       die "Doğrulanmış kurulum paketi bulunamadı."
-    read_secret
+    read_employee_secret
     printf '%s\n%s\n%s\n' "$2" "$3" "$SETUP_SECRET" |
       CACHY_SETUP_NONINTERACTIVE=1 \
         bash "$PROJECT_ROOT/installer/00-HEPSINI-HAZIRLA.sh" >&2
@@ -140,7 +145,7 @@ case ${1:-} in
       die "Kurulum zaten tamamlanmış; yeniden tamamlama engellendi."
     [[ -r $PROJECT_ROOT/installer/08-KURULUMU-TAMAMLA.sh ]] ||
       die "Doğrulanmış tamamlama paketi bulunamadı."
-    read_secret
+    read_grub_secret
     printf '%s\n' "$SETUP_SECRET" |
       CACHY_SETUP_NONINTERACTIVE=1 \
         bash "$PROJECT_ROOT/installer/08-KURULUMU-TAMAMLA.sh" >&2

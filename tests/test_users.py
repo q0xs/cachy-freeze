@@ -20,8 +20,8 @@ class UserValidationTests(unittest.TestCase):
                 UserManager.validate_username(invalid)
 
     def test_password_policy(self) -> None:
-        UserManager.validate_password("Correct-Horse-42")
-        for invalid in ("short", "alllowercasebutlong", "Colon:Password42"):
+        UserManager.validate_password("1234")
+        for invalid in ("123", "Colon:Password42"):
             with self.subTest(invalid=invalid), self.assertRaises(CachyFreezeError):
                 UserManager.validate_password(invalid)
 

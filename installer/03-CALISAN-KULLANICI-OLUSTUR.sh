@@ -72,7 +72,8 @@ while [[ ${CACHY_SETUP_NONINTERACTIVE:-0} != 1 ]]; do
   }
   break
 done
-[[ -n $employee_password && $employee_password == "$employee_password_again" ]] ||
+(( ${#employee_password} >= 4 && ${#employee_password} <= 256 )) &&
+  [[ $employee_password == "$employee_password_again" ]] ||
   die "Calisan parolasi bos veya tekrariyla uyusmuyor."
 [[ $employee_password != *:* && $employee_password != *$'\n'* && \
   $employee_password != *$'\r'* ]] ||
