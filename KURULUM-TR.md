@@ -65,9 +65,12 @@ hata ayrıntısını ve `/var/log/cachyos-workstation-install.log` dosyasını k
 
 ## 5. İş istasyonunu uygulamadan hazırla
 
-Önyüklenebilir kurtarma medyası ve geri alınabilir yedek hazır kutusunu
-işaretle. Aynı ekranda çalışan kullanıcı adını, görünen adını ve güçlü parolasını
-gir; ardından **Tam kurulumu başlat** düğmesine bas.
+Üretim/pilot cihazında önyüklenebilir kurtarma medyası ve geri alınabilir yedek
+hazır kutusunu işaretle. Yalnız veri tutulmayan, yeniden formatlanması kabul
+edilmiş disposable test cihazında bunun yerine tüm yerel verilerin kaybını kabul
+eden seçeneği işaretle ve ikinci risk uyarısını ayrıca onayla. İki seçeneği aynı
+anda işaretleme. Aynı ekranda çalışan kullanıcı adını, görünen adını ve güçlü
+parolasını gir; ardından **Tam kurulumu başlat** düğmesine bas.
 
 Uygulama mevcut doğrulanmış kurulum motorunu kullanarak:
 

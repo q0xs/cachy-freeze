@@ -63,6 +63,42 @@ class SetupGuiTests(unittest.TestCase):
         self.assertEqual(self.window.setup_password.text(), "")
         self.assertEqual(self.window.setup_password_confirm.text(), "")
 
+    def test_disposable_device_requires_explicit_data_loss_confirmation(self) -> None:
+        self.window.setup_preflight_ok = True
+        self.window.setup_disposable_check.setChecked(True)
+        self.window.setup_username.setText("qa_user")
+        self.window.setup_display_name.setText("QA User")
+        self.window.setup_password.setText("Correct-Horse-42")
+        self.window.setup_password_confirm.setText("Correct-Horse-42")
+
+        with patch(
+            "cachy_freeze_gui.window.QMessageBox.warning",
+            return_value=QMessageBox.StandardButton.Cancel,
+        ) as warning:
+            self.window._start_setup()
+
+        warning.assert_called_once()
+        self.assertIn("veri kaybı", warning.call_args.args[1])
+        self.backend.run.assert_not_called()
+
+    def test_disposable_device_can_provision_after_two_confirmations(self) -> None:
+        self.window.setup_preflight_ok = True
+        self.window.setup_disposable_check.setChecked(True)
+        self.window.setup_username.setText("qa_user")
+        self.window.setup_display_name.setText("QA User")
+        self.window.setup_password.setText("Correct-Horse-42")
+        self.window.setup_password_confirm.setText("Correct-Horse-42")
+
+        with patch(
+            "cachy_freeze_gui.window.QMessageBox.warning",
+            side_effect=[QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.Yes],
+        ):
+            self.window._start_setup()
+
+        self.backend.run.assert_called_once_with(
+            "setup-provision", "qa_user", "QA User", secret="Correct-Horse-42"
+        )
+
     def test_finalize_requires_all_live_checks(self) -> None:
         self.window.setup_grub_password.setText("Correct-Horse-42")
         self.window.setup_grub_confirm.setText("Correct-Horse-42")

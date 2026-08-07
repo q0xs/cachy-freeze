@@ -502,6 +502,9 @@ class MainWindow(QMainWindow):
         self.setup_password_confirm = QLineEdit()
         self.setup_password_confirm.setEchoMode(QLineEdit.EchoMode.Password)
         self.setup_backup_check = QCheckBox("Kurtarma medyası ve geri alınabilir yedek hazır")
+        self.setup_disposable_check = QCheckBox(
+            "Disposable test cihazı: tüm yerel verilerin kaybını kabul ediyorum"
+        )
         self.setup_start_button = QPushButton("Tam kurulumu başlat")
         self.setup_start_button.setObjectName("primary")
         provision_form.addRow("Kullanıcı adı", self.setup_username)
@@ -509,6 +512,7 @@ class MainWindow(QMainWindow):
         provision_form.addRow("Kullanıcı parolası", self.setup_password)
         provision_form.addRow("Parola tekrar", self.setup_password_confirm)
         provision_form.addRow("", self.setup_backup_check)
+        provision_form.addRow("", self.setup_disposable_check)
         provision_form.addRow("", self.setup_start_button)
         stages.addWidget(provision_group, 0, 0)
 
@@ -1018,14 +1022,28 @@ class MainWindow(QMainWindow):
                 "Kuruluma başlamadan önce sistem ön kontrolünü başarıyla çalıştırın.",
             )
             return
-        if not self.setup_backup_check.isChecked():
+        backup_ready = self.setup_backup_check.isChecked()
+        disposable_accepted = self.setup_disposable_check.isChecked()
+        if backup_ready == disposable_accepted:
             QMessageBox.warning(
                 self,
-                "Yedek gerekli",
-                "Önyüklenebilir kurtarma medyasını ve geri alınabilir yedeği hazırladığınızı "
-                "onaylayın.",
+                "Kurtarma seçimi gerekli",
+                "Ya kurtarma medyası/yedeğin hazır olduğunu ya da bu disposable test "
+                "cihazındaki tüm yerel verilerin kaybını kabul ettiğinizi seçin.",
             )
             return
+        if disposable_accepted:
+            disposable_answer = QMessageBox.warning(
+                self,
+                "Disposable test cihazı — veri kaybı riski",
+                "Bu cihaz açılmayabilir ve yeniden formatlama gerekebilir. Kurtarma USB'si "
+                "ve harici yedek olmadan devam etmeyi, cihazdaki tüm yerel verilerin "
+                "kalıcı kaybını kabul ediyor musunuz?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if disposable_answer != QMessageBox.StandardButton.Yes:
+                return
         if re.fullmatch(r"[a-z][a-z0-9_-]{2,31}", username) is None:
             QMessageBox.warning(
                 self,
