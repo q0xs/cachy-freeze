@@ -19,9 +19,7 @@ Historical baseline before the independent-workflow update:
 - PASS — no CachyFreeze application error was found in the inspected journal.
 - NOT RUN — privileged GUI mutations, reboot, destructive Btrfs/GRUB tests.
 
-## 2026-08-07 — independent install/freeze workflow — working tree
-
-Status will be replaced with the final commit after publication.
+## 2026-08-07 — independent install/freeze workflow — commit `91116a0`
 
 - PASS — Ruff check and format check; 25 Python files formatted.
 - PASS — 37/37 Python unit tests, including independent install/freeze and first-freeze GRUB protection contracts.
