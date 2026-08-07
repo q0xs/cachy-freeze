@@ -8,7 +8,6 @@ while IFS= read -r -d '' script; do
   bash -n "$script"
 done < <(
   find "$PROJECT_ROOT" \
-    -path "$PROJECT_ROOT/cachy-freeze" -prune -o \
     -type f \( -name '*.sh' -o \
       -path "$PROJECT_ROOT/deepfreeze/bin/cachy-freeze" -o \
       -path "$PROJECT_ROOT/deepfreeze/initcpio/cachy-freeze-reset" -o \
@@ -94,7 +93,7 @@ grep -q 'auth_admin_keep' \
   "$PROJECT_ROOT/app/org.cachyos.cachy-freeze.policy"
 grep -q '^Exec=/usr/bin/cachy-freeze-manager$' \
   "$PROJECT_ROOT/app/cachy-freeze-manager.desktop"
-grep -q '^Name=CachyOS Kurulum Uygulaması$' \
+grep -q '^Name=CachyFreeze Setup$' \
   "$PROJECT_ROOT/cachyfreeze-setup.desktop"
 grep -q '^Terminal=false$' \
   "$PROJECT_ROOT/cachyfreeze-setup.desktop"
@@ -113,7 +112,7 @@ grep -q 'setup-provision)' \
 grep -q 'CACHY_SETUP_NONINTERACTIVE' \
   "$PROJECT_ROOT/installer/create-employee-user.sh"
 
-[[ $(find "$PROJECT_ROOT" -maxdepth 1 -type f -name '*.sh' | wc -l) -eq 5 ]]
+[[ $(find "$PROJECT_ROOT" -maxdepth 1 -type f -name '*.sh' | wc -l) -eq 0 ]]
 for desktop in "$PROJECT_ROOT"/user/desktop/*.desktop; do
   grep -qx '\[Desktop Entry\]' "$desktop"
   grep -q '^Type=Application$' "$desktop"
