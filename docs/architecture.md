@@ -1,7 +1,7 @@
-# CachyOS Workstation Management Platform Mimarisi
+# CachyFreeze Architecture
 
 Bu belge, grafik yönetim uygulamasının güven sınırlarını, Btrfs veri modelini ve
-kesinti kurtarma davranışını tanımlar. Günlük yönetim işlemleri **Cachy Freeze
+kesinti kurtarma davranışını tanımlar. Günlük yönetim işlemleri **CachyFreeze
 Yönetim Merkezi** üzerinden yapılır; normal kullanıcı terminal kullanmaz.
 
 ## Bileşenler

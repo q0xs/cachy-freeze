@@ -10,7 +10,7 @@ die() {
 }
 
 (( EUID == 0 )) || die "Su sekilde calistir: sudo $0"
-[[ -r $DF_ROOT/bin/cachy-freeze ]] || die "Deep Freeze proje dosyalari eksik."
+[[ -r $DF_ROOT/bin/cachy-freeze ]] || die "CachyFreeze proje dosyalari eksik."
 command -v python >/dev/null || die "Python bulunamadi."
 python -c 'import PyQt6' 2>/dev/null ||
   die "PyQt6 bulunamadi. Once python-pyqt6 paketini kur."
@@ -24,7 +24,7 @@ root_uuid=$(findmnt -n -o UUID /)
   die "Kurulum yalnizca Maintenance @ kokunde yapilir."
 root_options=$(findmnt -n -o OPTIONS /)
 [[ ,$root_options, == *,rw,* ]] ||
-  die "Maintenance @ koku salt-okunur bagli; Deep Freeze kurulumu yapilamaz."
+  die "Maintenance @ koku salt-okunur bagli; CachyFreeze kurulumu yapilamaz."
 
 backup_dir="/var/backups/cachy-freeze/$(date -u +%Y%m%dT%H%M%SZ)"
 install -d -m 0700 "$backup_dir"
@@ -179,7 +179,7 @@ systemctl enable --now "$state_unit"
 systemctl enable cachy-freeze-boot-health.service
 systemctl enable --now cachy-freeze-auto-snapshot.timer
 systemctl enable cachy-employee-reset.service
-mountpoint -q "$state_mount" || die "Kalici Cachy Freeze state alt birimi baglanamadi."
+mountpoint -q "$state_mount" || die "Kalici CachyFreeze state alt birimi baglanamadi."
 systemctl is-enabled --quiet cachy-freeze-boot-health.service ||
   die "Boot saglik servisi etkinlestirilemedi."
 systemctl is-enabled --quiet cachy-freeze-auto-snapshot.timer ||
@@ -236,20 +236,20 @@ grep -q -- "--id 'cachyos-current'" /boot/grub/grub.cfg ||
 [[ $(grep -c '^menuentry ' /boot/grub/grub.cfg) -eq 1 ]] ||
   die "GRUB menusunde bir disinda giris bulundu."
 [[ -x /usr/bin/cachy-freeze-manager ]] ||
-  die "Cachy Freeze masaustu uygulamasi kurulamadi."
+  die "CachyFreeze masaustu uygulamasi kurulamadi."
 [[ -x /usr/lib/cachy-freeze/cachy-freeze-manager-helper ]] ||
-  die "Cachy Freeze yetkili yardimcisi kurulamadi."
+  die "CachyFreeze yetkili yardimcisi kurulamadi."
 [[ -r /usr/share/applications/cachy-freeze-manager.desktop ]] ||
-    die "Cachy Freeze uygulama menu girdisi kurulamadi."
+    die "CachyFreeze uygulama menu girdisi kurulamadi."
 [[ -r /usr/lib/cachy-freeze/python/cachy_freeze/cli.py ]] ||
-  die "Cachy Freeze Python backend kurulamadi."
+  die "CachyFreeze Python backend kurulamadi."
 
 /usr/local/sbin/cachy-freeze thaw
 
 trap - ERR
 
 printf '%s\n' \
-  "Deep Freeze kuruldu ve test edildi." \
+  "CachyFreeze kuruldu ve test edildi." \
   "Guvenli varsayilan: THAWED (Maintenance)." \
-  "Golden henuz yayinlanmadi; 06-GOLDEN-YAYINLA.sh calistirilmali." \
-  "Frozen moda gecmek icin 04-DONDUR.sh dosyasini ayrica calistir."
+  "Golden henuz yayinlanmadi; publish-golden.sh calistirilmali." \
+  "Frozen moda gecmek icin set-frozen-mode.sh dosyasini ayrica calistir."

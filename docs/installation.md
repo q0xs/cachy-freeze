@@ -1,4 +1,4 @@
-# CachyOS Kurumsal Laptop Kurulumu — Türkçe Rehber
+# CachyFreeze Installation Guide
 
 Bu belge ayrıntılı Türkçe kurulum sırasıdır. Projenin İngilizce genel
 açıklaması ve güvenlik uyarıları için `README.md` dosyasını da oku.
@@ -96,7 +96,7 @@ Uygulama mevcut doğrulanmış kurulum motorunu kullanarak:
 - Çalışan hesabı `wheel` veya `sudo` grubunda bulunmuyor.
 - Plasma ve uygulamalar koyu temayla açılıyor.
 
-Bir sorun varsa FROZEN aşamasına geçme. `localadm` hesabına dön, **Cachy Freeze
+Bir sorun varsa FROZEN aşamasına geçme. `localadm` hesabına dön, **CachyFreeze
 Yönetim Merkezi → Kurulum** sayfasını aç ve hata kaydını koru.
 
 Uygulama dosyasının veya komutunun varlığı yeterli değildir; her uygulamanın
@@ -130,7 +130,7 @@ parçası değildir. `installer/` ve `deepfreeze/` altındaki dosyaları tek tek
 
 ## Sonradan bakım yapmak
 
-Günlük yönetimde terminal gerekmez. **Cachy Freeze Yönetim Merkezi** içinden:
+Günlük yönetimde terminal gerekmez. **CachyFreeze Yönetim Merkezi** içinden:
 
 1. Ayarlar sayfasında kalıcı THAWED veya yalnızca bir kez THAWED seç.
 2. Uygulamanın sunduğu yeniden başlatma onayını kullan.

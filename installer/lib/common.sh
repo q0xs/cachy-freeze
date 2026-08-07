@@ -13,7 +13,7 @@ require_maintenance() {
   local source options
   source=$(findmnt -n -o SOURCE /)
   [[ $source == *'[/@]' ]] ||
-    die "Bu islem yalnizca Maintenance modunda yapilir. Once 05-COZ.sh ve reboot."
+    die "Bu islem yalnizca Maintenance modunda yapilir. Once set-thawed-mode.sh ve reboot."
   options=$(findmnt -n -o OPTIONS /)
   [[ ,$options, == *,rw,* ]] ||
     die "Maintenance koku salt-okunur bagli. Sistemi degistirmeden once @ kokunu yazilabilir ac."

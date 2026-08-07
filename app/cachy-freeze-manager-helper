@@ -127,12 +127,12 @@ case ${1:-} in
       die "Geçersiz görünen ad."
     [[ ! -s /etc/cachy-freeze-grub-auth.conf ]] ||
       die "Kurulum zaten tamamlanmış; yeniden hazırlama engellendi."
-    [[ -r $PROJECT_ROOT/installer/00-HEPSINI-HAZIRLA.sh ]] ||
+    [[ -r $PROJECT_ROOT/installer/provision-workstation.sh ]] ||
       die "Doğrulanmış kurulum paketi bulunamadı."
     read_employee_secret
     printf '%s\n%s\n%s\n' "$2" "$3" "$SETUP_SECRET" |
       CACHY_SETUP_NONINTERACTIVE=1 \
-        bash "$PROJECT_ROOT/installer/00-HEPSINI-HAZIRLA.sh" >&2
+        bash "$PROJECT_ROOT/installer/provision-workstation.sh" >&2
     unset SETUP_SECRET
     printf '%s\n' '{"ok":true,"result":{"phase":"provisioned"}}'
     exit 0
@@ -143,19 +143,19 @@ case ${1:-} in
       die "Önce iş istasyonu hazırlama adımını tamamlayın."
     [[ ! -s /etc/cachy-freeze-grub-auth.conf ]] ||
       die "Kurulum zaten tamamlanmış; yeniden tamamlama engellendi."
-    [[ -r $PROJECT_ROOT/installer/08-KURULUMU-TAMAMLA.sh ]] ||
+    [[ -r $PROJECT_ROOT/installer/finalize-setup.sh ]] ||
       die "Doğrulanmış tamamlama paketi bulunamadı."
     read_grub_secret
     printf '%s\n' "$SETUP_SECRET" |
       CACHY_SETUP_NONINTERACTIVE=1 \
-        bash "$PROJECT_ROOT/installer/08-KURULUMU-TAMAMLA.sh" >&2
+        bash "$PROJECT_ROOT/installer/finalize-setup.sh" >&2
     unset SETUP_SECRET
     printf '%s\n' '{"ok":true,"result":{"phase":"complete"}}'
     exit 0
     ;;
 esac
 
-[[ -x $BACKEND ]] || die "Cachy Freeze altyapısı kurulu değil."
+[[ -x $BACKEND ]] || die "CachyFreeze altyapısı kurulu değil."
 
 case ${1:-} in
   status)

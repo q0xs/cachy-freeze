@@ -105,9 +105,9 @@ class MainWindow(QMainWindow):
     def __init__(self, backend: BackendClient) -> None:
         super().__init__()
         self.backend = backend
-        self.settings = QSettings("CachyOS Workstation", "Cachy Freeze")
+        self.settings = QSettings("CachyOS Workstation", "CachyFreeze")
         self.setup_preflight_ok = False
-        self.setWindowTitle("Cachy Freeze Yönetim Merkezi")
+        self.setWindowTitle("CachyFreeze Yönetim Merkezi")
         self.setMinimumSize(980, 640)
         self.resize(1180, 740)
         self._build_ui()
@@ -126,7 +126,7 @@ class MainWindow(QMainWindow):
         sidebar.setFixedWidth(220)
         side_layout = QVBoxLayout(sidebar)
         side_layout.setContentsMargins(16, 22, 16, 18)
-        brand = QLabel("Cachy Freeze")
+        brand = QLabel("CachyFreeze")
         brand.setObjectName("brand")
         side_layout.addWidget(brand)
         self.nav_buttons: list[QPushButton] = []
@@ -1225,7 +1225,7 @@ class MainWindow(QMainWindow):
         if action == "user-create" and not success:
             self.settings.remove("pending_autologin")
         if not success and "iptal edildi" not in message.lower():
-            QMessageBox.critical(self, "Cachy Freeze Hatası", message)
+            QMessageBox.critical(self, "CachyFreeze Hatası", message)
         elif success and action == "setup-finalize":
             answer = QMessageBox.question(
                 self,

@@ -1,244 +1,88 @@
-# CachyOS Corporate Laptop Provisioning
+# CachyFreeze
 
-This repository provisions CachyOS laptops for shared call-center and sales
-workstations. It installs the required applications, creates a restricted
-employee account, and restores the machine to a clean **Frozen** state after
-every reboot.
+CachyFreeze is an open-source, Btrfs-based system freeze and recovery manager
+for CachyOS workstations. It restores managed machines to a known-good state
+after reboot while providing a persistent maintenance mode for administrators.
 
-> [!IMPORTANT]
-> For the complete installation procedure in Turkish, read
-> **[KURULUM-TR.md](KURULUM-TR.md)**.
-
-> [!TIP]
-> Codex CLI must read **[AGENTS.md](AGENTS.md)** first and then continue from
-> **[CODEX-CLI-DEVAM-TALIMATI.md](CODEX-CLI-DEVAM-TALIMATI.md)**. The handoff
-> records the current VirtualBox checkpoint, physical-device test matrix,
-> safety gates, and exact continuation order. Checkpoint data is informational;
-> Codex must revalidate the real target before changing it.
+Copyright 2026 Atilla Mert Akkaya. Licensed under the Apache License 2.0.
 
 > [!CAUTION]
-> The application modifies the boot chain, initramfs, GRUB configuration, and
-> Btrfs subvolumes. Perform the first installation on a backed-up pilot device
-> while you have physical access to it.
+> CachyFreeze changes Btrfs subvolumes, initramfs, GRUB, and the boot process.
+> Use a backed-up pilot device with physical access and recovery media.
 
-## Overview
+## Core capabilities
 
-The project validates the required UEFI, Btrfs, and GRUB layout before making
-changes. It then:
+- FROZEN mode recreates a writable `@active` root from read-only `@golden`.
+- THAWED mode boots the persistent `@` maintenance root.
+- Interrupted Golden/Active transactions are recovered during early boot.
+- Repeated boot failures can restore the previous known-good Golden snapshot.
+- Snapshot creation, verification, comparison, export, import, retention, and
+  rollback are available from one desktop application.
+- Standard-user lifecycle, protected updates, audit logs, and boot policy are
+  managed from the same application.
+- Privileged operations use a strict PolicyKit helper allow-list.
+- Passwords and reusable password hashes travel through stdin, never command
+  arguments or logs.
 
-- installs the workstation applications;
-- creates the managed employee account;
-- enables microphone, speaker, headset, video, input, and realtime access;
-- requests the `localadm` administrator password for privileged desktop
-  actions instead of immediately denying them, while preserving the upstream
-  allow policy for a small exact list of Plasma login-time hardware and network
-  actions so harmless probes do not show administrator prompts;
-- gives the employee a normal Windows-standard-user-like desktop experience:
-  user settings remain available, while system changes require Polkit
-  authentication with the `localadm` password;
-- starts the employee's Plasma session with the Breeze Dark theme;
-- hides `localadm` from the graphical login screen in Frozen mode;
-- restores both the employee and `localadm` home directories from clean
-  templates during every Frozen boot;
-- maintains a Golden Btrfs snapshot from which the active Frozen system is
-  recreated;
-- records snapshot metadata, checksums, history, health, exports, imports,
-  comparisons, cleanup, and rollback counters;
-- recovers interrupted Golden/Active transactions and automatically restores
-  the previous known-good Golden after repeated failed boots;
-- provides one GUI for first installation, dashboards, snapshots, standard
-  users, updates, audit logs, boot policy, automatic snapshots, network policy,
-  and settings;
-- performs privileged work only through a PolicyKit-authenticated allow-list
-  helper; passwords use stdin and never appear in process lists;
-- displays one GRUB entry whose title reflects the selected mode: **FROZEN**
-  or **THAWED**.
+## Supported workflow
 
-## Application preview
+All installation, setup, freeze, thaw, update, snapshot, and user-management
+operations are performed through the CachyFreeze desktop application. Legacy
+USB and numbered manual shell entry points are not supported.
 
-![Cachy Freeze Management Center dashboard](docs/images/cachy-freeze-management-center-preview.png)
-
-The preview is rendered from the real PyQt6 application with representative,
-non-production status data. The installed application reads the actual Btrfs,
-boot-health, snapshot, update, and audit state from the workstation.
-
-## Codex quick handoff — live CachyOS laptop test
-
-When this repository is reopened for the physical laptop test, start here
-instead of redesigning the project:
-
-1. Read `AGENTS.md`, `CODEX-CLI-DEVAM-TALIMATI.md`, `MIMARI-TR.md`,
-   `KURULUM-TR.md`, `GITHUB-ILE-CALISMA.md`, and `PILOT-NOTLARI.md`; then
-   inspect `git status --short`, the remotes, and the latest three commits.
-2. Keep the Windows host and CachyOS target strictly separate. Btrfs, GRUB,
-   initramfs, snapshot, freeze, and rollback commands may run only on the
-   dedicated CachyOS laptop or a disposable CachyOS VM.
-3. Before installation, make a recoverable backup and confirm **UEFI + Btrfs +
-   GRUB**, `/boot/efi`, and no separate `/boot`. Stop if preflight rejects the
-   layout; do not bypass it.
-4. Start `CachyOS-Kurulum-Uygulamasi.desktop` and keep the entire
-   preflight/provision/test/finalize flow in its **Kurulum** page. This desktop
-   launcher is the only supported user-facing installation entry point.
-5. Test all seven GUI pages, both `localadm` and a standard user, FROZEN/THAWED
-   and one-time THAWED boots, snapshot create/full verify/rollback, updates,
-   autologin, home reset, audio devices, and a real MicroSIP call.
-6. Exercise unexpected shutdown and boot rollback only after a healthy Golden
-   exists. Never cut power during Golden publication or package installation.
-7. On failure, preserve evidence before changing anything: application audit
-   logs, `journalctl -b`, `findmnt`, `btrfs subvolume list /`, boot mode, and the
-   exact failed step. Do not run `btrfs check --repair`.
-
-The 4 August 2026 clean VirtualBox checkpoint reached `phase=provisioned` in a
-real UEFI/Btrfs/GRUB guest. All six employee applications opened, the employee
-remained outside wheel/sudo, and GitHub Actions passed. Finalize was deliberately
-not run because the VM exposed no real microphone/headset and no real call was
-verified. The VM was later observed in VirtualBox's `aborted` state, so its next
-use also requires fresh boot-health, transaction, subvolume, and journal checks;
-this is not a passed power-loss test. Physical audio, finalize, FROZEN/THAWED
-reboot behavior, snapshot, update, user-lifecycle, stress, and destructive-gate
-acceptance therefore remain open. Do not report an older VM snapshot or
-loop-device result as physical acceptance.
-
-## Boot modes
-
-| Mode | Purpose | Persistence |
-| --- | --- | --- |
-| **FROZEN** | Normal employee operation | Local changes are removed on reboot |
-| **THAWED** | Persistent maintenance and updates | Changes are retained |
-| **Golden** | Published source snapshot for Frozen mode | Not booted directly |
-
-FROZEN boots without a GRUB password. THAWED requires the `cachyadmin` GRUB
-user and the password configured during installation.
-
-Changes made in THAWED mode do not automatically become the new Frozen
-baseline. Publish them with **Golden yayınla ve FROZEN yap** in the application.
+Launch `cachyfreeze-setup.desktop` on the target CachyOS device, complete the
+graphical preflight, and follow the Installation page. The application blocks
+unsupported disk and boot layouts.
 
 ## Requirements
 
 - CachyOS with KDE Plasma
 - UEFI boot
-- Btrfs root filesystem
+- Btrfs root using the `@` subvolume
 - GRUB
 - EFI system partition mounted at `/boot/efi`
 - no separate `/boot` filesystem
-- internet access
-- local `localadm` account with `sudo` privileges and an active password
-- AC power, bootable recovery media, and a recoverable external backup before
-  any physical-device boot-chain change
+- a working `localadm` administrator account
+- AC power, recovery media, and a recoverable backup
 
-The installer stops when it detects an unsupported disk or boot layout.
+## Architecture
 
-## Install everything from one application
+| Component | Responsibility |
+| --- | --- |
+| `app/` | PyQt6 desktop application, launcher, and PolicyKit boundary |
+| `src/cachy_freeze/` | Snapshot, boot, settings, update, audit, and user domain logic |
+| `deepfreeze/` | Btrfs early-boot reset, GRUB, initramfs, and systemd integration |
+| `installer/` | Internal GUI-driven provisioning actions; not user entry points |
+| `user/` | Managed-user desktop and home-reset integration |
+| `policies/` | Managed application policies |
+| `tests/` | Unit and setup-contract tests |
 
-![CachyOS single-application setup wizard](docs/images/cachy-freeze-setup-preview.png)
+The persistent Btrfs model is documented in
+[docs/architecture.md](docs/architecture.md).
 
-Installation is performed only through the graphical application. On the clean
-CachyOS laptop:
+## Development checks
 
-1. Sign in to GitHub in the web browser, download this private repository as a
-   ZIP, and extract it. A Git clone is also acceptable, but is not required.
-2. Double-click **`CachyOS-Kurulum-Uygulamasi.desktop`** in the extracted
-   project folder. If Plasma asks whether to trust or launch the file, approve
-   it. The first start installs only the PyQt6 runtime and uses the graphical
-   PolicyKit password dialog.
-3. In the application's **Kurulum** page, run the UEFI/Btrfs/GRUB preflight.
-   The installation is blocked if the disk layout is unsupported.
-4. Confirm that recovery media and a recoverable backup exist; enter the
-   standard employee account details and select **Tam kurulumu başlat**.
-5. Test Chrome, Slack, AnyDesk, LibreOffice, MicroSIP, Zoiper, audio devices,
-   and a privileged desktop action from the employee account.
-6. Return to the same **Kurulum** page, approve the three test checkboxes, set
-   the GRUB maintenance password, and select **Kurulumu tamamla ve FROZEN yap**.
-7. Accept the application's reboot prompt and perform the first Frozen reset
-   test.
-
-Both account and GRUB passwords are sent through the helper's standard input;
-they are not placed in process arguments, installation logs, or repository
-files. Progress and errors are displayed inside the application and retained
-in `/var/log/cachyos-workstation-install.log`.
-
-The employee login must not request administrator authentication merely to
-probe QMK/VIA devices, detect a discrete GPU, control the active user's network
-connection, or read battery thresholds. An unrelated privileged operation must
-still request the `localadm` password. Treat either opposite result as a policy
-regression and stop before finalize.
-
-After bootstrap, the installed **Cachy Freeze Management Center** contains
-seven wired pages:
-
-- **Dashboard:** running/scheduled mode, disk, snapshot and boot health.
-- **Snapshots:** create, verify, compare, export, import, delete and rollback.
-- **Users:** standard account lifecycle, password, lock and autologin policy.
-- **Updates:** read-only checks, corporate application verification/repair,
-  and snapshot-protected THAWED updates.
-- **Audit logs:** structured INFO/WARNING/ERROR operation history.
-- **Settings:** freeze, snapshot, update, theme, language, boot, log, network,
-  and automatic snapshot policy.
-- **Installation:** preflight, workstation provisioning, acceptance checklist,
-  GRUB protection, Golden publication, Frozen scheduling, and recovery status.
-
-The desktop launcher and its **Kurulum** page cover the complete installation.
-See **[KURULUM-TR.md](KURULUM-TR.md)** for the Turkish application checklist.
-
-## Maintenance
-
-Daily maintenance does not require a terminal. In **Cachy Freeze Management
-Center**, schedule persistent or one-time THAWED boot, accept its reboot
-prompt, then use the Updates page. A protected update creates a rollback
-snapshot before pacman and publishes a new Golden after verification. Return
-to FROZEN from Dashboard or Settings and accept the reboot prompt.
-
-The same application is the only user-facing interface for installation and
-daily management.
-
-## Repository layout
-
-```text
-.
-├── AGENTS.md      # Repository-wide Codex safety and validation rules
-├── CachyOS-Kurulum-Uygulamasi.desktop  # Terminal-free setup launcher
-├── app/           # Graphical freeze/thaw manager and Polkit policy
-├── CODEX-CLI-DEVAM-TALIMATI.md  # Current QA handoff and physical test order
-├── CODEX-CLI-FIZIKSEL-GOREV-METNI.md  # Paste-ready physical acceptance task
-├── KURULUM-TR.md  # Complete Turkish installation guide
-├── deepfreeze/    # Btrfs, initramfs, and GRUB infrastructure
-├── installer/     # Provisioning and publishing steps
-├── policies/      # Managed application policies
-├── user/          # Employee account services and desktop entries
-└── vendor/        # Offline or reviewed packaging helpers
+```bash
+ruff check src app/cachy_freeze_gui tests
+ruff format --check src app/cachy_freeze_gui tests
+python -m unittest discover -s tests -v
+SHELLCHECK_OPTS=--severity=error bash deepfreeze/tests/static.sh
+QT_QPA_PLATFORM=offscreen bash deepfreeze/tests/ui-smoke.sh
 ```
 
-## Validation
+Btrfs loop, initramfs, GRUB, reboot, and power-loss tests must run only on a
+disposable VM or an explicitly approved pilot device.
 
-The automated validation suite checks syntax, core configuration, desktop
-entries, JSON, systemd units, the graphical interface, Btrfs transactions,
-users, snapshots, secret transport, and recovery behavior. The minimum
-pre-push gate is Ruff check and format, all Python unit tests, Bash syntax,
-ShellCheck, systemd verification, desktop-file validation, and the Qt offscreen
-smoke test. Boot-chain and Btrfs integration tests must run only on a dedicated
-test device or disposable virtual machine. The full physical matrix is in
-`CODEX-CLI-DEVAM-TALIMATI.md`.
+## Documentation
 
-## Additional documentation
+- [Installation guide](docs/installation.md)
+- [Architecture](docs/architecture.md)
+- [Boot recovery](docs/boot-recovery.md)
+- [Pilot checklist](docs/pilot-checklist.md)
+- [Physical acceptance plan](docs/physical-acceptance.md)
+- [Development workflow](docs/development.md)
+- [Development handoff](docs/development-handoff.md)
 
-- [Turkish installation guide](KURULUM-TR.md)
-- [Codex repository rules](AGENTS.md)
-- [Codex CLI continuation and physical acceptance](CODEX-CLI-DEVAM-TALIMATI.md)
-- [Paste-ready Codex CLI physical task](CODEX-CLI-FIZIKSEL-GOREV-METNI.md)
-- [Pilot-device checklist](PILOT-NOTLARI.md)
-- [GitHub workflow on Linux](GITHUB-ILE-CALISMA.md)
-- [Boot recovery notes](KURTARMA-EKRAN-GELMEZSE.txt)
-- [Platform architecture and recovery model](MIMARI-TR.md)
-- [Optional legacy USB workflow](USB-KURULUM.txt)
+## License
 
-## Safety and backups
-
-- GitHub protects the project files; it is not a disk image or a replacement
-  for bootable recovery media.
-- Never commit passwords, access tokens, device UUIDs, or real user data.
-- Never put a password or reusable password hash in a process argument; use the
-  existing stdin secret channel.
-- Unpushed changes made in FROZEN mode disappear after reboot.
-- Do not manually delete the `@`, `@golden`, or `@active` Btrfs subvolumes.
-- Do not run `btrfs check --repair` without expert guidance.
-- Do not cut power while freezing or publishing snapshots.
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

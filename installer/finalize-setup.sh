@@ -35,14 +35,14 @@ printf 'Kurulum tamamlama basladi: %s\n' "$(date --iso-8601=seconds)"
 if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
   printf '%s\n' "$grub_password" |
     CACHY_SETUP_NONINTERACTIVE=1 \
-      bash "$INSTALLER_DIR/07-GRUB-MAINTENANCE-SIFRE-KOY.sh"
+      bash "$INSTALLER_DIR/configure-grub-password.sh"
   unset grub_password
 else
-  bash "$INSTALLER_DIR/07-GRUB-MAINTENANCE-SIFRE-KOY.sh"
+  bash "$INSTALLER_DIR/configure-grub-password.sh"
 fi
-bash "$INSTALLER_DIR/10-CALISAN-SABLONUNU-GUNCELLE.sh"
-bash "$INSTALLER_DIR/06-GOLDEN-YAYINLA.sh"
-bash "$INSTALLER_DIR/04-DONDUR.sh"
+bash "$INSTALLER_DIR/refresh-user-templates.sh"
+bash "$INSTALLER_DIR/publish-golden.sh"
+bash "$INSTALLER_DIR/set-frozen-mode.sh"
 
 printf '%s\n' \
   "Kurulum guvenli sirayla tamamlandi." \

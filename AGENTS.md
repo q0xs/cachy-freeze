@@ -5,11 +5,11 @@ dosyası kendi kapsamındaki ek kuralları tanımlar.
 
 ## Başlangıç ve bağlam
 
-- Önce bu dosyanın tamamını; sonra `CODEX-CLI-DEVAM-TALIMATI.md`, `README.md`,
-  `MIMARI-TR.md`, `KURULUM-TR.md`, `GITHUB-ILE-CALISMA.md` ve
-  `PILOT-NOTLARI.md` dosyalarını oku.
+- Önce bu dosyanın tamamını; sonra `docs/development-handoff.md`, `README.md`,
+  `docs/architecture.md`, `docs/installation.md`, `docs/development.md` ve
+  `docs/pilot-checklist.md` dosyalarını oku.
 - Fiziksel laptop görevi verildiyse ayrıca
-  `CODEX-CLI-FIZIKSEL-GOREV-METNI.md` içindeki uçtan uca kabul sözleşmesini oku.
+  `docs/physical-acceptance.md` içindeki uçtan uca kabul sözleşmesini oku.
 - Her turda `git status --short`, `git remote -v` ve son commitleri incele.
   Kullanıcı değişikliklerini silme, stash etme, restore etme veya ezme.
 - Windows host, VirtualBox VM ve fiziksel CachyOS laptopu ayrı hedefler olarak
@@ -19,7 +19,7 @@ dosyası kendi kapsamındaki ek kuralları tanımlar.
 
 ## Kullanıcı arayüzü sınırı
 
-- Normal kullanıcı kurulumu yalnız `CachyOS-Kurulum-Uygulamasi.desktop` ve
+- Normal kullanıcı kurulumu yalnız `cachyfreeze-setup.desktop` ve
   uygulamanın **Kurulum** sayfasından yapılır.
 - Kullanıcıya numaralı `.sh`, `sudo`, terminal kurulum veya bakım akışı sunma.
 - Terminal yalnız Codex'in repo işlemleri, geliştirme, test, log ve salt-okunur

@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Cachy Freeze Yönetim Merkezi
+Name=CachyFreeze Yönetim Merkezi
 GenericName=CachyOS Workstation Yönetimi
 Comment=Freeze, snapshot, kullanıcı ve güncellemeleri yönet
 Exec=/usr/bin/cachy-freeze-manager

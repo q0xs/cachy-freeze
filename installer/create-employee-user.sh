@@ -82,7 +82,7 @@ done
 for command in wine unzip rsync google-chrome-stable slack libreoffice zoiper \
   anydesk; do
   command -v "$command" >/dev/null ||
-    die "Once 02-UYGULAMALARI-KUR.sh calistirilmali. Eksik: $command"
+    die "Once install-applications.sh calistirilmali. Eksik: $command"
 done
 
 if ! id "$employee_user" >/dev/null 2>&1; then

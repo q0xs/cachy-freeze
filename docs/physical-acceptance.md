@@ -1,10 +1,10 @@
-# Codex CLI'ye yapıştırılacak fiziksel CachyOS görev metni
+# Physical CachyOS Acceptance Plan
 
 Aşağıdaki metnin tamamını Codex CLI'ye görev olarak ver:
 
 ---
 
-Repo: https://github.com/q0xs/CachyOS-USB-Kurulum
+Repo: https://github.com/q0xs/cachy-freeze
 
 Fiziksel, yedekli CachyOS pilot laptop üzerinde sıfırdan güvenlik doğrulaması,
 grafik kurulum, canlı kabul, FROZEN/THAWED, snapshot, güncelleme, kullanıcı,
@@ -28,8 +28,8 @@ alt dizinlerdeki daha özel `AGENTS.md` dosyalarına eksiksiz uy.
   `git remote -v`, `git log -3 --oneline` çalıştır ve kullanıcı değişikliklerini
   koru. Temiz ve uyumluysa yalnız `git pull --ff-only` kullan.
 - Sırasıyla kök `AGENTS.md`, `CODEX-CLI-DEVAM-TALIMATI.md`, `README.md`,
-  `MIMARI-TR.md`, `KURULUM-TR.md`, `GITHUB-ILE-CALISMA.md` ve
-  `PILOT-NOTLARI.md` dosyalarının tamamını oku. İlgili alt dizindeki
+  `docs/architecture.md`, `docs/installation.md`, `docs/development.md` ve
+  `docs/pilot-checklist.md` dosyalarının tamamını oku. İlgili alt dizindeki
   `AGENTS.md` dosyasını kod değiştirmeden önce ayrıca oku.
 - Token, parola, SSH anahtarı, cihaz UUID'si, gerçek kullanıcı verisi, parola
   hash'i veya hassas logu çıktıya/repoya koyma.
@@ -93,7 +93,7 @@ incele ve bütün kapıyı yeniden çalıştır. Yapılmamış testi geçmiş g�
 - Kurtarma/yedek kutusunu yalnız gerçekten hazırsa işaretle.
 - Standart çalışan kullanıcı adı/görünen adı ve güçlü parolayı GUI alanlarına
   gir. **Tam kurulumu başlat** akışını kullan.
-- Paketler, AUR derlemeleri, çalışan hesabı, Wine/MicroSIP, Deep Freeze, state
+- Paketler, AUR derlemeleri, çalışan hesabı, Wine/MicroSIP, CachyFreeze, state
   alt birimi, initramfs, GRUB ve ilk Golden tamamlanana kadar izle. Pacman,
   Golden, mkinitcpio veya GRUB yazımı sırasında kapatma/reboot yapma.
 - Beklenen ara durum: `phase=provisioned`, çalışan wheel/sudo dışı,

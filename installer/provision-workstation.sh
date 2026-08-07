@@ -24,18 +24,18 @@ printf 'Kurulum basladi: %s\n' "$(date --iso-8601=seconds)"
 CACHY_FREEZE_CONFIG="$PROJECT_ROOT/deepfreeze/etc/cachy-freeze.conf" \
   bash "$PROJECT_ROOT/deepfreeze/bin/cachy-freeze" preflight
 
-bash "$INSTALLER_DIR/02-UYGULAMALARI-KUR.sh"
+bash "$INSTALLER_DIR/install-applications.sh"
 if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
   printf '%s\n%s\n%s\n' \
     "$setup_employee_user" "$setup_employee_name" "$setup_employee_password" |
     CACHY_SETUP_NONINTERACTIVE=1 \
-      bash "$INSTALLER_DIR/03-CALISAN-KULLANICI-OLUSTUR.sh"
+      bash "$INSTALLER_DIR/create-employee-user.sh"
   unset setup_employee_password
 else
-  bash "$INSTALLER_DIR/03-CALISAN-KULLANICI-OLUSTUR.sh"
+  bash "$INSTALLER_DIR/create-employee-user.sh"
 fi
-bash "$INSTALLER_DIR/01-DEEPFREEZE-KUR.sh"
-bash "$INSTALLER_DIR/06-GOLDEN-YAYINLA.sh"
+bash "$INSTALLER_DIR/install-freeze-engine.sh"
+bash "$INSTALLER_DIR/publish-golden.sh"
 
 printf '%s\n' \
   "Tum hazirliklar tamamlandi." \

@@ -8,7 +8,7 @@ while IFS= read -r -d '' script; do
   bash -n "$script"
 done < <(
   find "$PROJECT_ROOT" \
-    -path "$PROJECT_ROOT/CachyOS-USB-Kurulum" -prune -o \
+    -path "$PROJECT_ROOT/cachy-freeze" -prune -o \
     -type f \( -name '*.sh' -o \
       -path "$PROJECT_ROOT/deepfreeze/bin/cachy-freeze" -o \
       -path "$PROJECT_ROOT/deepfreeze/initcpio/cachy-freeze-reset" -o \
@@ -19,7 +19,7 @@ done < <(
       -path "$PROJECT_ROOT/app/cachy-freeze-setup" -o \
       -path "$PROJECT_ROOT/user/files/cachy-employee-reset" -o \
       -path "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict" -o \
-      -path "$PROJECT_ROOT/user/files/cachy-kurulum-oturum-kapat" -o \
+      -path "$PROJECT_ROOT/user/files/cachyfreeze-finish-session" -o \
       -path "$PROJECT_ROOT/user/files/company-microsip" \) \
     -print0
 )
@@ -75,9 +75,9 @@ for agent_rules in \
   [[ -s $agent_rules ]]
 done
 grep -q 'Fiziksel CachyOS ayrıntılı kabul matrisi' \
-  "$PROJECT_ROOT/CODEX-CLI-DEVAM-TALIMATI.md"
+  "$PROJECT_ROOT/docs/development-handoff.md"
 grep -q 'Fiziksel, yedekli CachyOS pilot laptop' \
-  "$PROJECT_ROOT/CODEX-CLI-FIZIKSEL-GOREV-METNI.md"
+  "$PROJECT_ROOT/docs/physical-acceptance.md"
 grep -q 'cachy-user-template' \
   "$ROOT/../user/files/cachy-employee-reset"
 grep -q '^ColorScheme=BreezeDark$' \
@@ -89,18 +89,18 @@ grep -q '^name=breeze-dark$' \
 ! grep -q 'Action Restrictions' \
   "$PROJECT_ROOT/user/files/kdeglobals"
 grep -q 'gpasswd -d "$employee_user" wheel' \
-  "$PROJECT_ROOT/installer/03-CALISAN-KULLANICI-OLUSTUR.sh"
+  "$PROJECT_ROOT/installer/create-employee-user.sh"
 grep -q 'auth_admin_keep' \
   "$PROJECT_ROOT/app/org.cachyos.cachy-freeze.policy"
 grep -q '^Exec=/usr/bin/cachy-freeze-manager$' \
   "$PROJECT_ROOT/app/cachy-freeze-manager.desktop"
 grep -q '^Name=CachyOS Kurulum Uygulaması$' \
-  "$PROJECT_ROOT/CachyOS-Kurulum-Uygulamasi.desktop"
+  "$PROJECT_ROOT/cachyfreeze-setup.desktop"
 grep -q '^Terminal=false$' \
-  "$PROJECT_ROOT/CachyOS-Kurulum-Uygulamasi.desktop"
+  "$PROJECT_ROOT/cachyfreeze-setup.desktop"
 if command -v desktop-file-validate >/dev/null; then
   desktop-file-validate \
-    "$PROJECT_ROOT/CachyOS-Kurulum-Uygulamasi.desktop" \
+    "$PROJECT_ROOT/cachyfreeze-setup.desktop" \
     "$PROJECT_ROOT/app/cachy-freeze-manager.desktop" \
     "$PROJECT_ROOT"/user/desktop/*.desktop
 fi
@@ -111,7 +111,7 @@ fi
 grep -q 'setup-provision)' \
   "$PROJECT_ROOT/app/cachy-freeze-manager-helper"
 grep -q 'CACHY_SETUP_NONINTERACTIVE' \
-  "$PROJECT_ROOT/installer/03-CALISAN-KULLANICI-OLUSTUR.sh"
+  "$PROJECT_ROOT/installer/create-employee-user.sh"
 
 [[ $(find "$PROJECT_ROOT" -maxdepth 1 -type f -name '*.sh' | wc -l) -eq 5 ]]
 for desktop in "$PROJECT_ROOT"/user/desktop/*.desktop; do

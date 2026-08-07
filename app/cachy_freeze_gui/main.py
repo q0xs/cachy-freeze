@@ -24,7 +24,7 @@ def _arguments(values: list[str]) -> argparse.Namespace:
 def main() -> int:
     arguments = _arguments(sys.argv)
     application = QApplication(arguments.qt_arguments)
-    application.setApplicationName("Cachy Freeze Yönetim Merkezi")
+    application.setApplicationName("CachyFreeze Yönetim Merkezi")
     application.setOrganizationName("CachyOS Workstation")
     application.setFont(QFont("Noto Sans", 10))
     backend = BackendClient(setup_root=arguments.setup_source)

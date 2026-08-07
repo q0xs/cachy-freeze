@@ -41,7 +41,7 @@ manager = UserManager(
     template_root=root / "templates",
 )
 
-created = manager.create(username, "Cachy Freeze Test", "Test-Password-42")
+created = manager.create(username, "CachyFreeze Test", "Test-Password-42")
 assert created["administrator"] is False
 assert (root / "templates" / username).is_dir()
 manager.set_locked(username, True)

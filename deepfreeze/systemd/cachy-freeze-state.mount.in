@@ -1,5 +1,5 @@
 [Unit]
-Description=Persistent Cachy Freeze state
+Description=Persistent CachyFreeze state
 Before=local-fs.target
 
 [Mount]

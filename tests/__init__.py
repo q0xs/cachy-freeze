@@ -1,1 +1,1 @@
-"""Cachy Freeze automated test package."""
+"""CachyFreeze automated test package."""

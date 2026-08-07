@@ -1,5 +1,5 @@
 [Unit]
-Description=Evaluate the Cachy Freeze automatic snapshot policy
+Description=Evaluate the CachyFreeze automatic snapshot policy
 After=var-lib-cachy\x2dfreeze.mount
 RequiresMountsFor=/var/lib/cachy-freeze
 

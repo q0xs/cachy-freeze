@@ -1,4 +1,4 @@
-# GitHub Üzerinden Linux'ta Çalışma
+# CachyFreeze Development Workflow
 
 Bu depo USB taşımadan geliştirme ve yedekleme yapmak için özel GitHub deposu
 olarak tutulur.
@@ -48,8 +48,8 @@ sudo pacman -S --needed git github-cli
 gh auth login
 mkdir -p ~/Projeler
 cd ~/Projeler
-gh repo clone q0xs/CachyOS-USB-Kurulum
-cd CachyOS-USB-Kurulum
+gh repo clone q0xs/cachy-freeze
+cd cachy-freeze
 ```
 
 `gh auth login` sırasında GitHub.com, HTTPS ve tarayıcı ile giriş seçenekleri
@@ -60,7 +60,7 @@ kullanılabilir.
 Çalışmaya başlamadan önce:
 
 ```bash
-cd ~/Projeler/CachyOS-USB-Kurulum
+cd ~/Projeler/cachy-freeze
 git switch main
 git pull --ff-only
 git status
@@ -136,8 +136,8 @@ değiştirmez.
 ```bash
 sudo pacman -S --needed git github-cli
 gh auth login
-gh repo clone q0xs/CachyOS-USB-Kurulum
-cd CachyOS-USB-Kurulum
+gh repo clone q0xs/cachy-freeze
+cd cachy-freeze
 git status
 ```
 

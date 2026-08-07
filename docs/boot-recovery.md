@@ -1,5 +1,4 @@
-CACHYOS DEEP FREEZE KURTARMA - EKRAN GELMEZSE
-================================================
+# CachyFreeze Boot Recovery
 
 Bu belge belirli bir laptopun disk UUID'sini icermez. Temiz kurulumdan sonra
 UUID'ler degisecegi icin eski UUID kullanmak tehlikelidir.

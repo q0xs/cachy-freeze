@@ -15,11 +15,11 @@ pacman -S --needed --noconfirm \
   polkit \
   python-pyqt6
 
-bash "$INSTALLER_DIR/01-DEEPFREEZE-KUR.sh"
-bash "$INSTALLER_DIR/06-GOLDEN-YAYINLA.sh"
+bash "$INSTALLER_DIR/install-freeze-engine.sh"
+bash "$INSTALLER_DIR/publish-golden.sh"
 
 printf '%s\n' \
-  "Cachy Freeze Yoneticisi kuruldu." \
-  "Uygulama menusunde 'Cachy Freeze Yoneticisi' adiyla bulabilirsiniz." \
+  "CachyFreeze Yoneticisi kuruldu." \
+  "Uygulama menusunde 'CachyFreeze Yoneticisi' adiyla bulabilirsiniz." \
   "Sistem simdilik Eritilmis (Bakim) modunda birakildi." \
   "Hazir oldugunuzda uygulamadan Dondur secenegini kullanin."

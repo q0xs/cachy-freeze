@@ -1,8 +1,8 @@
-# Codex CLI devam talimatı
+# Development Handoff
 
 Bu dosya Codex CLI için operasyonel devam kaynağıdır. Önce kök `AGENTS.md`
-dosyasını, sonra bu dosyanın tamamını, `README.md`, `MIMARI-TR.md`,
-`KURULUM-TR.md`, `GITHUB-ILE-CALISMA.md` ve `PILOT-NOTLARI.md` dosyalarını oku.
+dosyasını, sonra bu dosyanın tamamını, `README.md`, `docs/architecture.md`,
+`docs/installation.md`, `docs/development.md` ve `docs/pilot-checklist.md` dosyalarını oku.
 Bir alt dizinde çalışırken o dizindeki daha özel `AGENTS.md` kurallarını da
 uygula. Mevcut mimariyi ve çalışma ağacını incelemeden kod değiştirme.
 
@@ -380,7 +380,7 @@ yalnız Codex'in salt-okunur teşhis/test kaydı içindir. Her maddede **hedef**
 5. İlk FROZEN boot sonrası `/proc/cmdline` içinde `cachy.freeze=1`, kök kaynakta
    `@active`, Golden/Active varlığı, initramfs içinde reset hook'u, boot-attempt
    sayacı, boot-health ve Dashboard FROZEN durumu kaydedilir.
-6. `journalctl -b -p err`, Cachy Freeze servisleri ve audit logları incelenir.
+6. `journalctl -b -p err`, CachyFreeze servisleri ve audit logları incelenir.
    Gerçek hata varsa davranış testine geçilmez.
 
 ### F. FROZEN, THAWED ve tek-sefer THAWED davranışı

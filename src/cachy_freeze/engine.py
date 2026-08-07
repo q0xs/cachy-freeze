@@ -799,7 +799,7 @@ class FreezeEngine:
         settings = SettingsStore(Path(self.config.STATE_DIR)).load()
         if not settings["network_online_checks"]:
             raise CachyFreezeError("Ağ kullanan yönetim işlemleri ayarlardan kapatılmış.")
-        script = Path("/usr/lib/cachy-freeze/deployment/installer/02-UYGULAMALARI-KUR.sh")
+        script = Path("/usr/lib/cachy-freeze/deployment/installer/install-applications.sh")
         if not script.is_file():
             raise CachyFreezeError("Doğrulanmış uygulama kurulum paketi bulunamadı.")
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():

@@ -1,4 +1,4 @@
-"""Cachy Freeze workstation management backend."""
+"""CachyFreeze workstation management backend."""
 
 from .models import SnapshotMetadata
 

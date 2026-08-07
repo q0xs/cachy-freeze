@@ -1,4 +1,4 @@
-"""Strict parser for the root-owned Cachy Freeze configuration."""
+"""Strict parser for the root-owned CachyFreeze configuration."""
 
 from __future__ import annotations
 

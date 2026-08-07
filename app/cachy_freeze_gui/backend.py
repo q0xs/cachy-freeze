@@ -91,7 +91,7 @@ class BackendClient(QObject):
     def run(self, action: str, *arguments: str, secret: str | None = None) -> bool:
         if self.busy:
             self.operation_finished.emit(
-                action, False, "Başka bir Cachy Freeze işlemi devam ediyor."
+                action, False, "Başka bir CachyFreeze işlemi devam ediyor."
             )
             return False
         helper = self._helper_for(action)
@@ -99,7 +99,7 @@ class BackendClient(QObject):
             self.operation_finished.emit(
                 action,
                 False,
-                "Yetkili Cachy Freeze yardımcısı bulunamadı. Kurulum uygulamasını "
+                "Yetkili CachyFreeze yardımcısı bulunamadı. Kurulum uygulamasını "
                 "proje klasöründeki masaüstü başlatıcısından açın.",
             )
             return False

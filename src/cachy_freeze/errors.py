@@ -2,7 +2,7 @@
 
 
 class CachyFreezeError(RuntimeError):
-    """Base exception for an expected Cachy Freeze failure."""
+    """Base exception for an expected CachyFreeze failure."""
 
 
 class ConfigurationError(CachyFreezeError):

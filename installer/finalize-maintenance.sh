@@ -17,9 +17,9 @@ printf '%s\n' \
 read -r -p "Bakim kontrolleri tamamlandi mi? [e/H]: " confirmed </dev/tty
 [[ ${confirmed,,} == e ]] || die "Islem iptal edildi; sistem degistirilmedi."
 
-bash "$INSTALLER_DIR/10-CALISAN-SABLONUNU-GUNCELLE.sh"
-bash "$INSTALLER_DIR/06-GOLDEN-YAYINLA.sh"
-bash "$INSTALLER_DIR/04-DONDUR.sh"
+bash "$INSTALLER_DIR/refresh-user-templates.sh"
+bash "$INSTALLER_DIR/publish-golden.sh"
+bash "$INSTALLER_DIR/set-frozen-mode.sh"
 
 printf '%s\n' \
   "Bakim degisiklikleri Golden'a aktarildi." \

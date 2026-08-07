@@ -1,4 +1,4 @@
-# Pilot Laptop Teknik Notları
+# Pilot Device Checklist
 
 Bu paket boot zincirini, initramfs'i ve Btrfs alt birimlerini değiştirir. İlk
 kurulum mutlaka yedeği alınmış bir pilot laptopta ve cihazın başında yapılmalı.
@@ -56,7 +56,7 @@ btrfs device stats /
 ```
 
 Gerçek kurulumdan önce harici diske sistem yedeği alınmalıdır. Ana ve son
-kullanıcı kurulumu için `KURULUM-TR.md` izlenmelidir.
+kullanıcı kurulumu için `docs/installation.md` izlenmelidir.
 
 ## Finalize öncesi fiziksel kabul
 

@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=CachyOS Kurulum Uygulaması
+Name=CachyFreeze Setup
 GenericName=CachyOS Workstation Kurulumu
-Comment=Kurulumu ve Cachy Freeze yönetimini tek uygulamadan yap
+Comment=Kurulumu ve CachyFreeze yönetimini tek uygulamadan yap
 Exec=/usr/bin/bash -c "desktop=\\$1; desktop=\\${desktop#file://}; launcher=\\${desktop%%/*}/app/cachy-freeze-setup; IFS=; set -f; exec /usr/bin/bash \\$launcher" bootstrap %k
 Icon=system-software-install
 Terminal=false

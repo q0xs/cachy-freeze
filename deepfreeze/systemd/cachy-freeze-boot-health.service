@@ -1,5 +1,5 @@
 [Unit]
-Description=Confirm a healthy Cachy Freeze graphical boot
+Description=Confirm a healthy CachyFreeze graphical boot
 After=display-manager.service var-lib-cachy\x2dfreeze.mount
 Wants=display-manager.service
 RequiresMountsFor=/var/lib/cachy-freeze

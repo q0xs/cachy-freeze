@@ -1,4 +1,4 @@
-# Fiziksel CachyOS Pilot QA — 7 Ağustos 2026
+# Physical CachyOS Pilot QA — 2026-08-07
 
 ## Kapsam ve kimlik
 

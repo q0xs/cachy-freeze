@@ -1,5 +1,5 @@
 [Unit]
-Description=Schedule Cachy Freeze automatic snapshot checks
+Description=Schedule CachyFreeze automatic snapshot checks
 
 [Timer]
 OnBootSec=10min

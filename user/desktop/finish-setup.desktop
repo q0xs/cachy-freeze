@@ -1,9 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Kurulumu Tamamlamak İçin Çıkış Yap
+Name=Finish CachyFreeze Setup
 Comment=Uygulama testlerinden sonra localadm hesabına dön
-Exec=/usr/local/bin/cachy-kurulum-oturum-kapat
+Exec=/usr/local/bin/cachyfreeze-finish-session
 Icon=system-log-out
 Terminal=false
 Categories=System;
-

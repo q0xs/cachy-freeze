@@ -6,4 +6,3 @@ set -Eeuo pipefail
 }
 /usr/local/sbin/cachy-freeze freeze
 printf '%s\n' "Frozen mod etkin. Yeniden baslatinca kullanici degisiklikleri sifirlanacak."
-

@@ -1,1 +1,1 @@
-"""Qt6 desktop client for Cachy Freeze."""
+"""Qt6 desktop client for CachyFreeze."""

@@ -17,4 +17,3 @@ printf '%s\n' \
   "Otomatik oturum kapatma ekrani acilamadi." \
   "Uygulama menusunden Oturumu Kapat secenegini kullanin." >&2
 exit 1
-
