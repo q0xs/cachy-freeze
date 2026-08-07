@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -28,13 +29,21 @@ class SetupGuiTests(unittest.TestCase):
 
     def test_setup_page_contract_and_password_policy(self) -> None:
         self.assertEqual(self.window.pages.count(), 7)
-        self.assertEqual(self.window.setup_username.placeholderText(), "ornek_kullanici")
+        self.assertEqual(self.window.setup_start_button.text(), "Install CachyFreeze")
         self.assertTrue(self.window._password_is_strong("Correct-Horse-42"))
         self.assertFalse(self.window._password_is_strong("short"))
         self.assertFalse(self.window._password_is_strong("Colon:Password42"))
-        self.assertTrue(self.window._employee_password_is_valid("1234"))
-        self.assertFalse(self.window._employee_password_is_valid("123"))
-        self.assertFalse(self.window._employee_password_is_valid("12:34"))
+
+    def test_helper_does_not_require_a_managed_user_to_freeze(self) -> None:
+        helper = (Path(__file__).parents[1] / "app/cachy-freeze-manager-helper").read_text()
+        freeze_case = helper.split("setup-freeze)", 1)[1].split(";;", 1)[0]
+        self.assertNotIn("/etc/cachy-employee.conf", freeze_case)
+        self.assertIn("finalize-setup.sh", freeze_case)
+
+    def test_regular_freeze_requires_grub_protection(self) -> None:
+        helper = (Path(__file__).parents[1] / "app/cachy-freeze-manager-helper").read_text()
+        freeze_case = helper.split("  freeze)", 1)[1].split(";;", 1)[0]
+        self.assertIn("/etc/cachy-freeze-grub-auth.conf", freeze_case)
 
     def test_provision_requires_preflight(self) -> None:
         with patch("cachy_freeze_gui.window.QMessageBox.warning") as warning:
@@ -43,13 +52,9 @@ class SetupGuiTests(unittest.TestCase):
         warning.assert_called_once()
         self.backend.run.assert_not_called()
 
-    def test_provision_sends_secret_only_through_secret_channel(self) -> None:
+    def test_install_is_independent_from_user_creation(self) -> None:
         self.window.setup_preflight_ok = True
         self.window.setup_backup_check.setChecked(True)
-        self.window.setup_username.setText("qa_user")
-        self.window.setup_display_name.setText("QA User")
-        self.window.setup_password.setText("Correct-Horse-42")
-        self.window.setup_password_confirm.setText("Correct-Horse-42")
 
         with patch(
             "cachy_freeze_gui.window.QMessageBox.warning",
@@ -57,22 +62,11 @@ class SetupGuiTests(unittest.TestCase):
         ):
             self.window._start_setup()
 
-        self.backend.run.assert_called_once_with(
-            "setup-provision",
-            "qa_user",
-            "QA User",
-            secret="Correct-Horse-42",
-        )
-        self.assertEqual(self.window.setup_password.text(), "")
-        self.assertEqual(self.window.setup_password_confirm.text(), "")
+        self.backend.run.assert_called_once_with("setup-install")
 
     def test_disposable_device_requires_explicit_data_loss_confirmation(self) -> None:
         self.window.setup_preflight_ok = True
         self.window.setup_disposable_check.setChecked(True)
-        self.window.setup_username.setText("qa_user")
-        self.window.setup_display_name.setText("QA User")
-        self.window.setup_password.setText("Correct-Horse-42")
-        self.window.setup_password_confirm.setText("Correct-Horse-42")
 
         with patch(
             "cachy_freeze_gui.window.QMessageBox.warning",
@@ -81,16 +75,12 @@ class SetupGuiTests(unittest.TestCase):
             self.window._start_setup()
 
         warning.assert_called_once()
-        self.assertIn("veri kaybı", warning.call_args.args[1])
+        self.assertIn("data loss", warning.call_args.args[1])
         self.backend.run.assert_not_called()
 
     def test_disposable_device_can_provision_after_two_confirmations(self) -> None:
         self.window.setup_preflight_ok = True
         self.window.setup_disposable_check.setChecked(True)
-        self.window.setup_username.setText("qa_user")
-        self.window.setup_display_name.setText("QA User")
-        self.window.setup_password.setText("Correct-Horse-42")
-        self.window.setup_password_confirm.setText("Correct-Horse-42")
 
         with patch(
             "cachy_freeze_gui.window.QMessageBox.warning",
@@ -98,24 +88,9 @@ class SetupGuiTests(unittest.TestCase):
         ):
             self.window._start_setup()
 
-        self.backend.run.assert_called_once_with(
-            "setup-provision", "qa_user", "QA User", secret="Correct-Horse-42"
-        )
+        self.backend.run.assert_called_once_with("setup-install")
 
-    def test_finalize_requires_all_live_checks(self) -> None:
-        self.window.setup_grub_password.setText("Correct-Horse-42")
-        self.window.setup_grub_confirm.setText("Correct-Horse-42")
-
-        with patch("cachy_freeze_gui.window.QMessageBox.warning") as warning:
-            self.window._finish_setup()
-
-        warning.assert_called_once()
-        self.backend.run.assert_not_called()
-
-    def test_finalize_sends_grub_secret_and_clears_fields(self) -> None:
-        self.window.setup_apps_check.setChecked(True)
-        self.window.setup_audio_check.setChecked(True)
-        self.window.setup_admin_check.setChecked(True)
+    def test_freeze_is_independent_and_uses_secret_channel(self) -> None:
         self.window.setup_grub_password.setText("Correct-Horse-42")
         self.window.setup_grub_confirm.setText("Correct-Horse-42")
 
@@ -125,7 +100,7 @@ class SetupGuiTests(unittest.TestCase):
         ):
             self.window._finish_setup()
 
-        self.backend.run.assert_called_once_with("setup-finalize", secret="Correct-Horse-42")
+        self.backend.run.assert_called_once_with("setup-freeze", secret="Correct-Horse-42")
         self.assertEqual(self.window.setup_grub_password.text(), "")
         self.assertEqual(self.window.setup_grub_confirm.text(), "")
 

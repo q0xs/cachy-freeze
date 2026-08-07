@@ -5,26 +5,26 @@ readonly PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 readonly DF_ROOT=$PROJECT_ROOT/deepfreeze
 
 die() {
-  printf 'HATA: %s\n' "$*" >&2
+  printf 'ERROR: %s\n' "$*" >&2
   exit 1
 }
 
-(( EUID == 0 )) || die "Su sekilde calistir: sudo $0"
-[[ -r $DF_ROOT/bin/cachy-freeze ]] || die "CachyFreeze proje dosyalari eksik."
-command -v python >/dev/null || die "Python bulunamadi."
+(( EUID == 0 )) || die "Run as root: sudo $0"
+[[ -r $DF_ROOT/bin/cachy-freeze ]] || die "CachyFreeze repository files are missing."
+command -v python >/dev/null || die "Python was not found."
 python -c 'import PyQt6' 2>/dev/null ||
-  die "PyQt6 bulunamadi. Once python-pyqt6 paketini kur."
+  die "PyQt6 was not found. Install python-pyqt6 first."
 
 CACHY_FREEZE_CONFIG="$DF_ROOT/etc/cachy-freeze.conf" \
   bash "$DF_ROOT/bin/cachy-freeze" preflight
 
 root_uuid=$(findmnt -n -o UUID /)
-[[ -n $root_uuid ]] || die "Kok Btrfs UUID bulunamadi."
+[[ -n $root_uuid ]] || die "The root Btrfs UUID could not be detected."
 [[ $(findmnt -n -o SOURCE /) == *'[/@]' ]] ||
-  die "Kurulum yalnizca Maintenance @ kokunde yapilir."
+  die "Installation is allowed only on the maintenance @ root."
 root_options=$(findmnt -n -o OPTIONS /)
 [[ ,$root_options, == *,rw,* ]] ||
-  die "Maintenance @ koku salt-okunur bagli; CachyFreeze kurulumu yapilamaz."
+  die "The maintenance @ root is read-only; CachyFreeze cannot be installed."
 
 backup_dir="/var/backups/cachy-freeze/$(date -u +%Y%m%dT%H%M%SZ)"
 install -d -m 0700 "$backup_dir"
@@ -40,7 +40,7 @@ rollback_boot_configuration() {
   cp -a "$backup_dir/grub.cfg" /boot/grub/grub.cfg
   cp -a "$backup_dir/grub.d/." /etc/grub.d/
   systemctl daemon-reload
-  printf 'HATA: Boot yapılandırması %s yedeğinden geri alındı.\n' "$backup_dir" >&2
+  printf 'ERROR: Boot configuration was restored from %s.\n' "$backup_dir" >&2
   exit "$rc"
 }
 trap rollback_boot_configuration ERR
@@ -179,13 +179,13 @@ systemctl enable --now "$state_unit"
 systemctl enable cachy-freeze-boot-health.service
 systemctl enable --now cachy-freeze-auto-snapshot.timer
 systemctl enable cachy-employee-reset.service
-mountpoint -q "$state_mount" || die "Kalici CachyFreeze state alt birimi baglanamadi."
+mountpoint -q "$state_mount" || die "The persistent CachyFreeze state could not be mounted."
 systemctl is-enabled --quiet cachy-freeze-boot-health.service ||
-  die "Boot saglik servisi etkinlestirilemedi."
+  die "The boot-health service could not be enabled."
 systemctl is-enabled --quiet cachy-freeze-auto-snapshot.timer ||
-  die "Otomatik snapshot zamanlayicisi etkinlestirilemedi."
+  die "The automatic snapshot timer could not be enabled."
 systemctl is-enabled --quiet cachy-employee-reset.service ||
-  die "Yonetilen kullanici reset servisi etkinlestirilemedi."
+  die "The managed-user reset service could not be enabled."
 
 if ! grep -Eq '^HOOKS=.*\bcachy-freeze\b' /etc/mkinitcpio.conf; then
   sed -i -E \
@@ -194,7 +194,7 @@ if ! grep -Eq '^HOOKS=.*\bcachy-freeze\b' /etc/mkinitcpio.conf; then
 fi
 grep -Eq '^HOOKS=.*\bsystemd\b.*\bcachy-freeze\b.*\bfilesystems\b' \
   /etc/mkinitcpio.conf ||
-  die "mkinitcpio HOOKS guvenli sekilde guncellenemedi."
+  die "mkinitcpio HOOKS could not be updated safely."
 
 sed -i -E "s/^GRUB_DEFAULT=.*/GRUB_DEFAULT=saved/" /etc/default/grub
 if grep -q '^GRUB_DISABLE_OS_PROBER=' /etc/default/grub; then
@@ -209,8 +209,8 @@ else
   printf '%s\n' 'GRUB_SAVEDEFAULT=false' >>/etc/default/grub
 fi
 
-# Yalnızca tek kurumsal girişi göster. Diğer üreticiler silinmez; çalıştırma
-# izinleri kapatılır ve yukarıdaki kurulum yedeğinde özgün halleri korunur.
+# Show only the managed entry. Other generators are retained in the backup but
+# have their execute permission disabled.
 for generator in /etc/grub.d/*; do
   [[ -f $generator ]] || continue
   case ${generator##*/} in
@@ -229,27 +229,27 @@ grub-mkconfig -o /boot/grub/grub.cfg
 for image in /boot/initramfs-linux-cachyos.img /boot/initramfs-linux-cachyos-lts.img; do
   [[ -r $image ]] || continue
   lsinitcpio "$image" | grep -qx 'usr/lib/cachy-freeze/cachy-freeze-reset' ||
-    die "Reset programi initramfs icinde yok: $image"
+    die "The reset program is missing from initramfs: $image"
 done
 grep -q -- "--id 'cachyos-current'" /boot/grub/grub.cfg ||
-  die "Tek GRUB girisi eksik: cachyos-current"
+  die "The managed GRUB entry is missing: cachyos-current"
 [[ $(grep -c '^menuentry ' /boot/grub/grub.cfg) -eq 1 ]] ||
-  die "GRUB menusunde bir disinda giris bulundu."
+  die "The GRUB menu contains more than one entry."
 [[ -x /usr/bin/cachy-freeze-manager ]] ||
-  die "CachyFreeze masaustu uygulamasi kurulamadi."
+  die "The CachyFreeze desktop application was not installed."
 [[ -x /usr/lib/cachy-freeze/cachy-freeze-manager-helper ]] ||
-  die "CachyFreeze yetkili yardimcisi kurulamadi."
+  die "The CachyFreeze privileged helper was not installed."
 [[ -r /usr/share/applications/cachy-freeze-manager.desktop ]] ||
-    die "CachyFreeze uygulama menu girdisi kurulamadi."
+    die "The CachyFreeze application-menu entry was not installed."
 [[ -r /usr/lib/cachy-freeze/python/cachy_freeze/cli.py ]] ||
-  die "CachyFreeze Python backend kurulamadi."
+  die "The CachyFreeze Python backend was not installed."
 
 /usr/local/sbin/cachy-freeze thaw
 
 trap - ERR
 
 printf '%s\n' \
-  "CachyFreeze kuruldu ve test edildi." \
-  "Guvenli varsayilan: THAWED (Maintenance)." \
-  "Golden henuz yayinlanmadi; publish-golden.sh calistirilmali." \
-  "Frozen moda gecmek icin set-frozen-mode.sh dosyasini ayrica calistir."
+  "CachyFreeze was installed and verified." \
+  "Safe default: THAWED maintenance mode." \
+  "Golden has not been published by this internal step." \
+  "Use the public installer or management app to complete setup."

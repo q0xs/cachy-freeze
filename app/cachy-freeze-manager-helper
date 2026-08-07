@@ -14,32 +14,32 @@ unset CDPATH ENV BASH_ENV PYTHONHOME PYTHONPATH CACHY_FREEZE_CONFIG
 unset CACHY_FREEZE_ROOT_SUBVOLUME CACHY_FREEZE_INITRD_CONFIG CACHY_FREEZE_TOP
 
 (( EUID == 0 )) || {
-  printf '%s\n' "HATA: Yönetici yetkisi gerekli." >&2
+  printf '%s\n' "ERROR: Administrator privileges are required." >&2
   exit 1
 }
 
 die() {
-  printf '%s\n' "HATA: $*" >&2
+  printf '%s\n' "ERROR: $*" >&2
   exit 1
 }
 
 read_employee_secret() {
-  IFS= read -r SETUP_SECRET || die "Parola güvenli giriş kanalından alınamadı."
+  IFS= read -r SETUP_SECRET || die "Password was not received through the secure input channel."
   (( ${#SETUP_SECRET} >= 4 && ${#SETUP_SECRET} <= 256 )) ||
-    die "Çalışan parolası 4-256 karakter olmalıdır."
+    die "Password must contain 4-256 characters."
   [[ $SETUP_SECRET != *:* && $SETUP_SECRET != *$'\r'* && $SETUP_SECRET != *$'\n'* ]] ||
-    die "Parola desteklenmeyen bir karakter içeriyor."
+    die "Password contains an unsupported character."
 }
 
 read_grub_secret() {
   read_employee_secret
-  (( ${#SETUP_SECRET} >= 12 )) || die "GRUB parolası 12-256 karakter olmalıdır."
+  (( ${#SETUP_SECRET} >= 12 )) || die "GRUB password must contain 12-256 characters."
   local classes=0
   [[ $SETUP_SECRET =~ [a-z] ]] && ((classes += 1))
   [[ $SETUP_SECRET =~ [A-Z] ]] && ((classes += 1))
   [[ $SETUP_SECRET =~ [0-9] ]] && ((classes += 1))
   [[ $SETUP_SECRET =~ [^A-Za-z0-9] ]] && ((classes += 1))
-  (( classes >= 3 )) || die "Parola en az üç karakter sınıfı içermelidir."
+  (( classes >= 3 )) || die "Password must contain at least three character classes."
 }
 
 setup_status() {
@@ -80,10 +80,10 @@ except (json.JSONDecodeError, AttributeError):
 
 golden = bool(status.get("golden_present"))
 scheduled_frozen = status.get("scheduled_mode") == "frozen"
-if manager and employee and golden and grub and scheduled_frozen:
+if manager and golden and grub and scheduled_frozen:
     phase = "complete"
-elif manager and employee and golden:
-    phase = "provisioned"
+elif manager:
+    phase = "installed"
 elif not manager and not employee and not grub:
     phase = "ready"
 else:
@@ -116,35 +116,27 @@ case ${1:-} in
       exec "$BACKEND" preflight
     fi
     [[ -r $PROJECT_ROOT/deepfreeze/bin/cachy-freeze ]] ||
-      die "Proje içindeki ön kontrol motoru bulunamadı."
+      die "The repository preflight engine was not found."
     exec env CACHY_FREEZE_CONFIG="$PROJECT_ROOT/deepfreeze/etc/cachy-freeze.conf" \
       bash "$PROJECT_ROOT/deepfreeze/bin/cachy-freeze" preflight
     ;;
-  setup-provision)
-    (( $# == 3 )) || exit 2
-    [[ $2 =~ ^[a-z][a-z0-9_-]{2,31}$ ]] || die "Geçersiz çalışan kullanıcı adı."
-    [[ -n ${3//[[:space:]]/} && $3 != *:* && $3 != *$'\n'* && $3 != *$'\r'* ]] ||
-      die "Geçersiz görünen ad."
+  setup-install)
+    (( $# == 1 )) || exit 2
     [[ ! -s /etc/cachy-freeze-grub-auth.conf ]] ||
-      die "Kurulum zaten tamamlanmış; yeniden hazırlama engellendi."
-    [[ -r $PROJECT_ROOT/installer/provision-workstation.sh ]] ||
-      die "Doğrulanmış kurulum paketi bulunamadı."
-    read_employee_secret
-    printf '%s\n%s\n%s\n' "$2" "$3" "$SETUP_SECRET" |
-      CACHY_SETUP_NONINTERACTIVE=1 \
-        bash "$PROJECT_ROOT/installer/provision-workstation.sh" >&2
-    unset SETUP_SECRET
-    printf '%s\n' '{"ok":true,"result":{"phase":"provisioned"}}'
+      die "CachyFreeze is already activated; reinstallation was blocked."
+    [[ -r $PROJECT_ROOT/installer/install-cachyfreeze.sh ]] ||
+      die "Verified installer package was not found."
+    bash "$PROJECT_ROOT/installer/install-cachyfreeze.sh" >&2
+    printf '%s\n' '{"ok":true,"result":{"phase":"installed"}}'
     exit 0
     ;;
-  setup-finalize)
+  setup-freeze)
     (( $# == 1 )) || exit 2
-    [[ -x $BACKEND && -r /etc/cachy-employee.conf ]] ||
-      die "Önce iş istasyonu hazırlama adımını tamamlayın."
+    [[ -x $BACKEND ]] || die "Install CachyFreeze before enabling FROZEN mode."
     [[ ! -s /etc/cachy-freeze-grub-auth.conf ]] ||
-      die "Kurulum zaten tamamlanmış; yeniden tamamlama engellendi."
+      die "FROZEN mode is already activated. Use the Overview page to publish changes."
     [[ -r $PROJECT_ROOT/installer/finalize-setup.sh ]] ||
-      die "Doğrulanmış tamamlama paketi bulunamadı."
+      die "Verified FROZEN activation package was not found."
     read_grub_secret
     printf '%s\n' "$SETUP_SECRET" |
       CACHY_SETUP_NONINTERACTIVE=1 \
@@ -155,7 +147,7 @@ case ${1:-} in
     ;;
 esac
 
-[[ -x $BACKEND ]] || die "CachyFreeze altyapısı kurulu değil."
+[[ -x $BACKEND ]] || die "CachyFreeze is not installed."
 
 case ${1:-} in
   status)
@@ -168,8 +160,10 @@ case ${1:-} in
     exec "$BACKEND" thaw-once
     ;;
   freeze)
+    [[ -s /etc/cachy-freeze-grub-auth.conf ]] ||
+      die "Set the GRUB maintenance password from Setup before the first FROZEN boot."
     if [[ $(findmnt -n -o SOURCE /) == *'[/@]' ]]; then
-      "$BACKEND" publish --description "GUI üzerinden Golden yayınlama" >&2
+      "$BACKEND" publish --description "Golden publication from the GUI" >&2
     fi
     exec "$BACKEND" freeze
     ;;
@@ -181,7 +175,7 @@ case ${1:-} in
     ;;
   snapshot-create)
     [[ -n ${2:-} ]] || {
-      printf '%s\n' "HATA: Snapshot açıklaması gerekli." >&2
+      printf '%s\n' "ERROR: A snapshot description is required." >&2
       exit 2
     }
     exec "$BACKEND" snapshot create --description "$2"
@@ -235,7 +229,7 @@ case ${1:-} in
     [[ $3 == true || $3 == false ]] || exit 2
     [[ $5 == true || $5 == false ]] || exit 2
     [[ $6 == true || $6 == false ]] || exit 2
-    [[ $9 == tr ]] || exit 2
+    [[ $9 == en || $9 == tr ]] || exit 2
     [[ ${10} == dark || ${10} == light ]] || exit 2
     exec "$BACKEND" settings set \
       --retention-count "$2" \
@@ -286,7 +280,7 @@ case ${1:-} in
     exec "$BACKEND" user autologin
     ;;
   *)
-    printf '%s\n' "HATA: Geçersiz işlem." >&2
+    printf '%s\n' "ERROR: Invalid action." >&2
     exit 2
     ;;
 esac

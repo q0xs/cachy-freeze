@@ -1,39 +1,19 @@
-# CachyFreeze Boot Recovery
+# Boot recovery
 
-Bu belge belirli bir laptopun disk UUID'sini icermez. Temiz kurulumdan sonra
-UUID'ler degisecegi icin eski UUID kullanmak tehlikelidir.
+CachyFreeze keeps Golden and Active publication recoverable with staged names
+and a persistent transaction journal. Early boot validates the expected Btrfs
+device and subvolume names before completing or rolling back an interrupted step.
 
-1. GRUB MENUSU GELIYORSA
-------------------------
+If FROZEN does not reach the graphical target repeatedly, boot-attempt tracking
+can restore the previous healthy Golden. THAWED maintenance is protected by the
+GRUB `cachyadmin` password.
 
-GRUB parolanla su girisi sec:
+When recovery is needed:
 
-  THAWED
+1. Preserve the current and previous boot journals.
+2. Check the kernel mode argument, mounted root, transaction journal, Golden,
+   Active, and Btrfs device error counters without mutating them.
+3. Use THAWED or recovery media only after identifying the failed phase.
+4. Never run `btrfs check --repair` or manually delete managed subvolumes.
 
-2. SIYAH EKRAN VAR AMA TTY ACILIYORSA
---------------------------------------
-
-Ctrl+Alt+F3 tuslarina bas. Yonetici hesabinla giris yap:
-
-  sudo /usr/local/sbin/cachy-freeze thaw
-  sudo reboot
-
-3. GRUB GELMIYORSA
-------------------
-
-CachyOS Live USB'yi UEFI modunda ac. Once diskleri sadece listele:
-
-  lsblk -f
-
-Btrfs kok bolumunun UUID'sini ve EFI bolumunu not et. Eski bir belgeden UUID
-kopyalama. Emin degilsen mount, chroot veya onarim komutu calistirma; teknik
-destek al ve bu USB klasorunu goster.
-
-4. ONEMLI
-----------
-
-- @, @golden veya @active Btrfs alt birimlerini silme.
-- Diski yeniden formatlama.
-- btrfs check --repair calistirma.
-- THAWED girisiyle acmayi dene.
-- Btrfs snapshot tek basina disk yedegi degildir.
+Physical destructive recovery tests require explicit approval and full backup readiness.

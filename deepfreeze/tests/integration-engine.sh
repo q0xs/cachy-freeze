@@ -21,7 +21,7 @@ cleanup() {
 }
 
 fail() {
-  printf 'TEST HATASI: %s\n' "$*" >&2
+  printf 'TEST ERROR: %s\n' "$*" >&2
   exit 1
 }
 
@@ -119,11 +119,11 @@ grep -qx 'cachy_mode=frozen' <(
 run_backend thaw-once >"$TEST_ROOT/thaw-once.json"
 grep -qx 'cachy_once=thawed' <(
   grub-editenv "$TOP/@/boot/grub/grubenv" list
-) || fail "Tek seferlik Thawed boot ayarlanamadı."
+) || fail "One-time THAWED boot could not be scheduled."
 run_backend thaw >"$TEST_ROOT/thaw.json"
 ! grep -qx 'cachy_once=thawed' <(
   grub-editenv "$TOP/@/boot/grub/grubenv" list
-) || fail "Kalıcı Thawed seçimi tek seferlik ayarı temizlemedi."
+) || fail "Persistent THAWED did not clear the one-time setting."
 run_backend freeze >"$TEST_ROOT/freeze.json"
 
 # Simulate power loss after current Golden was moved to its pending name.
@@ -151,7 +151,7 @@ for iteration in $(seq 1 25); do
   run_backend snapshot create --description "Stress snapshot $iteration" \
     >"$TEST_ROOT/stress-$iteration.json"
   if (( iteration % 5 == 0 )); then
-    printf 'Snapshot stres ilerlemesi: %s/25\n' "$iteration"
+    printf 'Snapshot stress progress: %s/25\n' "$iteration"
   fi
 done
 
@@ -160,4 +160,4 @@ run_backend snapshot cleanup --keep 2 >"$TEST_ROOT/cleanup.json"
 [[ $(run_backend snapshot list | python -c 'import json,sys; print(len(json.load(sys.stdin)["result"]))') -eq 2 ]] ||
   fail "Snapshot retention politikasi uygulanmadi."
 
-printf '%s\n' "Snapshot engine entegrasyon testleri başarılı."
+printf '%s\n' "Snapshot engine integration tests passed."

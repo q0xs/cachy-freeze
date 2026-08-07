@@ -4,8 +4,8 @@ set -Eeuo pipefail
 readonly CONFIG=/etc/cachy-freeze-grub-auth.conf
 [[ -r $CONFIG ]] || exit 0
 
-# Root tarafından oluşturulan dosya yalnızca kullanıcı adı ve PBKDF2 özeti
-# içerir; açık parola diske yazılmaz.
+# The root-generated file contains only the username and PBKDF2 hash; the plain
+# password is never written to disk.
 # shellcheck source=/dev/null
 source "$CONFIG"
 

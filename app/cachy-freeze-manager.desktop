@@ -1,11 +1,11 @@
 [Desktop Entry]
 Type=Application
-Name=CachyFreeze Yönetim Merkezi
-GenericName=CachyOS Workstation Yönetimi
-Comment=Freeze, snapshot, kullanıcı ve güncellemeleri yönet
+Name=CachyFreeze Management Center
+GenericName=CachyOS Workstation Management
+Comment=Manage freeze, snapshots, users, and updates
 Exec=/usr/bin/cachy-freeze-manager
 Icon=drive-harddisk
 Terminal=false
 Categories=System;
-Keywords=freeze;deepfreeze;dondur;erit;bakım;
+Keywords=freeze;deepfreeze;thaw;maintenance;snapshot;
 StartupNotify=true

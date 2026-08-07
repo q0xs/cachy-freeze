@@ -11,27 +11,31 @@ require_maintenance
 
 readonly CONFIG=/etc/cachy-employee.conf
 readonly ADMIN_CONFIG=/etc/cachy-frozen-admin.conf
-[[ -r $CONFIG ]] || die "Calisan yapilandirmasi bulunamadi."
 if [[ ! -r $ADMIN_CONFIG ]]; then
   printf '%s\n' 'ADMIN_USER=localadm' >"$ADMIN_CONFIG"
   chmod 0600 "$ADMIN_CONFIG"
 fi
-# Dosya root tarafindan olusturulur ve yalnizca root yazabilir.
-# shellcheck disable=SC1090
-source "$CONFIG"
+# Configuration files are created by root and are not writable by users.
 # shellcheck disable=SC1090
 source "$ADMIN_CONFIG"
 
-[[ ${EMPLOYEE_USER:-} =~ ^[a-z][a-z0-9_-]{2,31}$ ]] ||
-  die "Gecersiz calisan hesabi yapilandirmasi."
 [[ ${ADMIN_USER:-} =~ ^[a-z][a-z0-9_-]{2,31}$ ]] ||
-  die "Gecersiz yonetici hesabi yapilandirmasi."
-id "$EMPLOYEE_USER" >/dev/null 2>&1 ||
-  die "Calisan hesabi bulunamadi: $EMPLOYEE_USER"
+  die "Invalid administrator account configuration."
 id "$ADMIN_USER" >/dev/null 2>&1 ||
-  die "Yonetici hesabi bulunamadi: $ADMIN_USER"
+  die "Administrator account not found: $ADMIN_USER"
 
-# Eski kurulumlari iki-kullanici reset duzenine tasir.
+managed_users=("$ADMIN_USER")
+if [[ -r $CONFIG ]]; then
+  # shellcheck disable=SC1090
+  source "$CONFIG"
+  [[ ${EMPLOYEE_USER:-} =~ ^[a-z][a-z0-9_-]{2,31}$ ]] ||
+    die "Invalid optional managed-user configuration."
+  id "$EMPLOYEE_USER" >/dev/null 2>&1 ||
+    die "Configured managed user not found: $EMPLOYEE_USER"
+  managed_users+=("$EMPLOYEE_USER")
+fi
+
+# Install the current reset and administrator-restriction services.
 install -m 0755 \
   "$PROJECT_ROOT/user/files/cachy-employee-reset" \
   /usr/local/sbin/cachy-employee-reset
@@ -45,21 +49,23 @@ install -m 0644 \
   "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict.service" \
   /etc/systemd/system/cachy-frozen-admin-restrict.service
 
-# Eski Frozen servisinin nologin degisikligi Golden'a tasinmasin.
+# Do not carry a legacy nologin shell into Golden.
 usermod --shell /bin/bash "$ADMIN_USER"
 systemctl daemon-reload
 systemctl enable cachy-employee-reset.service
 systemctl enable cachy-frozen-admin-restrict.service
 
-# Kopya alinirken kullanici sureclerinin dosya degistirmesini engelle.
-loginctl terminate-user "$EMPLOYEE_USER" 2>/dev/null || true
+# Stop optional managed-user sessions while their templates are copied.
+if [[ -n ${EMPLOYEE_USER:-} ]]; then
+  loginctl terminate-user "$EMPLOYEE_USER" 2>/dev/null || true
+fi
 
 template_root=/var/lib/cachy-user-template
 install -d -m 0700 "$template_root"
-for user in "$EMPLOYEE_USER" "$ADMIN_USER"; do
+for user in "${managed_users[@]}"; do
   user_home=$(getent passwd "$user" | cut -d: -f6)
   [[ -n $user_home && -d $user_home ]] ||
-    die "Ev dizini bulunamadi: $user"
+    die "Home directory not found: $user"
   template="$template_root/$user"
   next_template="$template_root/$user.next"
   previous_template="$template_root/$user.previous"
@@ -71,6 +77,6 @@ for user in "$EMPLOYEE_USER" "$ADMIN_USER"; do
   mv "$next_template" "$template"
 
   printf '%s\n' \
-    "Kullanici ev sablonu guncellendi: $user" \
-    "Onceki sablon kurtarma icin korunuyor: $previous_template"
+    "User home template updated: $user" \
+    "Previous template retained for recovery: $previous_template"
 done

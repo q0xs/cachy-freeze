@@ -24,15 +24,26 @@ Copyright 2026 Atilla Mert Akkaya. Licensed under the Apache License 2.0.
 - Passwords and reusable password hashes travel through stdin, never command
   arguments or logs.
 
-## Supported workflow
+## Install
 
-All installation, setup, freeze, thaw, update, snapshot, and user-management
-operations are performed through the CachyFreeze desktop application. Legacy
-USB and numbered manual shell entry points are not supported.
+Install from a terminal with one command:
 
-Launch `cachyfreeze-setup.desktop` on the target CachyOS device, complete the
-graphical preflight, and follow the Installation page. The application blocks
-unsupported disk and boot layouts.
+```bash
+curl -fsSL https://raw.githubusercontent.com/q0xs/cachy-freeze/main/install.sh | sudo bash
+```
+
+Alternatively, launch `cachyfreeze-setup.desktop` and use the Setup page. Both
+paths run the same preflight and privileged installer. Review `install.sh`
+before piping it to a root shell in security-sensitive environments.
+
+Installation leaves the system in THAWED maintenance mode. Engine installation,
+user creation, and FROZEN activation are independent:
+
+1. Install CachyFreeze.
+2. Optionally create or manage users from the Users page at any time.
+3. Enable FROZEN from Setup, or publish later changes from Overview.
+
+No user account is required to enable FROZEN mode.
 
 ## Requirements
 
@@ -78,10 +89,8 @@ disposable VM or an explicitly approved pilot device.
 - [Installation guide](docs/installation.md)
 - [Architecture](docs/architecture.md)
 - [Boot recovery](docs/boot-recovery.md)
-- [Pilot checklist](docs/pilot-checklist.md)
-- [Physical acceptance plan](docs/physical-acceptance.md)
 - [Development workflow](docs/development.md)
-- [Development handoff](docs/development-handoff.md)
+- [Test log](docs/testing/TEST-LOG.md)
 
 ## License
 

@@ -40,10 +40,10 @@ PYTHONPATH="$PROJECT_ROOT/src:$PROJECT_ROOT/app" \
 launcher_rc=$?
 set -e
 [[ $launcher_rc -eq 124 ]] || {
-  printf 'Kurulum baslaticisi olay dongusunde kalmadi (kod: %s).\n' \
+  printf 'Setup launcher did not remain in the event loop (code: %s).\n' \
     "$launcher_rc" >&2
   sed -n '1,120p' "$launcher_log" >&2
   exit 1
 }
 
-printf '%s\n' "Qt offscreen UI smoke testi başarılı."
+printf '%s\n' "Qt offscreen UI smoke test passed."

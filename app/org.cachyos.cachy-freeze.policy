@@ -9,8 +9,6 @@
   <action id="org.cachyos.cachy-freeze.manage">
     <description>Manage the CachyOS workstation platform</description>
     <message>Administrator authentication is required for this management operation</message>
-    <description xml:lang="tr">CachyOS iş istasyonu platformunu yönet</description>
-    <message xml:lang="tr">Bu yönetim işlemi için yönetici doğrulaması gerekli</message>
     <defaults>
       <allow_any>no</allow_any>
       <allow_inactive>no</allow_inactive>

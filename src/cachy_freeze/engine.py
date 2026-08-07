@@ -56,12 +56,12 @@ class FreezeEngine:
     @staticmethod
     def require_root() -> None:
         if not hasattr(os, "geteuid") or os.geteuid() != 0:
-            raise CachyFreezeError("Bu işlem root yetkisi gerektirir.")
+            raise CachyFreezeError("This operation requires root privileges.")
 
     def _root_source(self) -> str:
         source = self.runner.text(["findmnt", "-n", "-o", "SOURCE", "/"])
         if not source:
-            raise CachyFreezeError("Kök bağlama kaynağı algılanamadı.")
+            raise CachyFreezeError("The root mount source could not be detected.")
         return source
 
     def _root_device(self) -> str:
@@ -78,7 +78,7 @@ class FreezeEngine:
                 return value
         value = self.runner.text(["findmnt", "-n", "-o", "UUID", "/"])
         if not value:
-            raise CachyFreezeError("Kök dosya sistemi UUID değeri algılanamadı.")
+            raise CachyFreezeError("The root filesystem UUID could not be detected.")
         return value
 
     def _root_subvolume(self) -> str:
@@ -87,11 +87,11 @@ class FreezeEngine:
                 self.config.MAINTENANCE_SUBVOL,
                 self.config.ACTIVE_SUBVOL,
             }:
-                raise CachyFreezeError("Geçersiz test kök alt birimi geçersiz kılma değeri.")
+                raise CachyFreezeError("Invalid test root-subvolume override.")
             return override
         source = self._root_source()
         if "[" not in source or not source.endswith("]"):
-            raise CachyFreezeError(f"Kök Btrfs alt birimi bulunamadı: {source}")
+            raise CachyFreezeError(f"Root Btrfs subvolume was not found: {source}")
         return source.rsplit("[", 1)[1][:-1].lstrip("/")
 
     def _current_mode(self) -> str:
@@ -113,7 +113,7 @@ class FreezeEngine:
         if mounted:
             mounted_uuid = self.runner.text(["findmnt", "-n", "-o", "UUID", str(self.top)])
             if mounted_uuid != self._root_uuid():
-                raise CachyFreezeError(f"{self.top} üzerinde farklı bir dosya sistemi bağlı.")
+                raise CachyFreezeError(f"A different filesystem is mounted at {self.top}.")
         else:
             self.runner.run(
                 [
@@ -203,7 +203,7 @@ class FreezeEngine:
     ) -> SnapshotMetadata:
         description = " ".join(description.split())
         if not description or len(description) > 512:
-            raise CachyFreezeError("Snapshot açıklaması 1-512 karakter olmalıdır.")
+            raise CachyFreezeError("Snapshot description must contain 1-512 characters.")
         parent = self._ensure_snapshot_parent()
         snapshot_id = f"snap-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
         temporary = parent / f".{snapshot_id}.next"
@@ -243,7 +243,7 @@ class FreezeEngine:
         self.logger.write(
             "INFO",
             "snapshot.create",
-            "Snapshot oluşturuldu",
+            "Snapshot created",
             snapshot_id=snapshot_id,
             btrfs_uuid=metadata.btrfs_uuid,
             source=source.name,
@@ -314,7 +314,7 @@ class FreezeEngine:
         self.logger.write(
             "WARNING",
             "transaction.recover",
-            "Yarım kalan snapshot işlemi kurtarılıyor",
+            "Recovering an interrupted snapshot operation",
             kind=transaction["kind"],
             phase=phase,
         )
@@ -384,7 +384,7 @@ class FreezeEngine:
         self.logger.write(
             "INFO",
             "transaction.recover",
-            "Yarım kalan snapshot işlemi başarıyla tamamlandı",
+            "Interrupted snapshot operation completed successfully",
             kind=transaction["kind"],
         )
 
@@ -441,7 +441,7 @@ class FreezeEngine:
             self.logger.write(
                 "ERROR",
                 f"{kind}.failed",
-                "Snapshot rotasyonu tamamlanamadı; kurtarma günlüğü korundu",
+                "Snapshot rotation failed; the recovery journal was retained",
                 snapshot_id=snapshot_id,
             )
             raise
@@ -450,38 +450,38 @@ class FreezeEngine:
         self.require_root()
         filesystem = self.runner.text(["findmnt", "-n", "-o", "FSTYPE", "/"])
         if filesystem != "btrfs":
-            raise CachyFreezeError("Kök dosya sistemi Btrfs değil.")
+            raise CachyFreezeError("The root filesystem is not Btrfs.")
         if not Path("/sys/firmware/efi").is_dir():
-            raise CachyFreezeError("Sistem UEFI modunda açılmamış.")
+            raise CachyFreezeError("The system was not booted in UEFI mode.")
         for command in ("btrfs", "grub-editenv", "grub-mkconfig", "mkinitcpio"):
             if shutil.which(command) is None:
-                raise CachyFreezeError(f"Gerekli komut bulunamadı: {command}")
+                raise CachyFreezeError(f"Required command was not found: {command}")
         if not Path("/boot/grub").is_dir():
-            raise CachyFreezeError("/boot/grub bulunamadı.")
+            raise CachyFreezeError("/boot/grub was not found.")
         if not Path("/boot/efi/EFI").is_dir():
-            raise CachyFreezeError("EFI sistem bölümü /boot/efi konumunda bağlı değil.")
+            raise CachyFreezeError("The EFI system partition is not mounted at /boot/efi.")
         boot_target = self.runner.text(["findmnt", "-n", "-o", "TARGET", "--target", "/boot"])
         if boot_target != "/":
             raise CachyFreezeError(
-                "/boot ayrı bir dosya sisteminde; desteklenen düzen Btrfs kökü "
-                "içinde /boot ve /boot/efi bağlama noktasıdır."
+                "/boot is a separate filesystem; the supported layout keeps /boot in "
+                "the Btrfs root and mounts EFI at /boot/efi."
             )
         for image in (
             Path("/boot/vmlinuz-linux-cachyos"),
             Path("/boot/initramfs-linux-cachyos.img"),
         ):
             if not image.is_file():
-                raise CachyFreezeError(f"Gerekli boot dosyası bulunamadı: {image}")
+                raise CachyFreezeError(f"Required boot image was not found: {image}")
         current = self._root_subvolume()
         if current not in {
             self.config.MAINTENANCE_SUBVOL,
             self.config.ACTIVE_SUBVOL,
         }:
-            raise CachyFreezeError(f"Beklenmeyen kök alt birimi: {current}")
+            raise CachyFreezeError(f"Unexpected root subvolume: {current}")
         with self.mounted_top():
             if not self._subvolume_exists(self.config.MAINTENANCE_SUBVOL):
                 raise CachyFreezeError(
-                    f"Bakım alt birimi bulunamadı: {self.config.MAINTENANCE_SUBVOL}"
+                    f"Maintenance subvolume was not found: {self.config.MAINTENANCE_SUBVOL}"
                 )
             nested_output = self.runner.text(
                 [
@@ -502,7 +502,7 @@ class FreezeEngine:
             "firmware": "UEFI",
             "filesystem": filesystem,
         }
-        self.logger.write("INFO", "preflight", "Ön kontrol başarılı", **result)
+        self.logger.write("INFO", "preflight", "Preflight passed", **result)
         return result
 
     def status(self) -> dict[str, Any]:
@@ -581,7 +581,7 @@ class FreezeEngine:
                     self.runner.run(["grub-editenv", str(grub_env), "unset", "cachy_once"])
                     verified = self.runner.text(["grub-editenv", str(grub_env), "list"])
                     if "cachy_once=thawed" in verified.splitlines():
-                        raise IntegrityError("Tek seferlik THAWED boot ayarı temizlenemedi")
+                        raise IntegrityError("One-time THAWED boot setting could not be cleared")
                     one_time_thaw_cleared = True
         try:
             current = json.loads((state_dir / "boot-health.json").read_text(encoding="utf-8"))
@@ -599,7 +599,7 @@ class FreezeEngine:
         self.logger.write(
             "WARNING" if event else "INFO",
             "boot.success",
-            "Kurtarma sonrası boot doğrulandı" if event else "Boot sağlık doğrulaması tamamlandı",
+            "Boot verified after recovery" if event else "Boot health verification completed",
             recovery_event=event or None,
             automatic_recovery=automatic_recovery,
             one_time_thaw_cleared=one_time_thaw_cleared,
@@ -623,7 +623,7 @@ class FreezeEngine:
         self.logger.write(
             "WARNING",
             "settings.update",
-            "Yönetim ayarları değiştirildi",
+            "Management settings changed",
             changed=sorted(changes),
         )
         return result
@@ -665,7 +665,7 @@ class FreezeEngine:
             self._recover_transaction_locked()
             snapshot = self._create_snapshot_locked(
                 self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                "Zamanlanmış otomatik snapshot",
+                "Scheduled automatic snapshot",
                 frozen=False,
             )
             atomic_text_write(marker, f"{time.time()}\n")
@@ -689,21 +689,21 @@ class FreezeEngine:
         output = (completed.stdout or b"").decode("utf-8", errors="replace")
         packages = [line.strip() for line in output.splitlines() if line.strip()]
         result = {"enabled": True, "count": len(packages), "packages": packages[:500]}
-        self.logger.write("INFO", "updates.check", "Güncellemeler denetlendi", count=len(packages))
+        self.logger.write("INFO", "updates.check", "Updates checked", count=len(packages))
         return result
 
     def apply_updates(self) -> dict[str, Any]:
         self.require_root()
         if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
-            raise CachyFreezeError("Güncellemeler yalnızca THAWED bakım modunda uygulanabilir.")
+            raise CachyFreezeError("Updates can be applied only in THAWED maintenance mode.")
         settings = SettingsStore(Path(self.config.STATE_DIR)).load()
         if not settings["network_online_checks"]:
-            raise CachyFreezeError("Ağ kullanan yönetim işlemleri ayarlardan kapatılmış.")
+            raise CachyFreezeError("Online management operations are disabled in settings.")
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
             self._recover_transaction_locked()
             before = self._create_snapshot_locked(
                 self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                "Sistem güncellemesi öncesi otomatik snapshot",
+                "Automatic snapshot before system update",
                 frozen=False,
             )
             try:
@@ -714,7 +714,7 @@ class FreezeEngine:
                 self.runner.run(["pacman", "-Dk"], stdout=subprocess.DEVNULL)
                 after = self._create_snapshot_locked(
                     self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                    "Sistem güncellemesi sonrası Golden",
+                    "Golden after system update",
                     frozen=True,
                 )
                 self._publish_source_locked(
@@ -727,14 +727,14 @@ class FreezeEngine:
                 self.logger.write(
                     "ERROR",
                     "updates.apply.failed",
-                    "Sistem güncellemesi tamamlanamadı; geri dönüş snapshotı korundu",
+                    "System update failed; the rollback snapshot was retained",
                     rollback_snapshot=before.snapshot_id,
                 )
                 raise
         self.logger.write(
             "INFO",
             "updates.apply",
-            "Sistem güncellendi ve yeni Golden yayınlandı",
+            "System updated and a new Golden published",
             before_snapshot=before.snapshot_id,
             after_snapshot=after.snapshot_id,
         )
@@ -795,28 +795,28 @@ class FreezeEngine:
     def install_applications(self) -> dict[str, Any]:
         self.require_root()
         if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
-            raise CachyFreezeError("Uygulamalar yalnızca THAWED bakım modunda kurulabilir.")
+            raise CachyFreezeError("Applications can be installed only in THAWED mode.")
         settings = SettingsStore(Path(self.config.STATE_DIR)).load()
         if not settings["network_online_checks"]:
-            raise CachyFreezeError("Ağ kullanan yönetim işlemleri ayarlardan kapatılmış.")
+            raise CachyFreezeError("Online management operations are disabled in settings.")
         script = Path("/usr/lib/cachy-freeze/deployment/installer/install-applications.sh")
         if not script.is_file():
-            raise CachyFreezeError("Doğrulanmış uygulama kurulum paketi bulunamadı.")
+            raise CachyFreezeError("The verified application installer was not found.")
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
             self._recover_transaction_locked()
             before = self._create_snapshot_locked(
                 self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                "Kurumsal uygulama kurulumu öncesi snapshot",
+                "Snapshot before application installation",
                 frozen=False,
             )
             try:
                 self.runner.run(["bash", str(script)], stdout=subprocess.DEVNULL)
                 status = self.application_status()
                 if not status["all_installed"]:
-                    raise IntegrityError("Bir veya daha fazla kurumsal uygulama doğrulanamadı")
+                    raise IntegrityError("One or more applications could not be verified")
                 after = self._create_snapshot_locked(
                     self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                    "Kurumsal uygulamalar sonrası Golden",
+                    "Golden after application installation",
                     frozen=True,
                 )
                 self._publish_source_locked(
@@ -829,14 +829,14 @@ class FreezeEngine:
                 self.logger.write(
                     "ERROR",
                     "applications.install.failed",
-                    "Uygulama kurulumu tamamlanamadı; geri dönüş snapshotı korundu",
+                    "Application installation failed; the rollback snapshot was retained",
                     rollback_snapshot=before.snapshot_id,
                 )
                 raise
         self.logger.write(
             "INFO",
             "applications.install",
-            "Kurumsal uygulamalar doğrulandı ve yeni Golden yayınlandı",
+            "Applications verified and a new Golden published",
             before_snapshot=before.snapshot_id,
             after_snapshot=after.snapshot_id,
         )
@@ -845,7 +845,7 @@ class FreezeEngine:
     def create_snapshot(self, description: str) -> SnapshotMetadata:
         self.require_root()
         if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
-            raise CachyFreezeError("Snapshot yalnızca THAWED bakım modunda oluşturulabilir.")
+            raise CachyFreezeError("Snapshots can be created only in THAWED mode.")
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
             self._recover_transaction_locked()
             snapshot = self._create_snapshot_locked(
@@ -867,7 +867,7 @@ class FreezeEngine:
             self.logger.write(
                 "INFO" if result["healthy"] else "ERROR",
                 "snapshot.verify",
-                "Snapshot doğrulaması tamamlandı",
+                "Snapshot verification completed",
                 **result,
             )
             return result
@@ -922,7 +922,7 @@ class FreezeEngine:
     def delete_snapshot(self, snapshot_id: str) -> SnapshotMetadata:
         self.require_root()
         if not _SNAPSHOT_ID_RE.fullmatch(snapshot_id):
-            raise CachyFreezeError("Geçersiz snapshot kimliği.")
+            raise CachyFreezeError("Invalid snapshot ID.")
         metadata = self.catalog.get(snapshot_id)
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
             path = self._subvolume_path(metadata.subvolume)
@@ -972,7 +972,7 @@ class FreezeEngine:
         manifest = export_dir / f"{snapshot_id}.json"
         if destination.exists() or manifest.exists():
             raise CachyFreezeError(
-                "Bu snapshot için export dosyası zaten var; önce güvenli bir yere taşıyın."
+                "An export already exists for this snapshot; move it to a safe location first."
             )
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
             verification = self._verify_snapshot_locked(metadata)
@@ -1032,27 +1032,25 @@ class FreezeEngine:
     def import_snapshot(self, archive_name: str) -> SnapshotMetadata:
         self.require_root()
         if Path(archive_name).name != archive_name or not archive_name.endswith(".btrfs"):
-            raise CachyFreezeError(
-                "Import için yalnızca export klasöründeki dosya adı kullanılabilir."
-            )
+            raise CachyFreezeError("Import accepts only a filename from the export directory.")
         source = Path(self.config.EXPORT_DIR) / archive_name
         manifest = source.with_suffix(".json")
         if not source.is_file() or not manifest.is_file():
-            raise CachyFreezeError("Snapshot arşivi veya manifest dosyası bulunamadı.")
+            raise CachyFreezeError("Snapshot archive or manifest was not found.")
         try:
             document = json.loads(manifest.read_text(encoding="utf-8"))
             expected_checksum = str(document["stream_sha256"])
             exported_metadata = SnapshotMetadata.from_dict(document["snapshot"])
         except (KeyError, TypeError, json.JSONDecodeError) as error:
-            raise IntegrityError(f"Snapshot export manifesti geçersiz: {error}") from error
+            raise IntegrityError(f"Snapshot export manifest is invalid: {error}") from error
         if not exported_metadata.verifies():
-            raise IntegrityError("Snapshot export metadata checksum doğrulaması başarısız")
+            raise IntegrityError("Snapshot export metadata checksum verification failed")
         digest = hashlib.sha256()
         with source.open("rb") as handle:
             for block in iter(lambda: handle.read(1024 * 1024), b""):
                 digest.update(block)
         if digest.hexdigest() != expected_checksum:
-            raise IntegrityError("Snapshot export checksum doğrulaması başarısız")
+            raise IntegrityError("Snapshot export checksum verification failed")
 
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
             parent = self._ensure_snapshot_parent()
@@ -1069,7 +1067,7 @@ class FreezeEngine:
                     )
                 children = list(staging.iterdir())
                 if len(children) != 1 or not self._subvolume_exists(children[0]):
-                    raise IntegrityError("Btrfs receive exactly one snapshot üretmedi")
+                    raise IntegrityError("Btrfs receive did not produce exactly one snapshot")
                 received = children[0]
                 snapshot_id = (
                     f"snap-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
@@ -1103,7 +1101,7 @@ class FreezeEngine:
                     kernel=exported_metadata.kernel,
                     apparent_size_bytes=apparent,
                     exclusive_size_bytes=exclusive,
-                    description=f"İçe aktarıldı: {exported_metadata.description}"[:512],
+                    description=f"Imported: {exported_metadata.description}"[:512],
                     created_by=self._creator(),
                     frozen=exported_metadata.frozen,
                     bootable=(destination / "boot" / "vmlinuz-linux-cachyos").is_file(),
@@ -1130,7 +1128,7 @@ class FreezeEngine:
             self.logger.write(
                 "INFO",
                 "snapshot.import",
-                "Snapshot checksum doğrulamasıyla içe aktarıldı",
+                "Snapshot imported with checksum verification",
                 snapshot_id=metadata.snapshot_id,
                 source_archive=archive_name,
             )
@@ -1163,7 +1161,7 @@ class FreezeEngine:
             self.logger.write(
                 "INFO" if result["healthy"] else "ERROR",
                 "health",
-                "Btrfs ve snapshot sağlık kontrolü tamamlandı",
+                "Btrfs and snapshot health check completed",
                 **result,
             )
             return result
@@ -1171,7 +1169,7 @@ class FreezeEngine:
     def publish(self, description: str) -> SnapshotMetadata:
         self.require_root()
         if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
-            raise CachyFreezeError("Golden yalnızca THAWED bakım modunda yayınlanabilir.")
+            raise CachyFreezeError("Golden can be published only in THAWED mode.")
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
             from .users import UserManager
 
@@ -1196,7 +1194,7 @@ class FreezeEngine:
             self.logger.write(
                 "INFO",
                 "publish",
-                "Yeni Golden ve Active snapshot atomik olarak yayınlandı",
+                "New Golden and Active snapshots published atomically",
                 snapshot_id=archived.snapshot_id,
             )
             return archived
@@ -1205,12 +1203,12 @@ class FreezeEngine:
         self.require_root()
         metadata = self.catalog.get(snapshot_id)
         if not metadata.bootable:
-            raise CachyFreezeError("Seçilen snapshot boot edilebilir değil.")
+            raise CachyFreezeError("The selected snapshot is not bootable.")
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
             self._recover_transaction_locked()
             result = self._verify_snapshot_locked(metadata)
             if not result["healthy"]:
-                raise IntegrityError("Bozuk snapshot geri yüklenemez")
+                raise IntegrityError("An unhealthy snapshot cannot be restored")
             self._publish_source_locked(
                 self._subvolume_path(metadata.subvolume), "rollback", snapshot_id
             )
@@ -1219,7 +1217,7 @@ class FreezeEngine:
             self.logger.write(
                 "WARNING",
                 "snapshot.rollback",
-                "Golden seçilen snapshot sürümüne geri alındı",
+                "Golden rolled back to the selected snapshot",
                 snapshot_id=snapshot_id,
                 rollback_count=updated.rollback_count,
             )
@@ -1234,7 +1232,7 @@ class FreezeEngine:
 
     def _cleanup_snapshots_locked(self, retention: int) -> list[str]:
         if not 1 <= retention <= 1000:
-            raise CachyFreezeError("Saklama sayısı 1-1000 arasında olmalıdır.")
+            raise CachyFreezeError("Retention count must be between 1 and 1000.")
         snapshots = self.catalog.list()
         removed: list[str] = []
         for snapshot in snapshots[retention:]:
@@ -1252,7 +1250,7 @@ class FreezeEngine:
         self.logger.write(
             "INFO",
             "snapshot.cleanup",
-            "Snapshot saklama politikası uygulandı",
+            "Snapshot retention policy applied",
             retention=retention,
             removed=removed,
         )
@@ -1260,14 +1258,14 @@ class FreezeEngine:
 
     def _set_boot_mode_locked(self, mode: str) -> None:
         if mode not in {"frozen", "thawed", "thawed-once"}:
-            raise CachyFreezeError(f"Geçersiz boot modu: {mode}")
+            raise CachyFreezeError(f"Invalid boot mode: {mode}")
         maintenance = self._subvolume_path(self.config.MAINTENANCE_SUBVOL)
         grub_cfg = maintenance / "boot/grub/grub.cfg"
         grub_env = maintenance / "boot/grub/grubenv"
         if not grub_cfg.is_file() or not grub_env.is_file():
-            raise CachyFreezeError("Kanonik Maintenance GRUB dosyaları bulunamadı.")
+            raise CachyFreezeError("Canonical maintenance GRUB files were not found.")
         if "--id 'cachyos-current'" not in grub_cfg.read_text(encoding="utf-8", errors="replace"):
-            raise IntegrityError("cachyos-current GRUB girdisi bulunamadı")
+            raise IntegrityError("The cachyos-current GRUB entry was not found")
         persistent_mode = "frozen" if mode == "thawed-once" else mode
         assignments = [
             f"cachy_mode={persistent_mode}",
@@ -1283,7 +1281,7 @@ class FreezeEngine:
         if mode == "thawed-once":
             expected.add("cachy_once=thawed")
         if not expected.issubset(set(environment.splitlines())):
-            raise IntegrityError("GRUB boot modu yazıldıktan sonra doğrulanamadı")
+            raise IntegrityError("GRUB boot mode could not be verified after writing")
 
     def set_boot_mode(self, mode: str) -> None:
         self.require_root()
@@ -1300,13 +1298,13 @@ class FreezeEngine:
             self.logger.write(
                 "INFO",
                 "boot.mode",
-                "Sonraki kalıcı boot modu değiştirildi",
+                "Next persistent boot mode changed",
                 mode=mode,
             )
 
     def recent_logs(self, limit: int = 100) -> list[dict[str, Any]]:
         if not 1 <= limit <= 1000:
-            raise CachyFreezeError("Log satırı sınırı 1-1000 arasında olmalıdır.")
+            raise CachyFreezeError("Log line limit must be between 1 and 1000.")
         path = Path(self.config.LOG_FILE)
         if not path.exists():
             return []

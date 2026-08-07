@@ -20,7 +20,7 @@ exec > >(tee -a "$LOG") 2>&1
 trap 'rc=$?; printf "HATA: Kurulum satir %s civarinda durdu (kod: %s). Log: %s\n" "$LINENO" "$rc" "$LOG" >&2' ERR
 printf 'Kurulum basladi: %s\n' "$(date --iso-8601=seconds)"
 
-# Uzun uygulama indirmelerinden önce disk ve açılış düzenini doğrula.
+# Validate disk and boot layout before long application downloads.
 CACHY_FREEZE_CONFIG="$PROJECT_ROOT/deepfreeze/etc/cachy-freeze.conf" \
   bash "$PROJECT_ROOT/deepfreeze/bin/cachy-freeze" preflight
 

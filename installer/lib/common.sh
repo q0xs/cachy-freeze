@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 
 die() {
-  printf 'HATA: %s\n' "$*" >&2
+  printf 'ERROR: %s\n' "$*" >&2
   exit 1
 }
 
 require_root() {
-  (( EUID == 0 )) || die "Bu betik sudo ile calistirilmalidir."
+  (( EUID == 0 )) || die "This script must run as root."
 }
 
 require_maintenance() {
   local source options
   source=$(findmnt -n -o SOURCE /)
   [[ $source == *'[/@]' ]] ||
-    die "Bu islem yalnizca Maintenance modunda yapilir. Once set-thawed-mode.sh ve reboot."
+    die "This operation is allowed only in THAWED maintenance mode."
   options=$(findmnt -n -o OPTIONS /)
   [[ ,$options, == *,rw,* ]] ||
-    die "Maintenance koku salt-okunur bagli. Sistemi degistirmeden once @ kokunu yazilabilir ac."
+    die "The maintenance root is mounted read-only."
 }
 
 aur_install() {
@@ -51,17 +51,17 @@ aur_install() {
   mapfile -t packages < <(
     find "$build_dir" -maxdepth 1 -type f -name '*.pkg.tar.zst' -print
   )
-  (( ${#packages[@]} > 0 )) || die "AUR paket dosyasi olusmadi: $package"
+  (( ${#packages[@]} > 0 )) || die "No AUR package was built: $package"
   pacman -U --noconfirm --needed "${packages[@]}"
 
   pacman -Q "$package" >/dev/null 2>&1 ||
-    die "AUR paketi kurulamadi: $package"
+    die "The AUR package could not be installed: $package"
 }
 
 download_https() {
   local url=$1 destination=$2
-  [[ $url == https://* ]] || die "Yalnizca HTTPS indirmeye izin verilir: $url"
-  [[ $destination == /* ]] || die "Indirme hedefi mutlak yol olmali: $destination"
+  [[ $url == https://* ]] || die "Only HTTPS downloads are allowed: $url"
+  [[ $destination == /* ]] || die "The download destination must be absolute: $destination"
   local temporary="${destination}.download.$$"
   rm -f -- "$temporary"
   if ! curl \
@@ -77,11 +77,11 @@ download_https() {
     --output "$temporary" \
     "$url"; then
     rm -f -- "$temporary"
-    die "Indirme basarisiz: $url"
+    die "Download failed: $url"
   fi
   [[ -s $temporary ]] || {
     rm -f -- "$temporary"
-    die "Indirilen dosya bos: $url"
+    die "The downloaded file is empty: $url"
   }
   mv -f -- "$temporary" "$destination"
 }
@@ -91,9 +91,9 @@ validate_zip_paths() {
   while IFS= read -r entry; do
     [[ -n $entry ]] || continue
     [[ $entry != /* && $entry != \\* ]] ||
-      die "ZIP mutlak yol iceriyor: $entry"
+      die "ZIP contains an absolute path: $entry"
     [[ /$entry/ != */../* && /$entry/ != */./* ]] ||
-      die "ZIP guvensiz yol iceriyor: $entry"
-    [[ $entry != *\\* ]] || die "ZIP ters egik cizgili yol iceriyor: $entry"
+      die "ZIP contains an unsafe path: $entry"
+    [[ $entry != *\\* ]] || die "ZIP contains a backslash path: $entry"
   done < <(unzip -Z1 "$archive")
 }

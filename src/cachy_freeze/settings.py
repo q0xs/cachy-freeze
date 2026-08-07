@@ -18,7 +18,7 @@ DEFAULTS: dict[str, Any] = {
     "network_online_checks": True,
     "boot_failure_limit": 3,
     "log_retention_lines": 5000,
-    "language": "tr",
+    "language": "en",
     "theme": "dark",
 }
 
@@ -79,7 +79,7 @@ class SettingsStore:
                 or not minimum <= value <= maximum
             ):
                 raise ConfigurationError(f"{name} must be between {minimum} and {maximum}")
-        if document.get("language") != "tr":
-            raise ConfigurationError("This workstation profile supports the tr locale")
+        if document.get("language") not in {"en", "tr"}:
+            raise ConfigurationError("Unsupported interface locale")
         if document.get("theme") not in {"dark", "light"}:
             raise ConfigurationError("theme must be dark or light")

@@ -13,7 +13,7 @@ cleanup() {
 }
 
 fail() {
-  printf 'TEST HATASI: %s\n' "$*" >&2
+  printf 'TEST ERROR: %s\n' "$*" >&2
   exit 1
 }
 
@@ -36,31 +36,31 @@ PATH="$FAKE_BIN:$PATH" \
   "$ROOT/grub/40_cachy_freeze" >"$OUTPUT"
 
 grep -q -- "--id 'cachyos-current'" "$OUTPUT" ||
-  fail "Tek GRUB girişi eksik."
+  fail "The managed GRUB entry is missing."
 [[ $(grep -c '^menuentry ' "$OUTPUT") -eq 1 ]] ||
-  fail "Tam olarak bir kurumsal GRUB girişi üretilmedi."
+  fail "Exactly one managed GRUB entry was not generated."
 grep -q 'set cachy_title="FROZEN"' "$OUTPUT" ||
-  fail "Frozen başlığı eksik."
+  fail "The FROZEN title is missing."
 grep -q 'set cachy_title="THAWED"' "$OUTPUT" ||
-  fail "Thawed başlığı eksik."
+  fail "The THAWED title is missing."
 grep -q 'set cachy_subvol="@active"' "$OUTPUT" ||
-  fail "Frozen kök seçimi yanlış."
+  fail "The FROZEN root selection is incorrect."
 grep -q 'set cachy_subvol="@"' "$OUTPUT" ||
-  fail "Thawed kök seçimi yanlış."
+  fail "The THAWED root selection is incorrect."
 grep -q 'set cachy_freeze_arg="cachy.freeze=1"' "$OUTPUT" ||
-  fail "Frozen kernel parametresi yanlış."
+  fail "The FROZEN kernel argument is incorrect."
 grep -q 'set cachy_freeze_arg="cachy.freeze=0"' "$OUTPUT" ||
-  fail "Thawed kernel parametresi yanlış."
+  fail "The THAWED kernel argument is incorrect."
 grep -Fq 'linux /$cachy_subvol/boot/vmlinuz-linux-cachyos ' "$OUTPUT" ||
-  fail "Kernel dinamik alt birimden yüklenmiyor."
+  fail "The kernel is not loaded from the dynamic subvolume."
 grep -Fq 'if [ "${cachy_effective_mode}" = "thawed" ]; then' "$OUTPUT" ||
-  fail "Thawed yetkilendirme koşulu eksik."
+  fail "The THAWED authorization condition is missing."
 grep -q '^[[:space:]]*authenticate$' "$OUTPUT" ||
   fail "Thawed GRUB parola denetimi eksik."
 grep -Fq 'set cachy_effective_mode="thawed"' "$OUTPUT" ||
   fail "One-time Thawed mode is not selected."
 grep -q "^menuentry .*--unrestricted" "$OUTPUT" ||
-  fail "Frozen girişinin parolasız seçimi eksik."
+  fail "Passwordless selection of the FROZEN entry is missing."
 
 grub-script-check "$OUTPUT"
-printf '%s\n' "GRUB üretim ve sözdizimi testi başarılı."
+printf '%s\n' "GRUB generation and syntax tests passed."

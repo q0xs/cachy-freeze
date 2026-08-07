@@ -14,11 +14,11 @@ cleanup() {
 }
 
 fail() {
-  printf 'TEST HATASI: %s\n' "$*" >&2
+  printf 'TEST ERROR: %s\n' "$*" >&2
   exit 1
 }
 
-(( EUID == 0 )) || fail "Kullanıcı entegrasyon testi root gerektirir."
+(( EUID == 0 )) || fail "The user integration test requires root."
 shopt -s extglob
 trap cleanup EXIT
 
@@ -62,14 +62,14 @@ printf '%s\n' transient >"$test_home/frozen-change"
 CACHY_USER_TEMPLATE_ROOT="$TEST_ROOT/templates" \
   "$PROJECT_ROOT/user/files/cachy-employee-reset"
 [[ ! -e $test_home/frozen-change ]] ||
-  fail "Yönetilen standart kullanıcı ev şablonuna sıfırlanmadı."
+  fail "The managed standard user was not reset to its home template."
 
 if id "$TEST_USER" >/dev/null 2>&1; then
   runuser -u "$TEST_USER" -- env \
     PYTHONPATH="$PROJECT_ROOT/src" \
     CACHY_FREEZE_CONFIG="$PROJECT_ROOT/deepfreeze/etc/cachy-freeze.conf" \
     python -m cachy_freeze.cli status >/dev/null 2>&1 &&
-    fail "Standart kullanıcı ayrıcalıklı backend komutunu çalıştırabildi."
+    fail "A standard user could run a privileged backend command."
 fi
 
-printf '%s\n' "Kullanıcı ve yetki entegrasyon testleri başarılı."
+printf '%s\n' "User and privilege integration tests passed."

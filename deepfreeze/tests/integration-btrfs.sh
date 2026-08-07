@@ -19,12 +19,12 @@ cleanup() {
 }
 
 fail() {
-  printf 'TEST HATASI: %s\n' "$*" >&2
+  printf 'TEST ERROR: %s\n' "$*" >&2
   exit 1
 }
 
 assert_file() {
-  [[ -f $1 ]] || fail "Dosya bulunamadı: $1"
+  [[ -f $1 ]] || fail "File not found: $1"
 }
 
 run_reset() {
@@ -34,7 +34,7 @@ run_reset() {
 }
 
 (( EUID == 0 )) || fail "Entegrasyon testi root gerektirir."
-command -v mkfs.btrfs >/dev/null || fail "mkfs.btrfs bulunamadı."
+command -v mkfs.btrfs >/dev/null || fail "mkfs.btrfs was not found."
 trap cleanup EXIT
 
 truncate -s 512M "$IMAGE"
@@ -77,7 +77,7 @@ umount "$TOP"
 # A normal reboot must remove changes made to active.
 run_reset
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
-[[ ! -e $TOP/@active/unwanted ]] || fail "Kullanıcı değişikliği sıfırlanmadı."
+[[ ! -e $TOP/@active/unwanted ]] || fail "The user change was not reset."
 assert_file "$TOP/@active/version"
 
 printf '0\n' >"$TOP/@cachy-state/boot-attempts"
@@ -114,7 +114,7 @@ run_reset
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 assert_file "$TOP/@active/version"
 [[ $(<"$TOP/@active/version") == golden-v2 ]] ||
-  fail "Kurtarılan active yanlış golden sürümünde."
+  fail "Recovered Active was created from the wrong Golden version."
 
 # Three consecutive unconfirmed boots automatically restore the previous
 # known-good Golden before the root filesystem is mounted.
@@ -129,4 +129,4 @@ mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 [[ $(<"$TOP/@cachy-state/recovery-event") == automatic-rollback ]] ||
   fail "Automatic recovery event was not persisted."
 
-printf '%s\n' "Btrfs entegrasyon testleri başarılı."
+printf '%s\n' "Btrfs integration tests passed."

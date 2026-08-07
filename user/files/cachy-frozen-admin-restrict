@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 readonly CONFIG=/etc/cachy-frozen-admin.conf
 die() {
-  printf 'HATA: %s\n' "$*" >&2
+  printf 'ERROR: %s\n' "$*" >&2
   exit 1
 }
 

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Finish CachyFreeze Setup
-Comment=Uygulama testlerinden sonra localadm hesabına dön
+Comment=Return to the localadm account after application tests
 Exec=/usr/local/bin/cachyfreeze-finish-session
 Icon=system-log-out
 Terminal=false

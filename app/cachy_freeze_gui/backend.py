@@ -91,7 +91,7 @@ class BackendClient(QObject):
     def run(self, action: str, *arguments: str, secret: str | None = None) -> bool:
         if self.busy:
             self.operation_finished.emit(
-                action, False, "Başka bir CachyFreeze işlemi devam ediyor."
+                action, False, "Another CachyFreeze operation is already running."
             )
             return False
         helper = self._helper_for(action)
@@ -99,8 +99,8 @@ class BackendClient(QObject):
             self.operation_finished.emit(
                 action,
                 False,
-                "Yetkili CachyFreeze yardımcısı bulunamadı. Kurulum uygulamasını "
-                "proje klasöründeki masaüstü başlatıcısından açın.",
+                "The privileged CachyFreeze helper was not found. Open setup from "
+                "the desktop launcher in the repository.",
             )
             return False
         self.pending_action = action
@@ -159,10 +159,10 @@ class BackendClient(QObject):
         self.stderr_buffer.clear()
         self.busy_changed.emit(False)
         if exit_code in (126, 127):
-            self.operation_finished.emit(action, False, "Kimlik doğrulama iptal edildi.")
+            self.operation_finished.emit(action, False, "Authentication was cancelled.")
             return
         if exit_code != 0:
-            self.operation_finished.emit(action, False, stderr.strip() or "İşlem tamamlanamadı.")
+            self.operation_finished.emit(action, False, stderr.strip() or "Operation failed.")
             return
         try:
             payload = json.loads(stdout)
@@ -171,7 +171,7 @@ class BackendClient(QObject):
             result = payload.get("result")
         except (json.JSONDecodeError, AttributeError, ValueError):
             self.operation_finished.emit(
-                action, False, "Yetkili servis geçersiz bir yanıt döndürdü."
+                action, False, "The privileged service returned an invalid response."
             )
             return
 
@@ -202,42 +202,42 @@ class BackendClient(QObject):
         self.pending_secret = None
         self.stderr_buffer.clear()
         self.busy_changed.emit(False)
-        self.operation_finished.emit(action, False, "Yetkili işlem başlatılamadı.")
+        self.operation_finished.emit(action, False, "The privileged operation could not start.")
 
     @staticmethod
     def _success_message(action: str) -> str:
         messages = {
-            "status": "Sistem durumu yenilendi.",
-            "thaw": "Sonraki açılış THAWED bakım moduna ayarlandı.",
-            "thaw-once": "Yalnızca sonraki açılış THAWED olarak ayarlandı.",
-            "freeze": "Golden yayınlandı ve sonraki açılış FROZEN olarak ayarlandı.",
-            "snapshot-list": "Snapshot listesi yenilendi.",
-            "snapshot-create": "Snapshot başarıyla oluşturuldu.",
-            "snapshot-verify": "Snapshot doğrulaması tamamlandı.",
-            "snapshot-delete": "Snapshot silindi.",
-            "snapshot-rollback": "Rollback hazırlandı; sonraki açılış FROZEN olacak.",
-            "snapshot-export": "Snapshot export klasörüne yazıldı.",
-            "snapshot-import": "Snapshot checksum doğrulamasıyla içe aktarıldı.",
-            "health": "Sistem sağlık kontrolü tamamlandı.",
-            "logs": "Audit logları yenilendi.",
-            "user-list": "Kullanıcı listesi yenilendi.",
-            "user-create": "Standart kullanıcı oluşturuldu.",
-            "user-delete": "Kullanıcı yedeklenerek silindi.",
-            "user-restore": "Kullanıcı yedekten geri yüklendi.",
-            "user-password": "Kullanıcı parolası değiştirildi.",
-            "user-lock": "Kullanıcı hesabı kilitlendi.",
-            "user-unlock": "Kullanıcı hesabı açıldı.",
-            "user-autologin": "Otomatik giriş ayarı güncellendi.",
-            "updates-check": "Güncelleme denetimi tamamlandı.",
-            "updates-apply": "Güncellemeler uygulandı ve yeni Golden yayınlandı.",
-            "settings-get": "Ayarlar yüklendi.",
-            "settings-set": "Ayarlar doğrulanarak kaydedildi.",
-            "applications-status": "Kurumsal uygulamalar doğrulandı.",
-            "applications-install": "Uygulamalar kuruldu ve yeni Golden yayınlandı.",
-            "setup-status": "Kurulum durumu yenilendi.",
-            "setup-preflight": "CachyOS, UEFI, Btrfs ve GRUB ön kontrolü başarılı.",
-            "setup-provision": "İş istasyonu hazırlandı; uygulama testleri bekleniyor.",
-            "setup-finalize": "Kurulum tamamlandı ve sonraki açılış FROZEN olarak ayarlandı.",
-            "reboot": "Sistem yeniden başlatılıyor.",
+            "status": "System status refreshed.",
+            "thaw": "The next boot was set to THAWED maintenance mode.",
+            "thaw-once": "Only the next boot was set to THAWED.",
+            "freeze": "Golden was published and the next boot was set to FROZEN.",
+            "snapshot-list": "Snapshot list refreshed.",
+            "snapshot-create": "Snapshot created.",
+            "snapshot-verify": "Snapshot verification completed.",
+            "snapshot-delete": "Snapshot deleted.",
+            "snapshot-rollback": "Rollback prepared; the next boot will be FROZEN.",
+            "snapshot-export": "Snapshot written to the export directory.",
+            "snapshot-import": "Snapshot imported after checksum verification.",
+            "health": "System health check completed.",
+            "logs": "Audit log refreshed.",
+            "user-list": "User list refreshed.",
+            "user-create": "Standard user created.",
+            "user-delete": "User backed up and deleted.",
+            "user-restore": "User restored from backup.",
+            "user-password": "User password changed.",
+            "user-lock": "User account locked.",
+            "user-unlock": "User account unlocked.",
+            "user-autologin": "Automatic login updated.",
+            "updates-check": "Update check completed.",
+            "updates-apply": "Updates applied and a new Golden published.",
+            "settings-get": "Settings loaded.",
+            "settings-set": "Settings validated and saved.",
+            "applications-status": "Applications verified.",
+            "applications-install": "Applications installed and a new Golden published.",
+            "setup-status": "Setup status refreshed.",
+            "setup-preflight": "CachyOS, UEFI, Btrfs, and GRUB preflight passed.",
+            "setup-install": "CachyFreeze was installed in THAWED mode.",
+            "setup-freeze": "Golden was published and the next boot was set to FROZEN.",
+            "reboot": "System is rebooting.",
         }
-        return messages.get(action, "İşlem başarıyla tamamlandı.")
+        return messages.get(action, "Operation completed successfully.")

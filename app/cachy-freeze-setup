@@ -6,20 +6,20 @@ readonly PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 show_error() {
   local message=$1
   if command -v kdialog >/dev/null 2>&1; then
-    kdialog --title "CachyOS Kurulum Uygulaması" --error "$message"
+    kdialog --title "CachyFreeze Setup" --error "$message"
   elif command -v zenity >/dev/null 2>&1; then
-    zenity --error --title="CachyOS Kurulum Uygulaması" --text="$message"
+    zenity --error --title="CachyFreeze Setup" --text="$message"
   else
-    printf 'HATA: %s\n' "$message" >&2
+    printf 'ERROR: %s\n' "$message" >&2
   fi
 }
 
 command -v python >/dev/null 2>&1 || {
-  show_error "Python bulunamadı. Temiz CachyOS kurulumunu doğrulayın."
+  show_error "Python was not found. Verify the CachyOS installation."
   exit 1
 }
 command -v pkexec >/dev/null 2>&1 || {
-  show_error "PolicyKit bulunamadı. Temiz CachyOS KDE kurulumu gerekli."
+  show_error "PolicyKit was not found. A CachyOS KDE installation is required."
   exit 1
 }
 
@@ -29,7 +29,7 @@ chmod u+x "$PROJECT_ROOT/app/cachy-freeze-manager-helper"
 
 if ! python -s -c 'import PyQt6' >/dev/null 2>&1; then
   if ! pkexec /usr/bin/pacman -S --needed --noconfirm python-pyqt6; then
-    show_error "Grafik kurulum bileşeni yüklenemedi. İnternet bağlantısını kontrol edin."
+    show_error "The graphical setup component could not be installed. Check the network."
     exit 1
   fi
 fi

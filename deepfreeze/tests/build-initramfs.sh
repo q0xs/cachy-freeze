@@ -19,7 +19,7 @@ cleanup() {
 }
 
 fail() {
-  printf 'TEST HATASI: %s\n' "$*" >&2
+  printf 'TEST ERROR: %s\n' "$*" >&2
   exit 1
 }
 
@@ -30,7 +30,7 @@ for path in \
   "$INSTALLED_UNIT" \
   "$INSTALLED_HOOK" \
   "$INSTALLED_CONFIG"; do
-  [[ ! -e $path ]] || fail "Test geçici dosyanın üzerine yazmayacak: $path"
+  [[ ! -e $path ]] || fail "The test will not overwrite an existing file: $path"
 done
 
 trap cleanup EXIT
@@ -67,15 +67,15 @@ for kernel in /usr/lib/modules/*; do
   listing="$TEST_DIR/initramfs-$version.list"
   lsinitcpio "$image" >"$listing"
   grep -qx 'usr/lib/cachy-freeze/cachy-freeze-reset' "$listing" ||
-    fail "$version reset programını içermiyor."
+    fail "$version does not contain the reset program."
   grep -qx 'etc/cachy-freeze-initrd.conf' "$listing" ||
-    fail "$version yapılandırmayı içermiyor."
+    fail "$version does not contain the configuration."
   grep -qx 'usr/lib/systemd/system/cachy-freeze-reset.service' "$listing" ||
-    fail "$version systemd unitini içermiyor."
+    fail "$version does not contain the systemd unit."
   grep -qx \
     'usr/lib/systemd/system/initrd-root-fs.target.requires/cachy-freeze-reset.service' \
     "$listing" ||
-    fail "$version initrd bağımlılık bağlantısını içermiyor."
+    fail "$version does not contain the initrd dependency link."
 done
 
-printf '%s\n' "Her iki kernel için geçici initramfs testi başarılı."
+printf '%s\n' "Temporary initramfs tests passed for both kernels."

@@ -1,68 +1,35 @@
-# Codex çalışma kuralları
+# Repository rules
 
-Bu dosya bütün repo için geçerlidir. Alt dizindeki daha özel `AGENTS.md`
-dosyası kendi kapsamındaki ek kuralları tanımlar.
+These rules apply to the entire repository. A nested `AGENTS.md` adds rules for its directory.
 
-## Başlangıç ve bağlam
+## Start-up
 
-- Önce bu dosyanın tamamını; sonra `docs/development-handoff.md`, `README.md`,
-  `docs/architecture.md`, `docs/installation.md`, `docs/development.md` ve
-  `docs/pilot-checklist.md` dosyalarını oku.
-- Fiziksel laptop görevi verildiyse ayrıca
-  `docs/physical-acceptance.md` içindeki uçtan uca kabul sözleşmesini oku.
-- Her turda `git status --short`, `git remote -v` ve son commitleri incele.
-  Kullanıcı değişikliklerini silme, stash etme, restore etme veya ezme.
-- Windows host, VirtualBox VM ve fiziksel CachyOS laptopu ayrı hedefler olarak
-  tut. Snapshot, UUID, boot modu veya test sonucunu hedefler arasında taşıma.
-- Devam belgesindeki checkpoint yalnız devir notudur. Gerçek hedefin UEFI,
-  Btrfs, GRUB, kullanıcı, Golden/Active ve mod durumunu yeniden doğrula.
+- Read this file, `README.md`, `docs/architecture.md`, `docs/installation.md`,
+  `docs/development.md`, and `docs/testing/TEST-LOG.md` before making changes.
+- Inspect status, remotes, and recent commits. Never discard or overwrite user changes.
+- Keep VM and physical-device evidence separate and revalidate the actual target.
 
-## Kullanıcı arayüzü sınırı
+## Product contract
 
-- Normal kullanıcı kurulumu yalnız `cachyfreeze-setup.desktop` ve
-  uygulamanın **Kurulum** sayfasından yapılır.
-- Kullanıcıya numaralı `.sh`, `sudo`, terminal kurulum veya bakım akışı sunma.
-- Terminal yalnız Codex'in repo işlemleri, geliştirme, test, log ve salt-okunur
-  teşhisi içindir.
-- Canlı kabulte yalnız dosya/komut varlığını yeterli sayma; gerçek uygulama
-  penceresini ve gerçek donanım davranışını doğrula.
+- Engine installation, user management, and FROZEN activation are independent.
+  A user account must never be required to install or freeze CachyFreeze.
+- Public installation entries are the graphical setup launcher and documented
+  one-command installer. The GUI remains unprivileged; root work uses PolicyKit.
 
-## Güvenlik
+## Safety
 
-- Parola, token, SSH anahtarı, cihaz UUID'si, gerçek kullanıcı verisi veya gizli
-  değeri çıktı, komut argümanı, log, ekran görüntüsü, rapor ya da repoya koyma.
-- Parola ve yeniden kullanılabilir parola hash'leri mevcut stdin gizli veri
-  kanalıyla taşınmalıdır; süreç argümanına eklenemez.
-- Desteklenmeyen UEFI/Btrfs/`@`/GRUB/EFI düzeninde dur. Preflight'i atlatma veya
-  sistemi zorla dönüştürme.
-- `btrfs check --repair` çalıştırma. Gerçek `@`, `@golden`, `@active`, state veya
-  snapshot alt birimlerini elle bozma/silme.
-- Golden yayını, pacman, mkinitcpio veya GRUB yazımı sırasında güç kesme.
-- Fiziksel cihazda yıkıcı boot/güç testi için sağlıklı Golden, harici yedek,
-  kurtarma USB'si, AC güç, geri dönüş snapshotı ve ayrıca açık kullanıcı onayı
-  gerekir.
+- Never expose passwords, hashes, tokens, keys, device UUIDs, or private user data.
+  Secrets use the existing stdin/write-channel only.
+- Stop on unsupported UEFI/Btrfs/`@`/GRUB/EFI layouts. Never bypass preflight.
+- Never run `btrfs check --repair` or manually damage/delete managed subvolumes.
+- Never interrupt pacman, Golden publication, mkinitcpio, or GRUB writes.
+- Destructive physical tests require explicit approval and full recovery readiness.
 
-## Kod ve test kapısı
+## Quality and GitHub
 
-- Shell komutlarını Python veya GUI içinde string birleştirme ya da `shell=True`
-  ile çalıştırma; doğrulanmış argüman dizileri kullan.
-- Bütün yazma işlemlerini mevcut işlem kilidi, atomik yazma ve transaction
-  sözleşmeleriyle uyumlu tut.
-- Değişiklikten önce ve sonra en az Ruff check/format, tüm Python birim testleri,
-  Bash syntax, ShellCheck, systemd verify, desktop-file validation ve Qt
-  offscreen smoke çalıştır.
-- Btrfs, initramfs ve GRUB entegrasyon testlerini disposable VM veya açıkça
-  ayrılmış pilot dışında çalıştırma.
-- Yapılmamış, uygulanamaz veya kullanıcı onayı bekleyen testi geçmiş gösterme.
-  VM ses aygıtını fiziksel mikrofon/kulaklık kabulü sayma.
-
-## Git ve GitHub
-
-- Yalnız ilgili dosyaları adlarıyla stage et. `git diff --check`, staged diff ve
-  çalışma ağacını committen önce incele.
-- Kısa, amaç odaklı commit oluştur. Güncel kullanıcı tercihi değişmedikçe PR
-  açmadan doğrudan `main` dalına push et; force-push kullanma.
-- GitHub Actions tamamen yeşil olana kadar izle. Hata varsa logdaki kök nedeni
-  düzelt, testleri tekrarla ve yeni commit gönder.
-- Gerçek QA sonucunu tarih, hedef, kernel ve commit ile raporla; parolaları ve
-  hassas kimlikleri rapora yazma.
+- Preserve locking, atomic writes, validation, and transaction recovery.
+- Run Ruff, all Python tests, Bash/ShellCheck, systemd/desktop validation, and Qt smoke.
+- Run boot-stack integration only on a disposable VM or approved pilot.
+- Record actual results in `docs/testing/TEST-LOG.md`; never claim an unrun test passed.
+- Stage only relevant files, review diffs, use focused commits, push directly to `main`
+  unless the user requests a PR, and watch GitHub Actions to completion.

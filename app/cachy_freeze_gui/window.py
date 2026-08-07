@@ -78,7 +78,7 @@ class MetricCard(QFrame):
 class UserDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Standart kullanıcı oluştur")
+        self.setWindowTitle("Create standard user")
         layout = QFormLayout(self)
         self.username = QLineEdit()
         self.username.setPlaceholderText("ornek.kullanici")
@@ -87,11 +87,11 @@ class UserDialog(QDialog):
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_confirm = QLineEdit()
         self.password_confirm.setEchoMode(QLineEdit.EchoMode.Password)
-        self.autologin = QCheckBox("Bu kullanıcıyla otomatik giriş")
-        layout.addRow("Kullanıcı adı", self.username)
-        layout.addRow("Görünen ad", self.display_name)
-        layout.addRow("Parola", self.password)
-        layout.addRow("Parola tekrar", self.password_confirm)
+        self.autologin = QCheckBox("Sign in automatically as this user")
+        layout.addRow("Username", self.username)
+        layout.addRow("Display name", self.display_name)
+        layout.addRow("Password", self.password)
+        layout.addRow("Confirm password", self.password_confirm)
         layout.addRow("", self.autologin)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -107,7 +107,7 @@ class MainWindow(QMainWindow):
         self.backend = backend
         self.settings = QSettings("CachyOS Workstation", "CachyFreeze")
         self.setup_preflight_ok = False
-        self.setWindowTitle("CachyFreeze Yönetim Merkezi")
+        self.setWindowTitle("CachyFreeze Management Center")
         self.setMinimumSize(980, 640)
         self.resize(1180, 740)
         self._build_ui()
@@ -131,13 +131,13 @@ class MainWindow(QMainWindow):
         side_layout.addWidget(brand)
         self.nav_buttons: list[QPushButton] = []
         self.page_titles = (
-            "Genel Bakış",
-            "Snapshotlar",
-            "Kullanıcılar",
-            "Güncellemeler",
-            "Audit Logları",
-            "Ayarlar",
-            "Kurulum",
+            "Overview",
+            "Snapshots",
+            "Users",
+            "Updates",
+            "Audit Logs",
+            "Settings",
+            "Setup",
         )
         for title in self.page_titles:
             button = QPushButton(title)
@@ -148,7 +148,7 @@ class MainWindow(QMainWindow):
             side_layout.addWidget(button)
         self.nav_buttons[0].setChecked(True)
         side_layout.addStretch()
-        self.theme_button = QPushButton("Açık / Koyu Tema")
+        self.theme_button = QPushButton("Light / Dark Theme")
         side_layout.addWidget(self.theme_button)
 
         content = QWidget()
@@ -156,9 +156,9 @@ class MainWindow(QMainWindow):
         content_layout.setContentsMargins(28, 24, 28, 18)
         content_layout.setSpacing(14)
         header = QHBoxLayout()
-        self.page_title = QLabel("Genel Bakış")
+        self.page_title = QLabel("Overview")
         self.page_title.setObjectName("pageTitle")
-        self.mode_badge = QLabel("DURUM YÜKLENİYOR")
+        self.mode_badge = QLabel("LOADING STATUS")
         self.mode_badge.setStyleSheet(
             "padding: 7px 12px; border-radius: 10px; background: #273445; font-weight: 700;"
         )
@@ -188,7 +188,7 @@ class MainWindow(QMainWindow):
         shell.addWidget(sidebar)
         shell.addWidget(content, 1)
         self.setCentralWidget(central)
-        self.statusBar().showMessage("Hazır")
+        self.statusBar().showMessage("Ready")
 
     def open_setup_page(self) -> None:
         index = len(self.page_titles) - 1
@@ -202,12 +202,12 @@ class MainWindow(QMainWindow):
         layout.setSpacing(16)
         cards = QGridLayout()
         cards.setSpacing(14)
-        self.mode_card = MetricCard("Çalışan mod")
-        self.snapshot_card = MetricCard("Son snapshot")
-        self.disk_card = MetricCard("Disk kullanımı")
-        self.health_card = MetricCard("Sistem durumu")
-        self.count_card = MetricCard("Snapshot sayısı")
-        self.update_card = MetricCard("Güncellemeler")
+        self.mode_card = MetricCard("Running mode")
+        self.snapshot_card = MetricCard("Latest snapshot")
+        self.disk_card = MetricCard("Disk usage")
+        self.health_card = MetricCard("System status")
+        self.count_card = MetricCard("Snapshot count")
+        self.update_card = MetricCard("Updates")
         for index, card in enumerate(
             (
                 self.mode_card,
@@ -225,20 +225,19 @@ class MainWindow(QMainWindow):
         actions.setObjectName("card")
         action_layout = QVBoxLayout(actions)
         action_layout.setContentsMargins(20, 18, 20, 18)
-        title = QLabel("Boot modu")
+        title = QLabel("Boot mode")
         title.setObjectName("cardValue")
         text = QLabel(
-            "THAWED değişiklikleri kalıcı tutar. FROZEN, Golden tabanı her "
-            "açılışta temiz bir Active köke dönüştürür."
+            "THAWED keeps changes. FROZEN recreates a clean Active root from Golden at every boot."
         )
         text.setObjectName("muted")
         text.setWordWrap(True)
         button_row = QHBoxLayout()
-        self.thaw_button = QPushButton("THAWED bakım moduna geç")
-        self.freeze_button = QPushButton("Golden yayınla ve FROZEN yap")
+        self.thaw_button = QPushButton("Switch to THAWED maintenance")
+        self.freeze_button = QPushButton("Publish Golden and enable FROZEN")
         self.freeze_button.setObjectName("primary")
-        self.reboot_button = QPushButton("Yeniden başlat")
-        self.health_button = QPushButton("Sağlık taraması")
+        self.reboot_button = QPushButton("Reboot")
+        self.health_button = QPushButton("Health scan")
         button_row.addWidget(self.thaw_button)
         button_row.addWidget(self.freeze_button)
         button_row.addWidget(self.health_button)
@@ -248,16 +247,16 @@ class MainWindow(QMainWindow):
         action_layout.addWidget(text)
         action_layout.addLayout(button_row)
         layout.addWidget(actions)
-        self.alert_label = QLabel("Uyarı bulunmuyor.")
+        self.alert_label = QLabel("No warnings.")
         self.alert_label.setObjectName("muted")
         self.alert_label.setWordWrap(True)
         layout.addWidget(self.alert_label)
-        recent_title = QLabel("Son işlemler")
+        recent_title = QLabel("Recent operations")
         recent_title.setObjectName("cardCaption")
         self.recent_log_view = QPlainTextEdit()
         self.recent_log_view.setReadOnly(True)
         self.recent_log_view.setMaximumHeight(105)
-        self.recent_log_view.setPlaceholderText("Audit Logları sayfasından yenileyin.")
+        self.recent_log_view.setPlaceholderText("Refresh from the Audit Logs page.")
         layout.addWidget(recent_title)
         layout.addWidget(self.recent_log_view)
         layout.addStretch()
@@ -268,15 +267,15 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 4, 0, 0)
         buttons = QHBoxLayout()
-        self.create_button = QPushButton("Snapshot oluştur")
+        self.create_button = QPushButton("Create snapshot")
         self.create_button.setObjectName("primary")
-        self.verify_button = QPushButton("Doğrula")
-        self.compare_button = QPushButton("Karşılaştır")
+        self.verify_button = QPushButton("Verify")
+        self.compare_button = QPushButton("Compare")
         self.snapshot_details_button = QPushButton("Metadata")
         self.export_button = QPushButton("Export")
         self.import_button = QPushButton("Import")
-        self.rollback_button = QPushButton("Geri yükle")
-        self.delete_button = QPushButton("Sil")
+        self.rollback_button = QPushButton("Roll back")
+        self.delete_button = QPushButton("Delete")
         self.delete_button.setObjectName("danger")
         for button in (
             self.create_button,
@@ -295,11 +294,11 @@ class MainWindow(QMainWindow):
         self.snapshot_table.setHorizontalHeaderLabels(
             [
                 "Tarih",
-                "Açıklama",
-                "Oluşturan",
+                "Description",
+                "Created by",
                 "Boyut",
                 "Kernel",
-                "Sağlık",
+                "Health",
                 "Rollback",
                 "Boot",
                 "UUID",
@@ -319,14 +318,14 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 4, 0, 0)
         buttons = QHBoxLayout()
-        self.user_create_button = QPushButton("Kullanıcı oluştur")
+        self.user_create_button = QPushButton("Create user")
         self.user_create_button.setObjectName("primary")
-        self.user_password_button = QPushButton("Parola sıfırla")
-        self.user_lock_button = QPushButton("Kilitle / Aç")
-        self.user_autologin_button = QPushButton("Otomatik giriş")
-        self.user_delete_button = QPushButton("Sil")
+        self.user_password_button = QPushButton("Reset password")
+        self.user_lock_button = QPushButton("Lock / Unlock")
+        self.user_autologin_button = QPushButton("Automatic login")
+        self.user_delete_button = QPushButton("Delete")
         self.user_delete_button.setObjectName("danger")
-        self.user_restore_button = QPushButton("Yedekten geri yükle")
+        self.user_restore_button = QPushButton("Restore backup")
         self.user_refresh_button = QPushButton("Yenile")
         for button in (
             self.user_create_button,
@@ -341,15 +340,15 @@ class MainWindow(QMainWindow):
         buttons.addWidget(self.user_refresh_button)
         layout.addLayout(buttons)
         note = QLabel(
-            "Kullanıcılar CachyOS'un standart hesap varsayılanlarıyla oluşturulur. "
-            "CachyFreeze grup veya yönetici yetkilerini değiştirmez."
+            "Users are created with CachyOS account defaults. CachyFreeze does not "
+            "change group membership or administrator rights."
         )
         note.setObjectName("muted")
         note.setWordWrap(True)
         layout.addWidget(note)
         self.user_table = QTableWidget(0, 6)
         self.user_table.setHorizontalHeaderLabels(
-            ["Kullanıcı", "Görünen ad", "Tür", "Durum", "Otomatik giriş", "Ev dizini"]
+            ["User", "Display name", "Type", "Status", "Automatic login", "Home"]
         )
         self.user_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.user_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -367,20 +366,20 @@ class MainWindow(QMainWindow):
         card = QFrame()
         card.setObjectName("card")
         card_layout = QVBoxLayout(card)
-        title = QLabel("Sistem ve uygulama güncellemeleri")
+        title = QLabel("System and application updates")
         title.setObjectName("cardValue")
         description = QLabel(
-            "Denetim sistemi değiştirmez. Uygulama yalnızca THAWED bakım modunda çalışır; "
-            "önce geri dönüş snapshotı alır, pacman işlemini doğrular ve yeni Golden yayınlar."
+            "Checking does not change the system. Applying updates runs only in THAWED, "
+            "creates a rollback snapshot, verifies pacman, and publishes a new Golden."
         )
         description.setObjectName("muted")
         description.setWordWrap(True)
         row = QHBoxLayout()
-        self.update_check_button = QPushButton("Güncellemeleri denetle")
-        self.update_apply_button = QPushButton("Snapshot al ve güncelle")
+        self.update_check_button = QPushButton("Check for updates")
+        self.update_apply_button = QPushButton("Snapshot and update")
         self.update_apply_button.setObjectName("primary")
-        self.app_status_button = QPushButton("Uygulamaları doğrula")
-        self.app_install_button = QPushButton("Kurumsal uygulamaları kur / onar")
+        self.app_status_button = QPushButton("Verify applications")
+        self.app_install_button = QPushButton("Install / repair applications")
         row.addWidget(self.update_check_button)
         row.addWidget(self.update_apply_button)
         row.addWidget(self.app_status_button)
@@ -392,7 +391,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(card)
         self.update_view = QPlainTextEdit()
         self.update_view.setReadOnly(True)
-        self.update_view.setPlaceholderText("Henüz güncelleme denetimi yapılmadı.")
+        self.update_view.setPlaceholderText("No update check has been run yet.")
         layout.addWidget(self.update_view, 1)
         return page
 
@@ -416,35 +415,35 @@ class MainWindow(QMainWindow):
         self.auto_snapshot_check = QCheckBox("Etkin")
         self.auto_interval_spin = self._setting_spin(15, 10080, " dk")
         self.boot_failure_spin = self._setting_spin(2, 10, " deneme")
-        snapshot_form.addRow("Saklama sayısı", self.retention_spin)
-        snapshot_form.addRow("Otomatik snapshot", self.auto_snapshot_check)
-        snapshot_form.addRow("Otomatik aralık", self.auto_interval_spin)
-        snapshot_form.addRow("Boot geri dönüş sınırı", self.boot_failure_spin)
+        snapshot_form.addRow("Retention count", self.retention_spin)
+        snapshot_form.addRow("Automatic snapshot", self.auto_snapshot_check)
+        snapshot_form.addRow("Automatic interval", self.auto_interval_spin)
+        snapshot_form.addRow("Boot rollback limit", self.boot_failure_spin)
 
-        system_group = QGroupBox("Güncelleme, ağ ve log")
+        system_group = QGroupBox("Updates, network, and logs")
         system_form = QFormLayout(system_group)
         self.update_checks_check = QCheckBox("Etkin")
-        self.network_checks_check = QCheckBox("Çevrimiçi işlemlere izin ver")
-        self.log_retention_spin = self._setting_spin(100, 100000, " satır")
-        system_form.addRow("Güncelleme denetimi", self.update_checks_check)
-        system_form.addRow("Ağ", self.network_checks_check)
+        self.network_checks_check = QCheckBox("Allow online operations")
+        self.log_retention_spin = self._setting_spin(100, 100000, " lines")
+        system_form.addRow("Update checks", self.update_checks_check)
+        system_form.addRow("Network", self.network_checks_check)
         system_form.addRow("Log saklama", self.log_retention_spin)
 
-        appearance_group = QGroupBox("Görünüm ve dil")
+        appearance_group = QGroupBox("Appearance and language")
         appearance_form = QFormLayout(appearance_group)
         self.theme_combo = QComboBox()
-        self.theme_combo.addItem("Koyu", "dark")
-        self.theme_combo.addItem("Açık", "light")
+        self.theme_combo.addItem("Dark", "dark")
+        self.theme_combo.addItem("Light", "light")
         self.language_combo = QComboBox()
-        self.language_combo.addItem("Türkçe", "tr")
-        appearance_form.addRow("Tema", self.theme_combo)
-        appearance_form.addRow("Dil", self.language_combo)
+        self.language_combo.addItem("English", "en")
+        appearance_form.addRow("Theme", self.theme_combo)
+        appearance_form.addRow("Language", self.language_combo)
 
-        boot_group = QGroupBox("Sonraki açılış")
+        boot_group = QGroupBox("Next boot")
         boot_layout = QVBoxLayout(boot_group)
-        self.thaw_once_button = QPushButton("Yalnızca bir kez THAWED başlat")
+        self.thaw_once_button = QPushButton("Boot THAWED once")
         self.boot_frozen_button = QPushButton("Her zaman FROZEN")
-        self.boot_thawed_button = QPushButton("THAWED bakım modu")
+        self.boot_thawed_button = QPushButton("THAWED maintenance mode")
         boot_layout.addWidget(self.thaw_once_button)
         boot_layout.addWidget(self.boot_frozen_button)
         boot_layout.addWidget(self.boot_thawed_button)
@@ -455,9 +454,9 @@ class MainWindow(QMainWindow):
         grid.addWidget(boot_group, 1, 1)
         layout.addLayout(grid)
         row = QHBoxLayout()
-        self.settings_save_button = QPushButton("Ayarları doğrula ve kaydet")
+        self.settings_save_button = QPushButton("Validate and save settings")
         self.settings_save_button.setObjectName("primary")
-        self.settings_refresh_button = QPushButton("Ayarları yeniden yükle")
+        self.settings_refresh_button = QPushButton("Reload settings")
         row.addWidget(self.settings_save_button)
         row.addWidget(self.settings_refresh_button)
         row.addStretch()
@@ -477,12 +476,12 @@ class MainWindow(QMainWindow):
         state_card = QFrame()
         state_card.setObjectName("card")
         state_layout = QVBoxLayout(state_card)
-        state_title = QLabel("Tek uygulamalı kurulum")
+        state_title = QLabel("Independent setup")
         state_title.setObjectName("cardValue")
-        self.setup_state_label = QLabel("Kurulum durumu denetleniyor…")
+        self.setup_state_label = QLabel("Checking setup status…")
         self.setup_state_label.setObjectName("muted")
         self.setup_state_label.setWordWrap(True)
-        self.setup_preflight_button = QPushButton("1. Sistem ön kontrolünü çalıştır")
+        self.setup_preflight_button = QPushButton("1. Run system preflight")
         state_layout.addWidget(state_title)
         state_layout.addWidget(self.setup_state_label)
         state_layout.addWidget(self.setup_preflight_button)
@@ -491,58 +490,52 @@ class MainWindow(QMainWindow):
         stages = QGridLayout()
         stages.setSpacing(14)
 
-        provision_group = QGroupBox("2. İş istasyonunu hazırla")
+        provision_group = QGroupBox("2. Install CachyFreeze")
         provision_form = QFormLayout(provision_group)
-        self.setup_username = QLineEdit()
-        self.setup_username.setPlaceholderText("ornek_kullanici")
-        self.setup_display_name = QLineEdit()
-        self.setup_display_name.setPlaceholderText("Ad Soyad")
-        self.setup_password = QLineEdit()
-        self.setup_password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.setup_password_confirm = QLineEdit()
-        self.setup_password_confirm.setEchoMode(QLineEdit.EchoMode.Password)
-        self.setup_backup_check = QCheckBox("Kurtarma medyası ve geri alınabilir yedek hazır")
-        self.setup_disposable_check = QCheckBox(
-            "Disposable test cihazı: tüm yerel verilerin kaybını kabul ediyorum"
+        install_note = QLabel(
+            "Installs only the freeze engine and management app. User accounts are "
+            "optional and can be managed separately from the Users page."
         )
-        self.setup_start_button = QPushButton("Tam kurulumu başlat")
+        install_note.setWordWrap(True)
+        self.setup_backup_check = QCheckBox("Recovery media and a restorable backup are ready")
+        self.setup_disposable_check = QCheckBox(
+            "Disposable test device: I accept the loss of all local data"
+        )
+        self.setup_start_button = QPushButton("Install CachyFreeze")
         self.setup_start_button.setObjectName("primary")
-        provision_form.addRow("Kullanıcı adı", self.setup_username)
-        provision_form.addRow("Görünen ad", self.setup_display_name)
-        provision_form.addRow("Kullanıcı parolası", self.setup_password)
-        provision_form.addRow("Parola tekrar", self.setup_password_confirm)
+        provision_form.addRow(install_note)
         provision_form.addRow("", self.setup_backup_check)
         provision_form.addRow("", self.setup_disposable_check)
         provision_form.addRow("", self.setup_start_button)
         stages.addWidget(provision_group, 0, 0)
 
-        finalize_group = QGroupBox("3. Test et, Golden yayınla ve dondur")
+        finalize_group = QGroupBox("3. Enable FROZEN mode")
         finalize_form = QFormLayout(finalize_group)
-        self.setup_apps_check = QCheckBox("Kurumsal uygulamalar açıldı")
-        self.setup_audio_check = QCheckBox("Mikrofon, hoparlör ve görüşme test edildi")
-        self.setup_admin_check = QCheckBox("Yönetici işlemi localadm parolası istedi")
+        freeze_note = QLabel(
+            "This step is independent from user creation. It protects maintenance mode, "
+            "publishes Golden, and schedules the next boot as FROZEN."
+        )
+        freeze_note.setWordWrap(True)
         self.setup_grub_password = QLineEdit()
         self.setup_grub_password.setEchoMode(QLineEdit.EchoMode.Password)
         self.setup_grub_confirm = QLineEdit()
         self.setup_grub_confirm.setEchoMode(QLineEdit.EchoMode.Password)
-        self.setup_finish_button = QPushButton("Kurulumu tamamla ve FROZEN yap")
+        self.setup_finish_button = QPushButton("Publish Golden and enable FROZEN")
         self.setup_finish_button.setObjectName("primary")
-        finalize_form.addRow("", self.setup_apps_check)
-        finalize_form.addRow("", self.setup_audio_check)
-        finalize_form.addRow("", self.setup_admin_check)
-        finalize_form.addRow("GRUB parolası", self.setup_grub_password)
-        finalize_form.addRow("Parola tekrar", self.setup_grub_confirm)
+        finalize_form.addRow(freeze_note)
+        finalize_form.addRow("GRUB maintenance password", self.setup_grub_password)
+        finalize_form.addRow("Confirm password", self.setup_grub_confirm)
         finalize_form.addRow("", self.setup_finish_button)
         stages.addWidget(finalize_group, 0, 1)
         layout.addLayout(stages)
 
-        output_title = QLabel("Kurulum ilerlemesi ve hata ayrıntıları")
+        output_title = QLabel("Setup progress and error details")
         output_title.setObjectName("cardCaption")
         self.setup_output = QPlainTextEdit()
         self.setup_output.setReadOnly(True)
         self.setup_output.setMaximumBlockCount(2000)
         self.setup_output.setMinimumHeight(140)
-        self.setup_output.setPlaceholderText("Ön kontrol ve kurulum çıktısı burada gösterilecek.")
+        self.setup_output.setPlaceholderText("Preflight and setup output appears here.")
         layout.addWidget(output_title)
         layout.addWidget(self.setup_output)
         layout.addStretch()
@@ -554,9 +547,9 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 4, 0, 0)
         row = QHBoxLayout()
-        description = QLabel("Son 200 root işlemi, seviye ve bağlam bilgileriyle gösterilir.")
+        description = QLabel("Shows the latest 200 root operations with level and context.")
         description.setObjectName("muted")
-        self.logs_button = QPushButton("Logları yenile")
+        self.logs_button = QPushButton("Refresh logs")
         row.addWidget(description)
         row.addStretch()
         row.addWidget(self.logs_button)
@@ -673,7 +666,7 @@ class MainWindow(QMainWindow):
             self.setup_finish_button,
         ):
             button.setDisabled(busy)
-        self.statusBar().showMessage("İşlem devam ediyor…" if busy else "Hazır")
+        self.statusBar().showMessage("Operation in progress…" if busy else "Ready")
 
     def _status_changed(self, status: dict[str, Any]) -> None:
         mode = str(status.get("running_mode", "unknown"))
@@ -690,43 +683,44 @@ class MainWindow(QMainWindow):
         )
         self.mode_card.value.setText(label)
         self.mode_card.detail.setText(
-            f"Sonraki açılış: {str(status.get('scheduled_mode', 'unknown')).upper()}"
+            f"Next boot: {str(status.get('scheduled_mode', 'unknown')).upper()}"
         )
         last = status.get("last_snapshot")
         if isinstance(last, dict):
             self.snapshot_card.value.setText(_date(str(last.get("created_at", ""))))
             self.snapshot_card.detail.setText(str(last.get("description", "")))
         else:
-            self.snapshot_card.value.setText("Henüz yok")
-            self.snapshot_card.detail.setText("İlk Golden yayınından önce snapshot oluşturun.")
+            self.snapshot_card.value.setText("None yet")
+            self.snapshot_card.detail.setText(
+                "Create a snapshot before the first Golden publication."
+            )
         usage = shutil.disk_usage("/")
         self.disk_card.value.setText(f"%{round(usage.used / usage.total * 100)}")
         self.disk_card.detail.setText(f"{_human_bytes(usage.used)} / {_human_bytes(usage.total)}")
         ready = bool(status.get("golden_present")) and bool(status.get("active_present"))
         pending = bool(status.get("transaction_pending"))
-        self.health_card.value.setText("Dikkat" if pending or not ready else "Hazır")
+        self.health_card.value.setText("Attention" if pending or not ready else "Ready")
         self.health_card.detail.setText(
-            "Yarım kalan işlem algılandı."
+            "An interrupted operation was detected."
             if pending
-            else "Golden ve Active doğrulandı."
+            else "Golden and Active verified."
             if ready
-            else "Golden veya Active henüz hazır değil."
+            else "Golden or Active is not ready yet."
         )
         count = int(status.get("snapshot_count", 0))
         self.count_card.value.setText(str(count))
-        self.count_card.detail.setText("Otomatik saklama politikasıyla yönetiliyor.")
+        self.count_card.detail.setText("Managed by the automatic retention policy.")
         alerts = []
         if pending:
-            alerts.append("Yarım kalan snapshot işlemi kurtarma bekliyor.")
+            alerts.append("An interrupted snapshot operation requires recovery.")
         attempts = int(status.get("boot_attempts", 0))
         if attempts:
             alerts.append(
-                f"Henüz doğrulanmamış boot denemesi: {attempts}/"
-                f"{status.get('boot_failure_limit', 3)}"
+                f"Unconfirmed boot attempt: {attempts}/{status.get('boot_failure_limit', 3)}"
             )
         if status.get("failed_golden_present"):
-            alerts.append("Otomatik rollback sonrası başarısız Golden tanı için korunuyor.")
-        self.alert_label.setText("  •  ".join(alerts) if alerts else "Uyarı bulunmuyor.")
+            alerts.append("Failed Golden retained for diagnosis after automatic rollback.")
+        self.alert_label.setText("  •  ".join(alerts) if alerts else "No warnings.")
 
     def _snapshots_changed(self, snapshots: list[dict[str, Any]]) -> None:
         self.snapshot_table.setRowCount(len(snapshots))
@@ -739,7 +733,7 @@ class MainWindow(QMainWindow):
                 str(snapshot.get("kernel", "")),
                 str(snapshot.get("health", "unknown")),
                 str(snapshot.get("rollback_count", 0)),
-                "Evet" if snapshot.get("bootable") else "Hayır",
+                "Yes" if snapshot.get("bootable") else "No",
                 str(snapshot.get("btrfs_uuid", "")),
             )
             for column, value in enumerate(values):
@@ -767,9 +761,9 @@ class MainWindow(QMainWindow):
             values = (
                 str(user.get("username", "")),
                 str(user.get("display_name", "")),
-                "Yönetici" if user.get("administrator") else "Standart",
-                "Kilitli" if user.get("locked") else "Açık",
-                "Etkin" if user.get("autologin") else "Kapalı",
+                "Administrator" if user.get("administrator") else "Standard",
+                "Locked" if user.get("locked") else "Unlocked",
+                "Enabled" if user.get("autologin") else "Disabled",
                 str(user.get("home", "")),
             )
             for column, value in enumerate(values):
@@ -781,7 +775,7 @@ class MainWindow(QMainWindow):
     def _selected_user(self) -> dict[str, Any] | None:
         row = self.user_table.currentRow()
         if row < 0:
-            QMessageBox.information(self, "Kullanıcı seçin", "Önce tablodan bir kullanıcı seçin.")
+            QMessageBox.information(self, "Select a user", "Select a user from the table first.")
             return None
         item = self.user_table.item(row, 0)
         value = item.data(Qt.ItemDataRole.UserRole) if item else None
@@ -793,12 +787,12 @@ class MainWindow(QMainWindow):
             return
         password = dialog.password.text()
         if password != dialog.password_confirm.text():
-            QMessageBox.warning(self, "Parola uyuşmuyor", "Parola ve tekrarı aynı değil.")
+            QMessageBox.warning(self, "Password mismatch", "The passwords do not match.")
             return
         username = dialog.username.text().strip()
         display_name = dialog.display_name.text().strip()
         if not username or not display_name or not password:
-            QMessageBox.warning(self, "Eksik bilgi", "Tüm kullanıcı alanları zorunludur.")
+            QMessageBox.warning(self, "Missing information", "All user fields are required.")
             return
         started = self.backend.run("user-create", username, display_name, secret=password)
         if started and dialog.autologin.isChecked():
@@ -810,32 +804,32 @@ class MainWindow(QMainWindow):
             return
         password, accepted = QInputDialog.getText(
             self,
-            "Parola sıfırla",
-            f"{user['username']} için yeni parola:",
+            "Reset password",
+            f"New password for {user['username']}:",
             QLineEdit.EchoMode.Password,
         )
         if not accepted or not password:
             return
         confirmation, accepted = QInputDialog.getText(
             self,
-            "Parolayı doğrula",
-            "Yeni parolayı tekrar girin:",
+            "Confirm password",
+            "Enter the new password again:",
             QLineEdit.EchoMode.Password,
         )
         if accepted and password == confirmation:
             self.backend.run("user-password", str(user["username"]), secret=password)
         elif accepted:
-            QMessageBox.warning(self, "Parola uyuşmuyor", "Parola ve tekrarı aynı değil.")
+            QMessageBox.warning(self, "Password mismatch", "The passwords do not match.")
 
     def _toggle_user_lock(self) -> None:
         user = self._selected_user()
         if user is None:
             return
         action = "user-unlock" if user.get("locked") else "user-lock"
-        verb = "açılsın" if user.get("locked") else "kilitlensin"
+        verb = "unlocked" if user.get("locked") else "locked"
         if (
             QMessageBox.question(
-                self, "Hesap durumunu değiştir", f"{user['username']} hesabı {verb} mı?"
+                self, "Change account status", f"Should {user['username']} be {verb}?"
             )
             == QMessageBox.StandardButton.Yes
         ):
@@ -857,9 +851,9 @@ class MainWindow(QMainWindow):
         if (
             QMessageBox.warning(
                 self,
-                "Kullanıcı sil",
-                f"{user['username']} hesabı ve ev dizini silinmeden önce root erişimli "
-                "geri yükleme yedeği oluşturulacak. Devam edilsin mi?",
+                "Delete user",
+                f"A root-only recovery backup will be created before deleting "
+                f"{user['username']} and its home directory. Continue?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
@@ -870,8 +864,8 @@ class MainWindow(QMainWindow):
     def _restore_user(self) -> None:
         backup_id, accepted = QInputDialog.getText(
             self,
-            "Kullanıcı yedeğini geri yükle",
-            "Silme işleminde gösterilen yedek kimliği:",
+            "Restore user backup",
+            "Backup ID shown by the delete operation:",
         )
         if accepted and backup_id.strip():
             self.backend.run("user-restore", backup_id.strip())
@@ -879,7 +873,7 @@ class MainWindow(QMainWindow):
     def _selected_snapshot_id(self) -> str | None:
         row = self.snapshot_table.currentRow()
         if row < 0:
-            QMessageBox.information(self, "Snapshot seçin", "Önce tablodan bir snapshot seçin.")
+            QMessageBox.information(self, "Select a snapshot", "Select a snapshot first.")
             return None
         item = self.snapshot_table.item(row, 0)
         return str(item.data(Qt.ItemDataRole.UserRole)) if item else None
@@ -900,16 +894,16 @@ class MainWindow(QMainWindow):
             ("Parent UUID", "parent_uuid"),
             ("Tarih", "created_at"),
             ("Kernel", "kernel"),
-            ("Görünen boyut", "apparent_size_bytes"),
-            ("Özel boyut", "exclusive_size_bytes"),
-            ("Açıklama", "description"),
-            ("Oluşturan", "created_by"),
+            ("Apparent size", "apparent_size_bytes"),
+            ("Exclusive size", "exclusive_size_bytes"),
+            ("Description", "description"),
+            ("Created by", "created_by"),
             ("Frozen", "frozen"),
             ("Bootable", "bootable"),
             ("Metadata checksum", "checksum"),
-            ("Rollback sayısı", "rollback_count"),
-            ("Oluşturma süresi (ms)", "creation_duration_ms"),
-            ("Sağlık", "health"),
+            ("Rollback count", "rollback_count"),
+            ("Creation duration (ms)", "creation_duration_ms"),
+            ("Health", "health"),
             ("Kaynak", "source_subvolume"),
         )
         QMessageBox.information(
@@ -920,7 +914,7 @@ class MainWindow(QMainWindow):
 
     def _create_snapshot(self) -> None:
         description, accepted = QInputDialog.getText(
-            self, "Snapshot oluştur", "Açıklama (zorunlu):"
+            self, "Create snapshot", "Description (required):"
         )
         if accepted and description.strip():
             self.backend.run("snapshot-create", description.strip())
@@ -932,7 +926,7 @@ class MainWindow(QMainWindow):
     def _compare_snapshots(self) -> None:
         if len(self.backend.snapshots) < 2:
             QMessageBox.information(
-                self, "Snapshot karşılaştır", "Karşılaştırmak için en az iki snapshot gerekli."
+                self, "Compare snapshots", "At least two snapshots are required."
             )
             return
         choices = [
@@ -940,18 +934,18 @@ class MainWindow(QMainWindow):
             for snapshot in self.backend.snapshots
         ]
         older, accepted = QInputDialog.getItem(
-            self, "Eski snapshot", "Karşılaştırmanın başlangıcı:", choices, editable=False
+            self, "Older snapshot", "Comparison start:", choices, editable=False
         )
         if not accepted:
             return
         newer, accepted = QInputDialog.getItem(
-            self, "Yeni snapshot", "Karşılaştırmanın sonu:", choices, editable=False
+            self, "Newer snapshot", "Comparison end:", choices, editable=False
         )
         if accepted:
             older_id = older.split(" — ", 1)[0]
             newer_id = newer.split(" — ", 1)[0]
             if older_id == newer_id:
-                QMessageBox.warning(self, "Aynı snapshot", "İki farklı snapshot seçin.")
+                QMessageBox.warning(self, "Same snapshot", "Select two different snapshots.")
                 return
             self.backend.run("snapshot-compare", older_id, newer_id)
 
@@ -962,7 +956,7 @@ class MainWindow(QMainWindow):
             and QMessageBox.warning(
                 self,
                 "Snapshot sil",
-                "Seçilen snapshot kalıcı olarak silinecek. Devam edilsin mi?",
+                "The selected snapshot will be permanently deleted. Continue?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
@@ -976,9 +970,9 @@ class MainWindow(QMainWindow):
             snapshot_id
             and QMessageBox.warning(
                 self,
-                "Snapshot geri yükle",
-                "Seçilen snapshot yeni Golden olacak. İşlem doğrulandıktan "
-                "sonra sonraki açılış FROZEN yapılacak.",
+                "Roll back snapshot",
+                "The selected snapshot will become the new Golden. After verification, "
+                "the next boot will be FROZEN.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
@@ -994,7 +988,7 @@ class MainWindow(QMainWindow):
         filename, accepted = QInputDialog.getText(
             self,
             "Snapshot import",
-            "/var/lib/cachy-freeze/exports içindeki .btrfs dosya adı:",
+            "Name of the .btrfs file in /var/lib/cachy-freeze/exports:",
         )
         if accepted and filename.strip():
             self.backend.run("snapshot-import", filename.strip())
@@ -1018,14 +1012,11 @@ class MainWindow(QMainWindow):
         )
 
     def _start_setup(self) -> None:
-        username = self.setup_username.text().strip().lower()
-        display_name = self.setup_display_name.text().strip()
-        password = self.setup_password.text()
         if not self.setup_preflight_ok:
             QMessageBox.warning(
                 self,
-                "Ön kontrol gerekli",
-                "Kuruluma başlamadan önce sistem ön kontrolünü başarıyla çalıştırın.",
+                "Preflight required",
+                "Run system preflight successfully before installation.",
             )
             return
         backup_ready = self.setup_backup_check.isChecked()
@@ -1033,95 +1024,58 @@ class MainWindow(QMainWindow):
         if backup_ready == disposable_accepted:
             QMessageBox.warning(
                 self,
-                "Kurtarma seçimi gerekli",
-                "Ya kurtarma medyası/yedeğin hazır olduğunu ya da bu disposable test "
-                "cihazındaki tüm yerel verilerin kaybını kabul ettiğinizi seçin.",
+                "Recovery choice required",
+                "Confirm recovery media and backup readiness, or accept all local data "
+                "loss on this disposable test device.",
             )
             return
         if disposable_accepted:
             disposable_answer = QMessageBox.warning(
                 self,
-                "Disposable test cihazı — veri kaybı riski",
-                "Bu cihaz açılmayabilir ve yeniden formatlama gerekebilir. Kurtarma USB'si "
-                "ve harici yedek olmadan devam etmeyi, cihazdaki tüm yerel verilerin "
-                "kalıcı kaybını kabul ediyor musunuz?",
+                "Disposable test device — data loss risk",
+                "This device may fail to boot and require reformatting. Do you accept "
+                "permanent loss of all local data without recovery media or backup?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
             if disposable_answer != QMessageBox.StandardButton.Yes:
                 return
-        if re.fullmatch(r"[a-z][a-z0-9_-]{2,31}", username) is None:
-            QMessageBox.warning(
-                self,
-                "Geçersiz kullanıcı adı",
-                "Kullanıcı adı küçük harfle başlamalı; 3-32 karakter olmalı ve yalnızca "
-                "küçük harf, rakam, _ veya - içermelidir.",
-            )
-            return
-        if not display_name or ":" in display_name or "\n" in display_name:
-            QMessageBox.warning(self, "Geçersiz görünen ad", "Geçerli bir ad ve soyad girin.")
-            return
-        if password != self.setup_password_confirm.text():
-            QMessageBox.warning(self, "Parola hatası", "Kullanıcı parolaları aynı değil.")
-            return
-        if not self._employee_password_is_valid(password):
-            QMessageBox.warning(
-                self,
-                "Geçersiz parola",
-                "Çalışan parolası 4-256 karakter olmalı; iki nokta, satır sonu veya boş "
-                "karakter içeremez.",
-            )
-            return
         answer = QMessageBox.warning(
             self,
-            "Tam kurulumu başlat",
-            "Paketler kurulacak; Btrfs, initramfs ve GRUB yapılandırılacak. İşlem boyunca "
-            "gücü kesmeyin. Devam edilsin mi?",
+            "Start installation",
+            "Packages will be installed and Btrfs, initramfs, and GRUB configured. "
+            "Do not interrupt power. Continue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
         self.setup_output.clear()
-        if self.backend.run("setup-provision", username, display_name, secret=password):
-            self.setup_password.clear()
-            self.setup_password_confirm.clear()
+        self.backend.run("setup-install")
 
     def _finish_setup(self) -> None:
-        checks = (
-            self.setup_apps_check,
-            self.setup_audio_check,
-            self.setup_admin_check,
-        )
-        if not all(check.isChecked() for check in checks):
-            QMessageBox.warning(
-                self,
-                "Canlı test eksik",
-                "Kurulumu dondurmadan önce üç uygulama ve donanım testini de onaylayın.",
-            )
-            return
         password = self.setup_grub_password.text()
         if password != self.setup_grub_confirm.text():
-            QMessageBox.warning(self, "Parola hatası", "GRUB parolaları aynı değil.")
+            QMessageBox.warning(self, "Password error", "The GRUB passwords do not match.")
             return
         if not self._password_is_strong(password):
             QMessageBox.warning(
                 self,
-                "Zayıf GRUB parolası",
-                "GRUB parolası 12-256 karakter olmalı ve en az üç karakter sınıfı içermelidir.",
+                "Weak GRUB password",
+                "The GRUB password must contain 12-256 characters and at least three classes.",
             )
             return
         answer = QMessageBox.warning(
             self,
-            "Golden yayınla ve FROZEN yap",
-            "Kullanıcı şablonları güncellenecek, Golden yayınlanacak ve sonraki açılış "
-            "FROZEN yapılacak. İşlem sırasında bilgisayarı kapatmayın.",
+            "Publish Golden and enable FROZEN",
+            "Existing managed-user templates will be refreshed, Golden published, and the "
+            "next boot set to FROZEN. Do not power off during the operation.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        if self.backend.run("setup-finalize", secret=password):
+        if self.backend.run("setup-freeze", secret=password):
             self.setup_grub_password.clear()
             self.setup_grub_confirm.clear()
 
@@ -1133,8 +1087,8 @@ class MainWindow(QMainWindow):
         if (
             QMessageBox.question(
                 self,
-                "THAWED moda geç",
-                "Sonraki açılışta yapılan değişiklikler kalıcı olacak. Devam edilsin mi?",
+                "Switch to THAWED",
+                "Changes made after the next boot will persist. Continue?",
             )
             == QMessageBox.StandardButton.Yes
         ):
@@ -1144,9 +1098,9 @@ class MainWindow(QMainWindow):
         if (
             QMessageBox.question(
                 self,
-                "Bir kez THAWED başlat",
-                "Yalnızca sonraki açılış THAWED olacak; onu izleyen açılış otomatik "
-                "olarak FROZEN'a dönecek. Devam edilsin mi?",
+                "Boot THAWED once",
+                "Only the next boot will be THAWED; the following boot automatically "
+                "returns to FROZEN. Continue?",
             )
             == QMessageBox.StandardButton.Yes
         ):
@@ -1156,10 +1110,9 @@ class MainWindow(QMainWindow):
         if (
             QMessageBox.warning(
                 self,
-                "Sistemi güncelle",
-                "Bu işlem THAWED bakım kökünde geri dönüş snapshotı oluşturacak, tüm "
-                "pacman güncellemelerini uygulayacak ve doğrulama sonrası yeni Golden "
-                "yayınlayacak. Gücü kesmeyin. Devam edilsin mi?",
+                "Update system",
+                "This creates a rollback snapshot in THAWED, applies pacman updates, "
+                "verifies them, and publishes a new Golden. Do not interrupt power. Continue?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
@@ -1171,10 +1124,9 @@ class MainWindow(QMainWindow):
         if (
             QMessageBox.warning(
                 self,
-                "Kurumsal uygulamaları kur",
-                "Bu işlem yalnızca THAWED bakım modunda çalışır; geri dönüş snapshotı "
-                "alır, paketleri ve MicroSIP'i doğrular, ardından yeni Golden yayınlar. "
-                "Devam edilsin mi?",
+                "Install applications",
+                "This runs only in THAWED, creates a rollback snapshot, verifies packages "
+                "and MicroSIP, then publishes a new Golden. Continue?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
@@ -1202,10 +1154,9 @@ class MainWindow(QMainWindow):
         if (
             QMessageBox.warning(
                 self,
-                "Golden yayınla ve dondur",
-                "Maintenance sistemi snapshot olarak arşivlenecek, yeni "
-                "Golden/Active atomik olarak yayınlanacak. Bilgisayarı işlem "
-                "sırasında kapatmayın.",
+                "Publish Golden and freeze",
+                "The maintenance system will be archived as a snapshot and new "
+                "Golden/Active subvolumes published atomically. Do not power off.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
@@ -1215,7 +1166,7 @@ class MainWindow(QMainWindow):
 
     def _confirm_reboot(self) -> None:
         if (
-            QMessageBox.question(self, "Yeniden başlat", "Bilgisayar şimdi yeniden başlatılsın mı?")
+            QMessageBox.question(self, "Reboot", "Reboot the computer now?")
             == QMessageBox.StandardButton.Yes
         ):
             self.backend.run("reboot")
@@ -1225,12 +1176,12 @@ class MainWindow(QMainWindow):
         if action == "user-create" and not success:
             self.settings.remove("pending_autologin")
         if not success and "iptal edildi" not in message.lower():
-            QMessageBox.critical(self, "CachyFreeze Hatası", message)
-        elif success and action == "setup-finalize":
+            QMessageBox.critical(self, "CachyFreeze Error", message)
+        elif success and action == "setup-freeze":
             answer = QMessageBox.question(
                 self,
-                "Kurulum tamamlandı",
-                f"{message}\n\nİlk FROZEN testi için şimdi yeniden başlatılsın mı?",
+                "Setup complete",
+                f"{message}\n\nReboot now for the first FROZEN test?",
             )
             if answer == QMessageBox.StandardButton.Yes:
                 self.backend.run("reboot")
@@ -1246,18 +1197,17 @@ class MainWindow(QMainWindow):
         }:
             answer = QMessageBox.question(
                 self,
-                "İşlem tamamlandı",
-                f"{message}\n\nDeğişikliği uygulamak için şimdi yeniden başlatılsın mı?",
+                "Operation complete",
+                f"{message}\n\nReboot now to apply the change?",
             )
             if answer == QMessageBox.StandardButton.Yes:
                 self.backend.run("reboot")
-        if success and action == "setup-provision":
+        if success and action == "setup-install":
             QMessageBox.information(
                 self,
-                "İlk aşama tamamlandı",
-                "Çalışan hesabında kurumsal uygulamaları, ses aygıtlarını ve yönetici "
-                "parolası isteğini test edin. Sonra Kurulum sayfasına dönüp üçüncü adımı "
-                "tamamlayın.",
+                "Installation complete",
+                "CachyFreeze is installed in THAWED mode. You may enable FROZEN now or "
+                "create users first; the two operations are independent.",
             )
             self.backend.run("setup-status")
         if success and action == "user-create":
@@ -1275,36 +1225,33 @@ class MainWindow(QMainWindow):
         if action == "setup-preflight":
             self.setup_preflight_ok = True
             self.setup_state_label.setText(
-                "Ön kontrol başarılı: UEFI + Btrfs + GRUB düzeni destekleniyor."
+                "Preflight passed: the UEFI + Btrfs + GRUB layout is supported."
             )
             self.setup_output.appendPlainText(
-                "Ön kontrol başarılı\n"
-                f"Kök aygıt: {result.get('root_device', '—')}\n"
-                f"Kök alt birimi: {result.get('current_subvolume', '—')}\n"
+                "Preflight passed\n"
+                f"Root device: {result.get('root_device', '—')}\n"
+                f"Root subvolume: {result.get('current_subvolume', '—')}\n"
                 f"Firmware: {result.get('firmware', '—')} / "
-                f"Dosya sistemi: {result.get('filesystem', '—')}"
+                f"Filesystem: {result.get('filesystem', '—')}"
             )
         elif action == "setup-status":
             phase = str(result.get("phase", "unknown"))
             labels = {
-                "ready": (
-                    "Kuruluma hazır. Ön kontrolü çalıştırın, çalışan hesabını girin ve "
-                    "tam kurulumu başlatın."
-                ),
+                "ready": "Ready to install. Run preflight, confirm recovery, and install.",
                 "partial": (
-                    "Yarım kalmış bir kurulum algılandı. Logu koruyun; ön kontrol sonrası "
-                    "aynı bilgilerle kurulumu güvenle yeniden başlatabilirsiniz."
+                    "An interrupted installation was detected. Preserve the log and rerun "
+                    "installation after preflight."
                 ),
-                "provisioned": (
-                    "Altyapı, çalışan hesabı ve Golden hazır. Canlı uygulama testlerinden "
-                    "sonra üçüncü adımı tamamlayın."
+                "installed": (
+                    "CachyFreeze is installed in THAWED mode. User creation is optional; "
+                    "FROZEN can be enabled at any time."
                 ),
-                "complete": ("Kurulum tamamlandı. Sistem sonraki açılış için FROZEN olarak hazır."),
+                "complete": "Setup is complete. The next boot is ready for FROZEN.",
             }
             employee = str(result.get("employee_user", ""))
-            detail = labels.get(phase, "Kurulum durumu belirlenemedi; logları inceleyin.")
+            detail = labels.get(phase, "Setup status is unknown; inspect the logs.")
             if employee:
-                detail += f" Yönetilen kullanıcı: {employee}."
+                detail += f" Managed user: {employee}."
             self.setup_state_label.setText(detail)
         elif action == "snapshot-compare":
             paths = result.get("changed_paths", [])
@@ -1313,32 +1260,32 @@ class MainWindow(QMainWindow):
                 preview += "\n…"
             QMessageBox.information(
                 self,
-                "Snapshot karşılaştırması",
-                f"Değişen yol sayısı: {result.get('changed_path_count', 0)}\n\n{preview}",
+                "Snapshot comparison",
+                f"Changed paths: {result.get('changed_path_count', 0)}\n\n{preview}",
             )
         elif action == "snapshot-verify":
             healthy = bool(result.get("healthy"))
             errors = "\n".join(str(item) for item in result.get("errors", []))
             QMessageBox.information(
                 self,
-                "Snapshot doğrulaması",
-                f"Durum: {'Sağlıklı' if healthy else 'Hatalı'}\n"
+                "Snapshot verification",
+                f"Status: {'Healthy' if healthy else 'Unhealthy'}\n"
                 f"Metadata SHA-256: {result.get('metadata_checksum', '')}\n"
                 f"Btrfs send SHA-256: {result.get('stream_sha256', '')}\n"
-                + (f"\nHatalar:\n{errors}" if errors else ""),
+                + (f"\nErrors:\n{errors}" if errors else ""),
             )
         elif action == "health":
             healthy = bool(result.get("healthy"))
-            self.health_card.value.setText("Hazır" if healthy else "Hata")
+            self.health_card.value.setText("Ready" if healthy else "Error")
             self.health_card.detail.setText(
-                "Btrfs sayaçları ve tüm snapshotlar doğrulandı."
+                "Btrfs counters and all snapshots verified."
                 if healthy
-                else "Sağlıksız snapshot veya Btrfs aygıt hatası bulundu."
+                else "An unhealthy snapshot or Btrfs device error was found."
             )
             QMessageBox.information(
                 self,
-                "Sistem sağlık taraması",
-                "Sağlıklı" if healthy else f"Dikkat gerekli:\n{result}",
+                "System health scan",
+                "Healthy" if healthy else f"Attention required:\n{result}",
             )
         elif action == "updates-check":
             packages = [str(item) for item in result.get("packages", [])]
@@ -1346,17 +1293,17 @@ class MainWindow(QMainWindow):
             if not result.get("enabled", True):
                 reason = result.get("reason")
                 message = (
-                    "Ağ kullanan denetimler ayarlardan kapalı."
+                    "Online checks are disabled in settings."
                     if reason == "network"
-                    else "Güncelleme denetimi ayarlardan kapalı."
+                    else "Update checks are disabled in settings."
                 )
                 self.update_view.setPlainText(message)
             else:
                 self.update_view.setPlainText(
-                    "\n".join(packages) if packages else "Sistem güncel; bekleyen paket bulunmuyor."
+                    "\n".join(packages) if packages else "The system is up to date."
                 )
             self.update_card.value.setText(str(count))
-            self.update_card.detail.setText("bekleyen paket")
+            self.update_card.detail.setText("pending packages")
         elif action in {"applications-status", "applications-install"}:
             applications = result.get("applications", [])
             lines = [
@@ -1375,7 +1322,7 @@ class MainWindow(QMainWindow):
             self.network_checks_check.setChecked(bool(result.get("network_online_checks", True)))
             self.boot_failure_spin.setValue(int(result.get("boot_failure_limit", 3)))
             self.log_retention_spin.setValue(int(result.get("log_retention_lines", 5000)))
-            language = self.language_combo.findData(str(result.get("language", "tr")))
+            language = self.language_combo.findData(str(result.get("language", "en")))
             if language >= 0:
                 self.language_combo.setCurrentIndex(language)
             theme = str(result.get("theme", self.settings.value("theme", "dark")))
@@ -1386,8 +1333,8 @@ class MainWindow(QMainWindow):
         elif action == "user-delete":
             QMessageBox.information(
                 self,
-                "Kullanıcı yedeği oluşturuldu",
-                f"Geri yükleme kimliği: {result.get('backup_id', '')}",
+                "User backup created",
+                f"Restore ID: {result.get('backup_id', '')}",
             )
 
     def _toggle_theme(self) -> None:

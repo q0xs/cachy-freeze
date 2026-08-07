@@ -11,26 +11,24 @@ require_root
 require_maintenance
 
 if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
-  IFS= read -r grub_password || die "GRUB parolasi GUI kanalindan alinamadi."
+  IFS= read -r grub_password || die "GRUB password was not received from the secure GUI channel."
 else
   [[ -r /dev/tty && -w /dev/tty ]] ||
-    die "Kurulumu tamamlamak icin etkilesimli terminal gerekli."
+    die "An interactive terminal is required to enable FROZEN mode."
   cat >/dev/tty <<'EOF'
-Bu son adim sirasiyla:
-  1. GRUB Maintenance parolasini ayarlar.
-  2. Mevcut Maintenance sistemini Golden olarak yayinlar.
-  3. Sonraki acilisi Frozen olarak ayarlar.
-
-Devam etmeden once calisan hesabinda Chrome, Slack, AnyDesk, LibreOffice,
-MicroSIP ve Zoiper uygulamalarini kontrol etmis olmalisiniz.
+This independent step:
+  1. Sets the GRUB maintenance password.
+  2. Refreshes templates for accounts that are currently managed.
+  3. Publishes the current maintenance system as Golden.
+  4. Schedules the next boot as FROZEN.
 EOF
-  read -r -p "Kontroller tamamlandi mi? [e/H]: " confirmed </dev/tty
-  [[ ${confirmed,,} == e ]] || die "Islem iptal edildi; sistem degistirilmedi."
+  read -r -p "Continue? [y/N]: " confirmed </dev/tty
+  [[ ${confirmed,,} == y ]] || die "Operation cancelled; the system was not changed."
 fi
 
 exec > >(tee -a "$LOG") 2>&1
-trap 'rc=$?; printf "HATA: Tamamlama satir %s civarinda durdu (kod: %s). Log: %s\n" "$LINENO" "$rc" "$LOG" >&2' ERR
-printf 'Kurulum tamamlama basladi: %s\n' "$(date --iso-8601=seconds)"
+trap 'rc=$?; printf "ERROR: FROZEN activation stopped near line %s (code: %s). Log: %s\n" "$LINENO" "$rc" "$LOG" >&2' ERR
+printf 'FROZEN activation started: %s\n' "$(date --iso-8601=seconds)"
 
 if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
   printf '%s\n' "$grub_password" |
@@ -45,7 +43,6 @@ bash "$INSTALLER_DIR/publish-golden.sh"
 bash "$INSTALLER_DIR/set-frozen-mode.sh"
 
 printf '%s\n' \
-  "Kurulum guvenli sirayla tamamlandi." \
-  "Sonraki acilis Frozen olacak." \
-  "Hazir oldugunuzda elle yeniden baslatin: sudo reboot" \
-  "USB'yi ilk Frozen testi bitene kadar cikarmayin."
+  "FROZEN activation completed safely." \
+  "The next boot will be FROZEN." \
+  "Reboot from the management app when ready."

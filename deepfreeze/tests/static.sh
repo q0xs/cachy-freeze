@@ -31,7 +31,7 @@ if command -v shellcheck >/dev/null; then
     "$ROOT/grub/01_cachy_auth" \
     "$ROOT/grub/40_cachy_freeze"
 else
-  printf '%s\n' "UYARI: shellcheck kurulu değil; yalnızca bash sözdizimi test edildi."
+  printf '%s\n' "WARNING: ShellCheck is unavailable; only Bash syntax was tested."
 fi
 
 grep -q '^MAINTENANCE_SUBVOL=@$' "$ROOT/etc/cachy-freeze.conf"
@@ -46,7 +46,7 @@ grep -q 'ConditionKernelCommandLine=cachy.freeze=1' \
   "$ROOT/../user/files/cachy-frozen-admin-restrict.service"
 grep -q 'def preflight' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'begin_transaction' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
-grep -Fq '"$BACKEND" publish --description "GUI üzerinden Golden yayınlama" >&2' \
+grep -Fq '"$BACKEND" publish --description "Golden publication from the GUI" >&2' \
   "$PROJECT_ROOT/app/cachy-freeze-manager-helper"
 grep -q 'chpasswd", "--encrypted"' \
   "$PROJECT_ROOT/src/cachy_freeze/users.py"
@@ -61,10 +61,6 @@ for agent_rules in \
   "$PROJECT_ROOT/deepfreeze/AGENTS.md"; do
   [[ -s $agent_rules ]]
 done
-grep -q 'Fiziksel CachyOS ayrıntılı kabul matrisi' \
-  "$PROJECT_ROOT/docs/development-handoff.md"
-grep -q 'Fiziksel, yedekli CachyOS pilot laptop' \
-  "$PROJECT_ROOT/docs/physical-acceptance.md"
 grep -q 'cachy-user-template' \
   "$ROOT/../user/files/cachy-employee-reset"
 grep -q '^ColorScheme=BreezeDark$' \
@@ -91,12 +87,18 @@ if command -v desktop-file-validate >/dev/null; then
     "$PROJECT_ROOT/app/cachy-freeze-manager.desktop" \
     "$PROJECT_ROOT"/user/desktop/*.desktop
 fi
-grep -q 'setup-provision)' \
+grep -q 'setup-install)' \
   "$PROJECT_ROOT/app/cachy-freeze-manager-helper"
+grep -q 'setup-freeze)' \
+  "$PROJECT_ROOT/app/cachy-freeze-manager-helper"
+! sed -n '/setup-freeze)/,/;;/p' \
+  "$PROJECT_ROOT/app/cachy-freeze-manager-helper" | grep -q '/etc/cachy-employee.conf'
 grep -q 'CACHY_SETUP_NONINTERACTIVE' \
   "$PROJECT_ROOT/installer/create-employee-user.sh"
 
-[[ $(find "$PROJECT_ROOT" -maxdepth 1 -type f -name '*.sh' | wc -l) -eq 0 ]]
+[[ -x $PROJECT_ROOT/install.sh ]]
+grep -q 'raw.githubusercontent.com/q0xs/cachy-freeze/main/install.sh' \
+  "$PROJECT_ROOT/install.sh"
 for desktop in "$PROJECT_ROOT"/user/desktop/*.desktop; do
   grep -qx '\[Desktop Entry\]' "$desktop"
   grep -q '^Type=Application$' "$desktop"
@@ -133,8 +135,8 @@ if command -v systemd-analyze >/dev/null; then
       exit 1
     }
     printf '%s\n' \
-      "UYARI: systemd-analyze sandbox izinleri nedeniyle tam çalışmadı."
+      "WARNING: systemd-analyze could not run fully because of sandbox permissions."
   fi
 fi
 
-printf '%s\n' "Statik testler başarılı."
+printf '%s\n' "Static tests passed."

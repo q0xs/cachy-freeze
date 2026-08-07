@@ -46,27 +46,27 @@ class UserManager:
     @staticmethod
     def require_root() -> None:
         if os.geteuid() != 0:
-            raise CachyFreezeError("Kullanıcı yönetimi root yetkisi gerektirir.")
+            raise CachyFreezeError("User management requires root privileges.")
 
     @staticmethod
     def validate_username(username: str) -> str:
         if not _USERNAME_RE.fullmatch(username):
             raise CachyFreezeError(
-                "Kullanıcı adı küçük harf/rakam ile _, - işaretlerinden oluşmalıdır."
+                "Username may contain lowercase letters, digits, underscores, and hyphens."
             )
         return username
 
     @staticmethod
     def validate_password(password: str) -> None:
         if not 4 <= len(password) <= 256:
-            raise CachyFreezeError("Çalışan parolası 4-256 karakter olmalıdır.")
+            raise CachyFreezeError("Password must contain 4-256 characters.")
         if "\n" in password or "\r" in password or "\x00" in password or ":" in password:
-            raise CachyFreezeError("Parola desteklenmeyen bir karakter içeriyor.")
+            raise CachyFreezeError("Password contains an unsupported character.")
 
     @staticmethod
     def _account(username: str) -> pwd.struct_passwd | None:
         if pwd is None:
-            raise CachyFreezeError("Kullanıcı yönetimi yalnızca Linux üzerinde desteklenir.")
+            raise CachyFreezeError("User management is supported only on Linux.")
         try:
             return pwd.getpwnam(username)
         except KeyError:
@@ -85,7 +85,7 @@ class UserManager:
     def list_users(self) -> list[dict[str, Any]]:
         self.require_root()
         if pwd is None:
-            raise CachyFreezeError("Kullanıcı yönetimi yalnızca Linux üzerinde desteklenir.")
+            raise CachyFreezeError("User management is supported only on Linux.")
         autologin = self._autologin_user()
         result: list[dict[str, Any]] = []
         for account in pwd.getpwall():
@@ -119,7 +119,7 @@ class UserManager:
             or len(password_hash) > 4096
             or any(character in password_hash for character in (":", "\n", "\r", "\x00"))
         ):
-            raise CachyFreezeError("Kullanıcı yedeğindeki parola hash'i geçersiz.")
+            raise CachyFreezeError("The password hash in the user backup is invalid.")
         return f"{username}:{password_hash}\n".encode()
 
     def _refresh_template(self, username: str, home: Path) -> None:
@@ -155,7 +155,7 @@ class UserManager:
         self.logger.write(
             "INFO",
             "user.templates",
-            "Yönetilen kullanıcı ev şablonları yenilendi",
+            "Managed user home templates refreshed",
             users=refreshed,
         )
         return refreshed
@@ -165,11 +165,11 @@ class UserManager:
         username = self.validate_username(username)
         display_name = " ".join(display_name.split())
         if not display_name or len(display_name) > 100 or ":" in display_name:
-            raise CachyFreezeError("Görünen ad 1-100 karakter olmalıdır.")
+            raise CachyFreezeError("Display name must contain 1-100 characters.")
         self.validate_password(password)
         with ProcessLock(self.lock_file):
             if self._account(username) is not None:
-                raise CachyFreezeError("Bu kullanıcı zaten var.")
+                raise CachyFreezeError("This user already exists.")
             self.runner.run(
                 [
                     "useradd",
@@ -192,9 +192,7 @@ class UserManager:
                 shutil.rmtree(self.template_root / username, ignore_errors=True)
                 shutil.rmtree(self.template_root / f"{username}.next", ignore_errors=True)
                 raise
-        self.logger.write(
-            "INFO", "user.create", "Standart kullanıcı oluşturuldu", username=username
-        )
+        self.logger.write("INFO", "user.create", "Standard user created", username=username)
         return next(item for item in self.list_users() if item["username"] == username)
 
     def _backup_account(self, account: pwd.struct_passwd) -> str:
@@ -255,11 +253,11 @@ class UserManager:
         self.require_root()
         username = self.validate_username(username)
         if username == "localadm":
-            raise CachyFreezeError("localadm korumalı yönetici hesabıdır ve silinemez.")
+            raise CachyFreezeError("localadm is a protected administrator and cannot be deleted.")
         with ProcessLock(self.lock_file):
             account = self._account(username)
             if account is None:
-                raise CachyFreezeError("Kullanıcı bulunamadı.")
+                raise CachyFreezeError("User not found.")
             backup_id = self._backup_account(account)
             if self._autologin_user() == username:
                 self._write_autologin(None)
@@ -269,7 +267,7 @@ class UserManager:
         self.logger.write(
             "WARNING",
             "user.delete",
-            "Kullanıcı geri yüklenebilir yedekle silindi",
+            "User deleted with a restorable backup",
             username=username,
             backup_id=backup_id,
         )
@@ -278,7 +276,7 @@ class UserManager:
     def restore(self, backup_id: str) -> dict[str, Any]:
         self.require_root()
         if not _BACKUP_ID_RE.fullmatch(backup_id):
-            raise CachyFreezeError("Geçersiz kullanıcı yedek kimliği.")
+            raise CachyFreezeError("Invalid user backup ID.")
         backup_dir = self.state_dir / "user-backups" / backup_id
         try:
             metadata = json.loads((backup_dir / "account.json").read_text(encoding="utf-8"))
@@ -287,10 +285,10 @@ class UserManager:
                 username, str(metadata["password_hash"])
             )
         except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
-            raise CachyFreezeError(f"Kullanıcı yedeği okunamadı: {error}") from error
+            raise CachyFreezeError(f"User backup could not be read: {error}") from error
         with ProcessLock(self.lock_file):
             if self._account(username) is not None:
-                raise CachyFreezeError("Yedekteki kullanıcı adı sistemde zaten var.")
+                raise CachyFreezeError("The user from the backup already exists.")
             group_name = username
             if self.runner.run(["getent", "group", group_name], check=False).returncode != 0:
                 self.runner.run(["groupadd", "--gid", str(int(metadata["gid"])), group_name])
@@ -345,7 +343,7 @@ class UserManager:
         self.logger.write(
             "WARNING",
             "user.restore",
-            "Standart kullanıcı yedekten geri yüklendi",
+            "Standard user restored from backup",
             username=username,
             backup_id=backup_id,
         )
@@ -355,26 +353,24 @@ class UserManager:
         self.require_root()
         username = self.validate_username(username)
         if self._account(username) is None:
-            raise CachyFreezeError("Kullanıcı bulunamadı.")
+            raise CachyFreezeError("User not found.")
         with ProcessLock(self.lock_file):
             self._set_password(username, password)
-        self.logger.write(
-            "WARNING", "user.password", "Kullanıcı parolası sıfırlandı", username=username
-        )
+        self.logger.write("WARNING", "user.password", "User password reset", username=username)
 
     def set_locked(self, username: str, locked: bool) -> None:
         self.require_root()
         username = self.validate_username(username)
         if username == "localadm":
-            raise CachyFreezeError("localadm yönetici hesabı kilitlenemez.")
+            raise CachyFreezeError("The localadm administrator account cannot be locked.")
         if self._account(username) is None:
-            raise CachyFreezeError("Kullanıcı bulunamadı.")
+            raise CachyFreezeError("User not found.")
         with ProcessLock(self.lock_file):
             self.runner.run(["usermod", "--lock" if locked else "--unlock", username])
         self.logger.write(
             "WARNING",
             "user.lock" if locked else "user.unlock",
-            "Kullanıcı hesabı kilitlendi" if locked else "Kullanıcı hesabı açıldı",
+            "User account locked" if locked else "User account unlocked",
             username=username,
         )
 
@@ -394,16 +390,16 @@ class UserManager:
             username = self.validate_username(username)
             account = self._account(username)
             if account is None:
-                raise CachyFreezeError("Kullanıcı bulunamadı.")
+                raise CachyFreezeError("User not found.")
             if username == "localadm":
-                raise CachyFreezeError("Yönetici hesabında otomatik giriş etkinleştirilemez.")
+                raise CachyFreezeError("Automatic login cannot be enabled for an administrator.")
         with ProcessLock(self.lock_file):
             self.autologin_path.parent.mkdir(parents=True, exist_ok=True)
             self._write_autologin(username)
         self.logger.write(
             "WARNING",
             "user.autologin",
-            "Otomatik giriş ayarı değiştirildi",
+            "Automatic login setting changed",
             username=username,
         )
         return {"username": username, "enabled": username is not None, "changed_at": time.time()}

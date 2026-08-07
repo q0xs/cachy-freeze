@@ -47,11 +47,11 @@ def parser() -> argparse.ArgumentParser:
     settings_set.add_argument("--network-online-checks", choices=("true", "false"), required=True)
     settings_set.add_argument("--boot-failure-limit", type=int, required=True)
     settings_set.add_argument("--log-retention-lines", type=int, required=True)
-    settings_set.add_argument("--language", choices=("tr",), required=True)
+    settings_set.add_argument("--language", choices=("en", "tr"), required=True)
     settings_set.add_argument("--theme", choices=("dark", "light"), required=True)
 
     publish = subcommands.add_parser("publish")
-    publish.add_argument("--description", default="Golden yayınlama öncesi otomatik snapshot")
+    publish.add_argument("--description", default="Automatic snapshot before Golden publication")
 
     snapshot = subcommands.add_parser("snapshot")
     snapshot_commands = snapshot.add_subparsers(dest="snapshot_command", required=True)
@@ -169,9 +169,7 @@ def dispatch(engine: FreezeEngine, arguments: argparse.Namespace) -> Any:
         if operation == "list":
             return manager.list_users()
         if engine._root_subvolume() != engine.config.MAINTENANCE_SUBVOL:
-            raise CachyFreezeError(
-                "Kullanıcı değişiklikleri yalnızca THAWED bakım modunda yapılabilir."
-            )
+            raise CachyFreezeError("User changes are allowed only in THAWED maintenance mode.")
         if operation == "create":
             return manager.create(
                 arguments.username,
@@ -219,7 +217,7 @@ def dispatch(engine: FreezeEngine, arguments: argparse.Namespace) -> Any:
 def _password_from_stdin() -> str:
     password = sys.stdin.readline(258)
     if not password.endswith("\n") or len(password) > 257:
-        raise CachyFreezeError("Parola güvenli giriş kanalından alınamadı.")
+        raise CachyFreezeError("Password was not received through the secure input channel.")
     return password[:-1]
 
 
@@ -241,10 +239,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         ):
             engine.write_status_cache(engine.status())
     except CachyFreezeError as error:
-        print(f"HATA: {error}", file=sys.stderr)
+        print(f"ERROR: {error}", file=sys.stderr)
         return 1
     except (OSError, ValueError) as error:
-        print(f"HATA: Beklenmeyen sistem hatası: {error}", file=sys.stderr)
+        print(f"ERROR: Unexpected system error: {error}", file=sys.stderr)
         return 1
     _json({"ok": True, "result": value})
     return 0

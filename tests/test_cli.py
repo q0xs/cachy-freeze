@@ -59,7 +59,7 @@ class CliParserTests(unittest.TestCase):
                 "--log-retention-lines",
                 "5000",
                 "--language",
-                "tr",
+                "en",
                 "--theme",
                 "dark",
             ]
