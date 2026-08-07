@@ -15,9 +15,9 @@ kurallarını uygular.
   beklenen executable kontrollerini zayıflatma.
 - Kullanılan mutlak hedefleri doğrula. Geniş veya hesaplanmış bir dizine
   doğrulamadan recursive silme/taşıma uygulama.
-- Çalışan hesabını her oluşturma/geri yükleme yolunda `wheel` ve `sudo`
-  gruplarından çıkar; `localadm` hesabının etkin parolasını ve wheel üyeliğini
-  doğrula.
+- Kullanıcı oluşturma ve geri yükleme akışında grup/yönetici yetkilerini
+  dayatma, ekleme veya kaldırma. CachyOS hesap varsayımlarını ve yedekteki özgün
+  grup üyeliklerini koru; `localadm` hesabının etkin parolasını doğrula.
 - Paket/boot yazımı sırasında yeniden başlatma veya güç kesme önerme. GUI'nin
   işlem tamamlandıktan sonraki reboot akışını kullan.
 - Değişiklikte Bash syntax, ShellCheck, statik test, GUI provisioning testi ve

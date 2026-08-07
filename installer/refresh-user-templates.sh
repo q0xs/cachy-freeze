@@ -31,7 +31,7 @@ id "$EMPLOYEE_USER" >/dev/null 2>&1 ||
 id "$ADMIN_USER" >/dev/null 2>&1 ||
   die "Yonetici hesabi bulunamadi: $ADMIN_USER"
 
-# Eski kurulumlari yeni iki-kullanici reset ve yetkilendirme duzenine tasir.
+# Eski kurulumlari iki-kullanici reset duzenine tasir.
 install -m 0755 \
   "$PROJECT_ROOT/user/files/cachy-employee-reset" \
   /usr/local/sbin/cachy-employee-reset
@@ -44,13 +44,6 @@ install -m 0755 \
 install -m 0644 \
   "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict.service" \
   /etc/systemd/system/cachy-frozen-admin-restrict.service
-
-install -d -m 0755 /etc/polkit-1/rules.d
-sed "s/__EMPLOYEE_USER__/$EMPLOYEE_USER/g" \
-  "$PROJECT_ROOT/user/files/49-company-employee-auth.rules" \
-  >/etc/polkit-1/rules.d/49-company-employee-auth.rules
-chown root:root /etc/polkit-1/rules.d/49-company-employee-auth.rules
-chmod 0644 /etc/polkit-1/rules.d/49-company-employee-auth.rules
 
 # Eski Frozen servisinin nologin degisikligi Golden'a tasinmasin.
 usermod --shell /bin/bash "$ADMIN_USER"

@@ -96,7 +96,14 @@ class UserValidationTests(unittest.TestCase):
                 chpasswd_calls[0][1].get("input_data"),
                 f"person_01:{password_hash}\n".encode(),
             )
-            self.assertIn(["usermod", "-aG", "audio", "person_01"], [c[0] for c in runner.calls])
+            self.assertIn(
+                ["usermod", "-aG", "wheel,sudo,audio", "person_01"],
+                [c[0] for c in runner.calls],
+            )
+
+    def test_create_does_not_modify_group_membership(self) -> None:
+        source = (Path(__file__).parents[1] / "src/cachy_freeze/users.py").read_text()
+        self.assertNotIn('["gpasswd", "-d", username', source)
 
 
 if __name__ == "__main__":

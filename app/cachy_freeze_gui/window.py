@@ -341,8 +341,8 @@ class MainWindow(QMainWindow):
         buttons.addWidget(self.user_refresh_button)
         layout.addLayout(buttons)
         note = QLabel(
-            "localadm korumalı yönetici hesabıdır. Yeni hesaplar wheel/sudo gruplarına "
-            "eklenmeyen standart kullanıcılar olarak oluşturulur."
+            "Kullanıcılar CachyOS'un standart hesap varsayılanlarıyla oluşturulur. "
+            "CachyFreeze grup veya yönetici yetkilerini değiştirmez."
         )
         note.setObjectName("muted")
         note.setWordWrap(True)

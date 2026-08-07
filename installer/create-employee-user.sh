@@ -15,9 +15,6 @@ id -nG "$ADMIN_USER" | grep -Eq '(^| )wheel( |$)' ||
   die "$ADMIN_USER wheel grubunda degil; yonetici hesabi dogrulanamadi."
 [[ $(passwd -S "$ADMIN_USER" | awk '{print $2}') == P ]] ||
   die "$ADMIN_USER icin etkin bir parola ayarlanmamis."
-if getent group nopasswdlogin >/dev/null; then
-  gpasswd -d "$ADMIN_USER" nopasswdlogin 2>/dev/null || true
-fi
 
 if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
   IFS= read -r employee_user || die "Kullanici adi GUI kanalindan alinamadi."
@@ -38,11 +35,9 @@ employee_user=${employee_user,,}
 [[ $employee_user != "$ADMIN_USER" ]] ||
   die "Calisan ve yonetici adi ayni olamaz."
 if id "$employee_user" >/dev/null 2>&1; then
-  configured_employee=$(
-    sed -n 's/^EMPLOYEE_USER=//p' /etc/cachy-employee.conf 2>/dev/null || true
-  )
-  [[ $configured_employee == "$employee_user" ]] ||
-    die "Bu kullanici zaten var ve yonetilen calisan hesabi degil: $employee_user"
+  employee_uid=$(id -u "$employee_user")
+  (( employee_uid >= 1000 && employee_uid < 65534 )) ||
+    die "Mevcut hesap standart yerel kullanici degil: $employee_user"
 fi
 
 if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} != 1 ]]; then
@@ -93,16 +88,6 @@ else
 fi
 printf '%s:%s\n' "$employee_user" "$employee_password" | chpasswd
 unset employee_password employee_password_again
-
-gpasswd -d "$employee_user" wheel 2>/dev/null || true
-gpasswd -d "$employee_user" sudo 2>/dev/null || true
-employee_groups=()
-for group in audio video input realtime; do
-  getent group "$group" >/dev/null && employee_groups+=("$group")
-done
-((${#employee_groups[@]} > 0)) &&
-  usermod --append --groups \
-    "$(IFS=,; printf '%s' "${employee_groups[*]}")" "$employee_user"
 
 home=$(getent passwd "$employee_user" | cut -d: -f6)
 install -d -o "$employee_user" -g "$employee_user" -m 0755 \
@@ -215,15 +200,6 @@ install -m 0644 \
   "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict.service" \
   /etc/systemd/system/cachy-frozen-admin-restrict.service
 
-# Calisan wheel/sudo grubunda kalmaz. Masaustundeki ayricalikli islemler
-# "yetkisiz" diye kapanmak yerine yerel yonetici parolasini ister.
-install -d -m 0755 /etc/polkit-1/rules.d
-sed "s/__EMPLOYEE_USER__/$employee_user/g" \
-  "$PROJECT_ROOT/user/files/49-company-employee-auth.rules" \
-  >/etc/polkit-1/rules.d/49-company-employee-auth.rules
-chown root:root /etc/polkit-1/rules.d/49-company-employee-auth.rules
-chmod 0644 /etc/polkit-1/rules.d/49-company-employee-auth.rules
-
 cat >/etc/cachy-employee.conf <<EOF
 EMPLOYEE_USER=$employee_user
 EOF
@@ -251,13 +227,9 @@ systemctl is-enabled --quiet cachy-employee-reset.service ||
 systemctl is-enabled --quiet cachy-frozen-admin-restrict.service ||
   die "Frozen yonetici kisitlama servisi etkinlestirilemedi."
 
-if id -nG "$employee_user" | grep -Eq '(^| )(wheel|sudo)( |$)'; then
-  die "Calisan ayricalikli gruptan cikarilamadi."
-fi
-
 printf '%s\n' \
   "Calisan hesabi hazir: $employee_user ($employee_full_name)" \
   "$ADMIN_USER Frozen grafik giris ekraninda gizlenecek." \
   "Frozen modda tum yonetilen hesaplar temiz sablonlarina doner." \
-  "Ayricalikli masaustu islemleri $ADMIN_USER parolasini sorar." \
+  "Hesabin CachyOS tarafindan belirlenen grup ve yetkileri degistirilmedi." \
   "Parola kurulum sirasinda sizin girdiginiz parola olarak ayarlandi."

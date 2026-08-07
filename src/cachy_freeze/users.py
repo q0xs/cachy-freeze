@@ -184,8 +184,6 @@ class UserManager:
             )
             try:
                 self._set_password(username, password)
-                self.runner.run(["gpasswd", "-d", username, "wheel"], check=False)
-                self.runner.run(["gpasswd", "-d", username, "sudo"], check=False)
                 account = self._account(username)
                 assert account is not None
                 self._refresh_template(username, Path(account.pw_dir))
@@ -336,8 +334,7 @@ class UserManager:
                 safe_groups = [
                     group
                     for group in metadata.get("groups", [])
-                    if group not in {group_name, "wheel", "sudo"}
-                    and re.fullmatch(r"[a-z_][a-z0-9_-]{0,30}", str(group))
+                    if group != group_name and re.fullmatch(r"[a-z_][a-z0-9_-]{0,30}", str(group))
                 ]
                 if safe_groups:
                     self.runner.run(["usermod", "-aG", ",".join(safe_groups), username])

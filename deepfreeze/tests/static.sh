@@ -46,20 +46,6 @@ grep -q 'ConditionKernelCommandLine=cachy.freeze=1' \
   "$ROOT/../user/files/cachy-frozen-admin-restrict.service"
 grep -q 'def preflight' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'begin_transaction' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
-grep -q 'AUTH_ADMIN_KEEP' \
-  "$ROOT/../user/files/49-company-employee-auth.rules"
-grep -q 'org.kde.kameleon.qmk.helper.HasDevices' \
-  "$ROOT/../user/files/49-company-employee-auth.rules"
-grep -q 'org.kde.kameleon.qmk.helper.ApplyColor' \
-  "$ROOT/../user/files/49-company-employee-auth.rules"
-grep -q 'org.kde.powerdevil.discretegpuhelper.hasdualgpu' \
-  "$ROOT/../user/files/49-company-employee-auth.rules"
-grep -q 'org.freedesktop.NetworkManager.network-control' \
-  "$ROOT/../user/files/49-company-employee-auth.rules"
-grep -q 'org.kde.powerdevil.chargethresholdhelper.getconservationmode' \
-  "$ROOT/../user/files/49-company-employee-auth.rules"
-grep -q 'org.kde.powerdevil.chargethresholdhelper.getthreshold' \
-  "$ROOT/../user/files/49-company-employee-auth.rules"
 grep -q 'chpasswd", "--encrypted"' \
   "$PROJECT_ROOT/src/cachy_freeze/users.py"
 ! grep -q '"--password"' \
@@ -87,7 +73,7 @@ grep -q '^name=breeze-dark$' \
   "$PROJECT_ROOT/user/files/plasmarc"
 ! grep -q 'Action Restrictions' \
   "$PROJECT_ROOT/user/files/kdeglobals"
-grep -q 'gpasswd -d "$employee_user" wheel' \
+! grep -Eq 'gpasswd|usermod --append --groups' \
   "$PROJECT_ROOT/installer/create-employee-user.sh"
 grep -q 'auth_admin_keep' \
   "$PROJECT_ROOT/app/org.cachyos.cachy-freeze.policy"
@@ -102,10 +88,6 @@ if command -v desktop-file-validate >/dev/null; then
     "$PROJECT_ROOT/cachyfreeze-setup.desktop" \
     "$PROJECT_ROOT/app/cachy-freeze-manager.desktop" \
     "$PROJECT_ROOT"/user/desktop/*.desktop
-fi
-if command -v node >/dev/null; then
-  node "$ROOT/tests/polkit-rules.js" \
-    "$PROJECT_ROOT/user/files/49-company-employee-auth.rules"
 fi
 grep -q 'setup-provision)' \
   "$PROJECT_ROOT/app/cachy-freeze-manager-helper"

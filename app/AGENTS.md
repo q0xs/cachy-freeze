@@ -10,9 +10,9 @@ kurallarını uygular.
   hata veya iptal durumunda bekleyen gizli veriyi bellek referansından temizle.
 - Helper girdilerini regex, argüman sayısı ve sabit değerlerle doğrula. Yol,
   snapshot kimliği, kullanıcı adı veya dosya adında traversal kabul etme.
-- `49-company-employee-auth.rules` içindeki Plasma giriş istisnaları yalnız tam
-  eylem kimliği, aktif yerel oturum ve yönetilen kullanıcıyla sınırlıdır.
-  Wildcard/önek izni veya genel `polkit.Result.YES` ekleme.
+- Kullanıcı oluşturma ve yönetme akışında CachyOS'un grup veya PolicyKit
+  yetkilerini değiştirme; uygulamanın kendi root işlemleri yalnız dar helper
+  allow-list'i üzerinden yürüsün.
 - QMK/VIA, ayrık GPU, NetworkManager ve pil okuma giriş eylemleri gereksiz
   yönetici penceresi göstermemeli; listede olmayan genel işlem `localadm`
   doğrulaması istemeye devam etmelidir.
