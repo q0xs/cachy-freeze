@@ -78,21 +78,37 @@ class MetricCard(QFrame):
 class UserDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Create standard user")
+        self.setWindowTitle("Create application-ready user")
+        self.setMinimumWidth(480)
         layout = QFormLayout(self)
+        intro = QLabel(
+            "Creates a standard, non-administrator account and prepares its desktop, "
+            "KDE settings, application shortcuts, and verified MicroSIP profile."
+        )
+        intro.setObjectName("muted")
+        intro.setWordWrap(True)
+        layout.addRow(intro)
         self.username = QLineEdit()
-        self.username.setPlaceholderText("ornek.kullanici")
+        self.username.setPlaceholderText("wrw21166")
+        self.username.setToolTip(
+            "Lowercase letters, digits, underscores, and hyphens; must start with a letter."
+        )
         self.display_name = QLineEdit()
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_confirm = QLineEdit()
         self.password_confirm.setEchoMode(QLineEdit.EchoMode.Password)
         self.autologin = QCheckBox("Sign in automatically as this user")
+        self.freeze_after_create = QCheckBox(
+            "Publish Golden and schedule FROZEN mode after creation"
+        )
+        self.freeze_after_create.setChecked(True)
         layout.addRow("Username", self.username)
         layout.addRow("Display name", self.display_name)
         layout.addRow("Password", self.password)
         layout.addRow("Confirm password", self.password_confirm)
         layout.addRow("", self.autologin)
+        layout.addRow("", self.freeze_after_create)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -107,6 +123,7 @@ class MainWindow(QMainWindow):
         self.backend = backend
         self.settings = QSettings("CachyOS Workstation", "CachyFreeze")
         self.setup_preflight_ok = False
+        self.pending_user_freeze = False
         self.setWindowTitle("CachyFreeze Management Center")
         self.setMinimumSize(980, 640)
         self.resize(1180, 740)
@@ -123,12 +140,15 @@ class MainWindow(QMainWindow):
 
         sidebar = QWidget()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(220)
+        sidebar.setFixedWidth(232)
         side_layout = QVBoxLayout(sidebar)
         side_layout.setContentsMargins(16, 22, 16, 18)
-        brand = QLabel("CachyFreeze")
+        brand = QLabel("❄  CachyFreeze")
         brand.setObjectName("brand")
         side_layout.addWidget(brand)
+        product_note = QLabel("WORKSTATION CONTROL")
+        product_note.setObjectName("sidebarCaption")
+        side_layout.addWidget(product_note)
         self.nav_buttons: list[QPushButton] = []
         self.page_titles = (
             "Overview",
@@ -139,8 +159,9 @@ class MainWindow(QMainWindow):
             "Settings",
             "Setup",
         )
-        for title in self.page_titles:
-            button = QPushButton(title)
+        nav_icons = ("⌂", "◇", "♙", "↻", "≡", "⚙", "✦")
+        for title, icon in zip(self.page_titles, nav_icons, strict=True):
+            button = QPushButton(f"{icon}   {title}")
             button.setObjectName("nav")
             button.setCheckable(True)
             button.setAutoExclusive(True)
@@ -159,10 +180,8 @@ class MainWindow(QMainWindow):
         self.page_title = QLabel("Overview")
         self.page_title.setObjectName("pageTitle")
         self.mode_badge = QLabel("LOADING STATUS")
-        self.mode_badge.setStyleSheet(
-            "padding: 7px 12px; border-radius: 10px; background: #273445; font-weight: 700;"
-        )
-        self.refresh_button = QPushButton("Yetkili Yenile")
+        self.mode_badge.setObjectName("modeBadge")
+        self.refresh_button = QPushButton("Refresh status")
         header.addWidget(self.page_title)
         header.addStretch()
         header.addWidget(self.mode_badge)
@@ -293,10 +312,10 @@ class MainWindow(QMainWindow):
         self.snapshot_table = QTableWidget(0, 9)
         self.snapshot_table.setHorizontalHeaderLabels(
             [
-                "Tarih",
+                "Created",
                 "Description",
                 "Created by",
-                "Boyut",
+                "Size",
                 "Kernel",
                 "Health",
                 "Rollback",
@@ -318,7 +337,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 4, 0, 0)
         buttons = QHBoxLayout()
-        self.user_create_button = QPushButton("Create user")
+        self.user_create_button = QPushButton("Create ready user")
         self.user_create_button.setObjectName("primary")
         self.user_password_button = QPushButton("Reset password")
         self.user_lock_button = QPushButton("Lock / Unlock")
@@ -326,7 +345,7 @@ class MainWindow(QMainWindow):
         self.user_delete_button = QPushButton("Delete")
         self.user_delete_button.setObjectName("danger")
         self.user_restore_button = QPushButton("Restore backup")
-        self.user_refresh_button = QPushButton("Yenile")
+        self.user_refresh_button = QPushButton("Refresh")
         for button in (
             self.user_create_button,
             self.user_password_button,
@@ -340,8 +359,9 @@ class MainWindow(QMainWindow):
         buttons.addWidget(self.user_refresh_button)
         layout.addLayout(buttons)
         note = QLabel(
-            "Users are created with CachyOS account defaults. CachyFreeze does not "
-            "change group membership or administrator rights."
+            "New accounts use CachyOS defaults and remain standard users. Their group "
+            "membership is never rewritten. Verified applications and a clean FROZEN "
+            "home template are prepared before creation is reported as complete."
         )
         note.setObjectName("muted")
         note.setWordWrap(True)
@@ -409,12 +429,12 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 4, 0, 0)
         grid = QGridLayout()
 
-        snapshot_group = QGroupBox("Snapshot ve Freeze")
+        snapshot_group = QGroupBox("Snapshots and FROZEN mode")
         snapshot_form = QFormLayout(snapshot_group)
         self.retention_spin = self._setting_spin(1, 1000)
-        self.auto_snapshot_check = QCheckBox("Etkin")
-        self.auto_interval_spin = self._setting_spin(15, 10080, " dk")
-        self.boot_failure_spin = self._setting_spin(2, 10, " deneme")
+        self.auto_snapshot_check = QCheckBox("Enabled")
+        self.auto_interval_spin = self._setting_spin(15, 10080, " min")
+        self.boot_failure_spin = self._setting_spin(2, 10, " attempts")
         snapshot_form.addRow("Retention count", self.retention_spin)
         snapshot_form.addRow("Automatic snapshot", self.auto_snapshot_check)
         snapshot_form.addRow("Automatic interval", self.auto_interval_spin)
@@ -422,12 +442,12 @@ class MainWindow(QMainWindow):
 
         system_group = QGroupBox("Updates, network, and logs")
         system_form = QFormLayout(system_group)
-        self.update_checks_check = QCheckBox("Etkin")
+        self.update_checks_check = QCheckBox("Enabled")
         self.network_checks_check = QCheckBox("Allow online operations")
         self.log_retention_spin = self._setting_spin(100, 100000, " lines")
         system_form.addRow("Update checks", self.update_checks_check)
         system_form.addRow("Network", self.network_checks_check)
-        system_form.addRow("Log saklama", self.log_retention_spin)
+        system_form.addRow("Log retention", self.log_retention_spin)
 
         appearance_group = QGroupBox("Appearance and language")
         appearance_form = QFormLayout(appearance_group)
@@ -442,7 +462,7 @@ class MainWindow(QMainWindow):
         boot_group = QGroupBox("Next boot")
         boot_layout = QVBoxLayout(boot_group)
         self.thaw_once_button = QPushButton("Boot THAWED once")
-        self.boot_frozen_button = QPushButton("Her zaman FROZEN")
+        self.boot_frozen_button = QPushButton("Always use FROZEN")
         self.boot_thawed_button = QPushButton("THAWED maintenance mode")
         boot_layout.addWidget(self.thaw_once_button)
         boot_layout.addWidget(self.boot_frozen_button)
@@ -671,9 +691,9 @@ class MainWindow(QMainWindow):
     def _status_changed(self, status: dict[str, Any]) -> None:
         mode = str(status.get("running_mode", "unknown"))
         mode_labels = {
-            "frozen": ("FROZEN", "#2b79c2"),
-            "thawed": ("THAWED — BAKIM", "#b76b18"),
-            "unknown": ("ALGILANAMADI", "#a63d49"),
+            "frozen": ("FROZEN", "#5865f2"),
+            "thawed": ("THAWED — MAINTENANCE", "#b76e18"),
+            "unknown": ("UNKNOWN", "#da373c"),
         }
         label, color = mode_labels.get(mode, mode_labels["unknown"])
         self.mode_badge.setText(label)
@@ -794,7 +814,34 @@ class MainWindow(QMainWindow):
         if not username or not display_name or not password:
             QMessageBox.warning(self, "Missing information", "All user fields are required.")
             return
+        if re.fullmatch(r"[a-z][a-z0-9_-]{1,30}", username) is None:
+            QMessageBox.warning(
+                self,
+                "Invalid username",
+                "Use 2-31 lowercase letters, digits, underscores, or hyphens. "
+                "The first character must be a letter.",
+            )
+            return
+        if not self._employee_password_is_valid(password):
+            QMessageBox.warning(
+                self,
+                "Invalid password",
+                "The password must contain 4-256 characters and cannot contain a colon.",
+            )
+            return
+        freeze_after_create = dialog.freeze_after_create.isChecked()
+        summary = f"Create the standard user '{username}' and prepare all verified applications?"
+        if freeze_after_create:
+            summary += "\n\nGolden will then be published and the next boot scheduled as FROZEN."
+        if (
+            QMessageBox.question(self, "Create application-ready user", summary)
+            != QMessageBox.StandardButton.Yes
+        ):
+            return
+        self.pending_user_freeze = freeze_after_create
         started = self.backend.run("user-create", username, display_name, secret=password)
+        if not started:
+            self.pending_user_freeze = False
         if started and dialog.autologin.isChecked():
             self.settings.setValue("pending_autologin", username)
 
@@ -889,10 +936,10 @@ class MainWindow(QMainWindow):
         if snapshot is None:
             return
         fields = (
-            ("Kimlik", "snapshot_id"),
+            ("Identity", "snapshot_id"),
             ("Btrfs UUID", "btrfs_uuid"),
             ("Parent UUID", "parent_uuid"),
-            ("Tarih", "created_at"),
+            ("Created", "created_at"),
             ("Kernel", "kernel"),
             ("Apparent size", "apparent_size_bytes"),
             ("Exclusive size", "exclusive_size_bytes"),
@@ -1175,6 +1222,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(message, 8000)
         if action == "user-create" and not success:
             self.settings.remove("pending_autologin")
+            self.pending_user_freeze = False
         if not success and "iptal edildi" not in message.lower():
             QMessageBox.critical(self, "CachyFreeze Error", message)
         elif success and action == "setup-freeze":
@@ -1216,6 +1264,14 @@ class MainWindow(QMainWindow):
             if pending:
                 self.backend.run("user-autologin", pending)
                 return
+            if self.pending_user_freeze:
+                self.pending_user_freeze = False
+                self.backend.run("freeze")
+                return
+        if success and action == "user-autologin" and self.pending_user_freeze:
+            self.pending_user_freeze = False
+            self.backend.run("freeze")
+            return
         if success and action.startswith("user-") and action != "user-list":
             self.backend.run("user-list")
 

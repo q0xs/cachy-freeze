@@ -4,6 +4,20 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-15 — ready-user and UI update — local working tree after `3466a8e`
+
+- PASS — 42/42 Python unit and GUI contract tests.
+- PASS — Bash syntax, desktop/XML/JSON/static contract gate; ShellCheck was not
+  installed, so the gate reported its documented syntax-only fallback.
+- PASS — Qt offscreen seven-page smoke test with the refreshed English UI.
+- PASS — isolated GRUB generation and syntax test; no installed GRUB file was changed.
+- PASS — Python bytecode compilation and `git diff --check`.
+- NOT RUN — Ruff; Ruff is not installed on the target.
+- NOT RUN — privileged temporary-user integration, application installation,
+  Golden publication, GRUB/initramfs writes, and reboot. The target has no
+  non-interactive privileged channel, and boot-stack mutation was outside this
+  non-reboot test pass.
+
 ## 2026-08-07 — physical CachyOS pilot — commit `845a7eb`
 
 Historical baseline before the independent-workflow update:

@@ -22,6 +22,13 @@ Engine installation, user management, and FROZEN activation are deliberately
 independent. Templates are refreshed for `localadm` and for any optional managed
 users that exist; the absence of a managed user never blocks Golden publication.
 
+GUI-created users follow the native `useradd` standard-account path. CachyFreeze
+does not rewrite their group membership. Before the account is committed, a
+verified provisioner checks the managed application set, installs desktop and KDE
+defaults, creates the per-user MicroSIP Wine prefix, rejects unexpected
+administrator membership, and only then captures the FROZEN home template.
+Provisioning failure removes the partial account and candidate template.
+
 Golden/Active replacement uses staged subvolumes and a durable transaction
 journal. Early boot can roll forward interrupted publication. Boot-health resets
 the failure counter after graphical startup; repeated failures can restore the

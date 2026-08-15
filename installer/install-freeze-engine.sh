@@ -110,6 +110,20 @@ install -m 0755 \
 install -m 0644 \
   "$PROJECT_ROOT/user/files/cachy-employee-reset.service" \
   /usr/lib/systemd/system/cachy-employee-reset.service
+install -m 0755 \
+  "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict" \
+  /usr/local/sbin/cachy-frozen-admin-restrict
+install -m 0644 \
+  "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict.service" \
+  /usr/lib/systemd/system/cachy-frozen-admin-restrict.service
+install -m 0755 \
+  "$PROJECT_ROOT/user/files/company-microsip" \
+  /usr/local/bin/company-microsip
+install -m 0755 \
+  "$PROJECT_ROOT/user/files/cachyfreeze-finish-session" \
+  /usr/local/bin/cachyfreeze-finish-session
+printf '%s\n' 'ADMIN_USER=localadm' >/etc/cachy-frozen-admin.conf
+chmod 0600 /etc/cachy-frozen-admin.conf
 install -d -m 0700 /var/lib/cachy-user-template
 install -m 0644 "$DF_ROOT/initcpio/install-hook" /etc/initcpio/install/cachy-freeze
 install -m 0755 "$DF_ROOT/grub/40_cachy_freeze" /etc/grub.d/40_cachy_freeze
@@ -179,6 +193,7 @@ systemctl enable --now "$state_unit"
 systemctl enable cachy-freeze-boot-health.service
 systemctl enable --now cachy-freeze-auto-snapshot.timer
 systemctl enable cachy-employee-reset.service
+systemctl enable cachy-frozen-admin-restrict.service
 mountpoint -q "$state_mount" || die "The persistent CachyFreeze state could not be mounted."
 systemctl is-enabled --quiet cachy-freeze-boot-health.service ||
   die "The boot-health service could not be enabled."
@@ -186,6 +201,8 @@ systemctl is-enabled --quiet cachy-freeze-auto-snapshot.timer ||
   die "The automatic snapshot timer could not be enabled."
 systemctl is-enabled --quiet cachy-employee-reset.service ||
   die "The managed-user reset service could not be enabled."
+systemctl is-enabled --quiet cachy-frozen-admin-restrict.service ||
+  die "The FROZEN administrator restriction service could not be enabled."
 
 if ! grep -Eq '^HOOKS=.*\bcachy-freeze\b' /etc/mkinitcpio.conf; then
   sed -i -E \

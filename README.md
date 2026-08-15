@@ -45,6 +45,14 @@ user creation, and FROZEN activation are independent:
 
 No user account is required to enable FROZEN mode.
 
+Application-ready standard users are created from the Users page while the
+machine is in THAWED maintenance mode. Install or repair the managed application
+set from Updates first. User creation then verifies the application commands,
+prepares the KDE desktop and isolated MicroSIP Wine profile, confirms that the
+account has no administrator membership, and captures its clean home template.
+The creation dialog can publish Golden and schedule FROZEN immediately afterward;
+reboot remains a separate, explicit action.
+
 ## Requirements
 
 - CachyOS with KDE Plasma

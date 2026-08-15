@@ -249,7 +249,9 @@ case ${1:-} in
     exec "$BACKEND" user list
     ;;
   user-create)
-    [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ && -n ${3:-} ]] || exit 2
+    [[ ${2:-} =~ ^[a-z][a-z0-9_-]{1,30}$ ]] ||
+      die "Username must contain 2-31 lowercase letters, digits, underscores, or hyphens."
+    [[ -n ${3:-} ]] || die "A display name is required."
     exec "$BACKEND" user create "$2" --display-name "$3"
     ;;
   user-delete)

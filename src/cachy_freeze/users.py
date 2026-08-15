@@ -22,6 +22,7 @@ except ImportError:  # pragma: no cover - Windows test host
     pwd = None  # type: ignore[assignment]
 
 _USERNAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,30}$")
+_NEW_USERNAME_RE = re.compile(r"^[a-z][a-z0-9_-]{1,30}$")
 _BACKUP_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-[a-z_][a-z0-9_-]{0,30}$")
 
 
@@ -35,6 +36,9 @@ class UserManager:
         runner: CommandRunner | None = None,
         autologin_path: Path = Path("/etc/sddm.conf.d/cachy-autologin.conf"),
         template_root: Path = Path("/var/lib/cachy-user-template"),
+        provisioner_path: Path = Path(
+            "/usr/lib/cachy-freeze/deployment/installer/prepare-standard-user.sh"
+        ),
     ) -> None:
         self.state_dir = state_dir
         self.lock_file = lock_file
@@ -42,6 +46,7 @@ class UserManager:
         self.runner = runner or CommandRunner()
         self.autologin_path = autologin_path
         self.template_root = template_root
+        self.provisioner_path = provisioner_path
 
     @staticmethod
     def require_root() -> None:
@@ -163,6 +168,11 @@ class UserManager:
     def create(self, username: str, display_name: str, password: str) -> dict[str, Any]:
         self.require_root()
         username = self.validate_username(username)
+        if not _NEW_USERNAME_RE.fullmatch(username):
+            raise CachyFreezeError(
+                "A new username must contain 2-31 lowercase letters, digits, underscores, "
+                "or hyphens and start with a letter."
+            )
         display_name = " ".join(display_name.split())
         if not display_name or len(display_name) > 100 or ":" in display_name:
             raise CachyFreezeError("Display name must contain 1-100 characters.")
@@ -186,13 +196,21 @@ class UserManager:
                 self._set_password(username, password)
                 account = self._account(username)
                 assert account is not None
+                if not self.provisioner_path.is_file():
+                    raise CachyFreezeError("The verified standard-user provisioner was not found.")
+                self.runner.run(["bash", str(self.provisioner_path), username])
                 self._refresh_template(username, Path(account.pw_dir))
             except Exception:
                 self.runner.run(["userdel", "--remove", username], check=False)
                 shutil.rmtree(self.template_root / username, ignore_errors=True)
                 shutil.rmtree(self.template_root / f"{username}.next", ignore_errors=True)
                 raise
-        self.logger.write("INFO", "user.create", "Standard user created", username=username)
+        self.logger.write(
+            "INFO",
+            "user.create",
+            "Standard user created with verified applications",
+            username=username,
+        )
         return next(item for item in self.list_users() if item["username"] == username)
 
     def _backup_account(self, account: pwd.struct_passwd) -> str:

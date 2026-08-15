@@ -95,6 +95,19 @@ grep -q 'setup-freeze)' \
   "$PROJECT_ROOT/app/cachy-freeze-manager-helper" | grep -q '/etc/cachy-employee.conf'
 grep -q 'CACHY_SETUP_NONINTERACTIVE' \
   "$PROJECT_ROOT/installer/create-employee-user.sh"
+grep -q 'prepare-standard-user.sh' \
+  "$PROJECT_ROOT/src/cachy_freeze/users.py"
+grep -q 'cachyfreeze-finish-session' \
+  "$PROJECT_ROOT/installer/create-employee-user.sh"
+! grep -q 'cachy-kurulum-oturum-kapat' \
+  "$PROJECT_ROOT/installer/create-employee-user.sh"
+for required_user_asset in \
+  "$PROJECT_ROOT/user/files/company-microsip" \
+  "$PROJECT_ROOT/user/files/cachyfreeze-finish-session" \
+  "$PROJECT_ROOT/installer/prepare-standard-user.sh" \
+  "$PROJECT_ROOT/installer/deploy-live-app.sh"; do
+  [[ -x $required_user_asset ]]
+done
 
 [[ -x $PROJECT_ROOT/install.sh ]]
 grep -q 'raw.githubusercontent.com/q0xs/cachy-freeze/main/install.sh' \

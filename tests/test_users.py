@@ -25,6 +25,22 @@ class UserValidationTests(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(CachyFreezeError):
                 UserManager.validate_password(invalid)
 
+    def test_new_account_requires_normal_login_name(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manager = UserManager(
+                state_dir=root / "state",
+                lock_file=root / "operation.lock",
+                logger=AuditLogger(root / "audit.jsonl"),
+            )
+            for invalid in ("a", "_service"):
+                with (
+                    self.subTest(invalid=invalid),
+                    patch.object(manager, "require_root"),
+                    self.assertRaises(CachyFreezeError),
+                ):
+                    manager.create(invalid, "Invalid User", "1234")
+
     def test_encrypted_password_hash_uses_stdin_safe_payload(self) -> None:
         password_hash = "$y$j9T$example-salt$example-hash"
         self.assertEqual(
@@ -104,6 +120,69 @@ class UserValidationTests(unittest.TestCase):
     def test_create_does_not_modify_group_membership(self) -> None:
         source = (Path(__file__).parents[1] / "src/cachy_freeze/users.py").read_text()
         self.assertNotIn('["gpasswd", "-d", username', source)
+
+    def test_create_runs_verified_provisioner_before_capturing_template(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / "home" / "person_01"
+            home.mkdir(parents=True)
+            provisioner = root / "prepare-standard-user.sh"
+            provisioner.touch()
+            account = SimpleNamespace(pw_dir=str(home))
+            manager = UserManager(
+                state_dir=root / "state",
+                lock_file=root / "operation.lock",
+                logger=AuditLogger(root / "audit.jsonl"),
+                template_root=root / "templates",
+                provisioner_path=provisioner,
+            )
+            created_user = {"username": "person_01", "administrator": False}
+            with (
+                patch.object(manager, "require_root"),
+                patch.object(manager, "_account", side_effect=[None, account]),
+                patch.object(manager, "_set_password"),
+                patch.object(manager, "_refresh_template") as refresh_template,
+                patch.object(manager, "list_users", return_value=[created_user]),
+                patch.object(manager.runner, "run") as run,
+            ):
+                self.assertEqual(
+                    manager.create("person_01", "Person One", "1234"), created_user
+                )
+
+            self.assertEqual(run.call_args_list[0].args[0][0], "useradd")
+            self.assertEqual(
+                run.call_args_list[1].args[0],
+                ["bash", str(provisioner), "person_01"],
+            )
+            refresh_template.assert_called_once_with("person_01", home)
+
+    def test_provisioning_failure_removes_partial_account(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            provisioner = root / "prepare-standard-user.sh"
+            provisioner.touch()
+            account = SimpleNamespace(pw_dir=str(root / "home" / "person_01"))
+            manager = UserManager(
+                state_dir=root / "state",
+                lock_file=root / "operation.lock",
+                logger=AuditLogger(root / "audit.jsonl"),
+                template_root=root / "templates",
+                provisioner_path=provisioner,
+            )
+            with (
+                patch.object(manager, "require_root"),
+                patch.object(manager, "_account", side_effect=[None, account]),
+                patch.object(manager, "_set_password"),
+                patch.object(
+                    manager.runner,
+                    "run",
+                    side_effect=[SimpleNamespace(returncode=0), RuntimeError("provision failed"), None],
+                ) as run,
+                self.assertRaisesRegex(RuntimeError, "provision failed"),
+            ):
+                manager.create("person_01", "Person One", "1234")
+
+            self.assertEqual(run.call_args_list[-1].args[0], ["userdel", "--remove", "person_01"])
 
 
 if __name__ == "__main__":

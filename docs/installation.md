@@ -32,5 +32,9 @@ or disposable-device acceptance, and select **Install CachyFreeze**.
 - Or enable FROZEN first and add users later during THAWED maintenance.
 
 User creation is never a prerequisite for installation or FROZEN activation.
+Before creating an application-ready user, open Updates and run **Install / repair
+applications**. The Users dialog can then create a standard account, enable
+automatic sign-in if requested, publish the prepared account into Golden, and
+schedule the next boot as FROZEN. It never reboots automatically.
 After an operation finishes, use the application's reboot confirmation. Never
 interrupt package, initramfs, GRUB, or Golden writes.

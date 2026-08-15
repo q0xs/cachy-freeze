@@ -39,6 +39,7 @@ manager = UserManager(
     runner=CommandRunner(),
     autologin_path=root / "sddm.conf",
     template_root=root / "templates",
+    provisioner_path=Path("/usr/bin/true"),
 )
 
 created = manager.create(username, "CachyFreeze Test", "Test-Password-42")

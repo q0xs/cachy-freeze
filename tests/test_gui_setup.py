@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from cachy_freeze_gui.backend import BackendClient  # noqa: E402
-from cachy_freeze_gui.window import MainWindow  # noqa: E402
+from cachy_freeze_gui.window import MainWindow, UserDialog  # noqa: E402
 from PyQt6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 
@@ -118,6 +118,24 @@ class SetupGuiTests(unittest.TestCase):
         self.assertTrue(self.window.setup_preflight_ok)
         self.assertIn("/dev/sda2", self.window.setup_output.toPlainText())
         self.assertIn("UEFI", self.window.setup_state_label.text())
+
+    def test_ready_user_dialog_matches_username_contract(self) -> None:
+        dialog = UserDialog(self.window)
+        self.assertEqual(dialog.username.placeholderText(), "wrw21166")
+        self.assertTrue(dialog.freeze_after_create.isChecked())
+        self.assertIn("non-administrator", dialog.layout().itemAt(0).widget().text())
+        dialog.close()
+
+    def test_successful_user_creation_can_schedule_frozen_without_reboot(self) -> None:
+        self.window.pending_user_freeze = True
+        self.window._operation_finished("user-create", True, "created")
+
+        self.backend.run.assert_called_once_with("freeze")
+        self.assertFalse(self.window.pending_user_freeze)
+        self.assertNotIn(
+            "reboot",
+            [call.args[0] for call in self.backend.run.call_args_list],
+        )
 
 
 if __name__ == "__main__":

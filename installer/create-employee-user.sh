@@ -185,8 +185,8 @@ install -m 0755 \
   "$PROJECT_ROOT/user/files/company-microsip" \
   /usr/local/bin/company-microsip
 install -m 0755 \
-  "$PROJECT_ROOT/user/files/cachy-kurulum-oturum-kapat" \
-  /usr/local/bin/cachy-kurulum-oturum-kapat
+  "$PROJECT_ROOT/user/files/cachyfreeze-finish-session" \
+  /usr/local/bin/cachyfreeze-finish-session
 install -m 0755 \
   "$PROJECT_ROOT/user/files/cachy-employee-reset" \
   /usr/local/sbin/cachy-employee-reset
