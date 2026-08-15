@@ -10,74 +10,74 @@ require_root
 require_maintenance
 
 id "$ADMIN_USER" >/dev/null 2>&1 ||
-  die "Beklenen yonetici hesabi bulunamadi: $ADMIN_USER"
+  die "Expected administrator account not found: $ADMIN_USER"
 id -nG "$ADMIN_USER" | grep -Eq '(^| )wheel( |$)' ||
-  die "$ADMIN_USER wheel grubunda degil; yonetici hesabi dogrulanamadi."
+  die "$ADMIN_USER is not in the wheel group; administrator status could not be verified."
 [[ $(passwd -S "$ADMIN_USER" | awk '{print $2}') == P ]] ||
-  die "$ADMIN_USER icin etkin bir parola ayarlanmamis."
+  die "$ADMIN_USER does not have an active password."
 
 if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
-  IFS= read -r employee_user || die "Kullanici adi GUI kanalindan alinamadi."
-  IFS= read -r employee_full_name || die "Gorunen ad GUI kanalindan alinamadi."
-  IFS= read -r employee_password || die "Parola GUI kanalindan alinamadi."
+  IFS= read -r employee_user || die "Username was not received from the GUI channel."
+  IFS= read -r employee_full_name || die "Display name was not received from the GUI channel."
+  IFS= read -r employee_password || die "Password was not received from the GUI channel."
   employee_password_again=$employee_password
 else
   [[ -r /dev/tty && -w /dev/tty ]] ||
-    die "Kullanici bilgilerini girmek icin etkilesimli terminal gerekli."
+    die "An interactive terminal is required to enter user details."
   printf '%s\n' \
-    "Calisan hesabi bilgileri" \
-    "Kullanici adi kucuk harf, rakam, _ ve - icerebilir." >/dev/tty
-  read -r -p "Kullanici adi (ornek: ahmet): " employee_user </dev/tty
+    "Standard account details" \
+    "The username may contain lowercase letters, digits, _ and -." >/dev/tty
+  read -r -p "Username (example: employee01): " employee_user </dev/tty
 fi
 employee_user=${employee_user,,}
 [[ $employee_user =~ ^[a-z][a-z0-9_-]{2,31}$ ]] ||
-  die "Gecersiz kullanici adi: $employee_user"
+  die "Invalid username: $employee_user"
 [[ $employee_user != "$ADMIN_USER" ]] ||
-  die "Calisan ve yonetici adi ayni olamaz."
+  die "The standard user and administrator cannot have the same username."
 if id "$employee_user" >/dev/null 2>&1; then
   employee_uid=$(id -u "$employee_user")
   (( employee_uid >= 1000 && employee_uid < 65534 )) ||
-    die "Mevcut hesap standart yerel kullanici degil: $employee_user"
+    die "The existing account is not a standard local user: $employee_user"
 fi
 
 if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} != 1 ]]; then
-  read -r -p "Gorunen ad ve soyad: " employee_full_name </dev/tty
+  read -r -p "Display name: " employee_full_name </dev/tty
 fi
 [[ -n ${employee_full_name//[[:space:]]/} ]] ||
-  die "Gorunen ad bos olamaz."
+  die "Display name cannot be empty."
 [[ $employee_full_name != *:* && $employee_full_name != *$'\n'* ]] ||
-  die "Gorunen ad ':' karakteri iceremez."
+  die "Display name cannot contain ':'."
 
 while [[ ${CACHY_SETUP_NONINTERACTIVE:-0} != 1 ]]; do
-  read -r -s -p "Calisan parolasi: " employee_password </dev/tty
+  read -r -s -p "Account password: " employee_password </dev/tty
   printf '\n' >/dev/tty
-  read -r -s -p "Parolayi tekrar gir: " employee_password_again </dev/tty
+  read -r -s -p "Repeat password: " employee_password_again </dev/tty
   printf '\n' >/dev/tty
   [[ -n $employee_password ]] || {
-    printf 'Parola bos olamaz.\n' >/dev/tty
+    printf 'Password cannot be empty.\n' >/dev/tty
     continue
   }
   [[ $employee_password != *:* ]] || {
-    printf "Parola ':' karakteri iceremez.\n" >/dev/tty
+    printf "Password cannot contain ':'.\n" >/dev/tty
     continue
   }
   [[ $employee_password == "$employee_password_again" ]] || {
-    printf 'Parolalar ayni degil; tekrar dene.\n' >/dev/tty
+    printf 'Passwords do not match; try again.\n' >/dev/tty
     continue
   }
   break
 done
 (( ${#employee_password} >= 4 && ${#employee_password} <= 256 )) &&
   [[ $employee_password == "$employee_password_again" ]] ||
-  die "Calisan parolasi bos veya tekrariyla uyusmuyor."
+  die "The account password is empty or does not match its confirmation."
 [[ $employee_password != *:* && $employee_password != *$'\n'* && \
   $employee_password != *$'\r'* ]] ||
-  die "Calisan parolasi desteklenmeyen bir karakter iceriyor."
+  die "The account password contains an unsupported character."
 
 for command in wine unzip rsync google-chrome-stable slack libreoffice zoiper \
   anydesk; do
   command -v "$command" >/dev/null ||
-    die "Once install-applications.sh calistirilmali. Eksik: $command"
+    die "Run install-applications.sh first. Missing command: $command"
 done
 
 if ! id "$employee_user" >/dev/null 2>&1; then
@@ -115,9 +115,9 @@ set -e
 runuser -u "$employee_user" -- \
   env WINEPREFIX="$prefix" wineserver -k >/dev/null 2>&1 || true
 if (( wineboot_rc != 0 && wineboot_rc != 124 )); then
-  die "MicroSIP Wine prefix olusturma testi basarisiz (kod: $wineboot_rc)."
+  die "MicroSIP Wine prefix initialization failed (code: $wineboot_rc)."
 fi
-[[ -s $prefix/system.reg ]] || die "MicroSIP Wine prefix olusturulamadi."
+[[ -s $prefix/system.reg ]] || die "The MicroSIP Wine prefix was not created."
 microsip_target="$prefix/drive_c/Program Files/MicroSIP"
 microsip_stage=$(mktemp -d)
 trap 'rm -rf --one-file-system "$microsip_stage"' EXIT
@@ -127,7 +127,7 @@ microsip_exe=$(
   find "$microsip_stage" -type f -iname 'microsip.exe' -print -quit
 )
 [[ -n $microsip_exe ]] ||
-  die "MicroSIP arsivinden calistirilabilir dosya cikmadi."
+  die "No executable was found in the MicroSIP archive."
 install -d -o "$employee_user" -g "$employee_user" -m 0755 \
   "$microsip_target"
 rsync -a --delete "${microsip_exe%/*}/" "$microsip_target/"
@@ -136,7 +136,7 @@ microsip_installed_exe=$(
     -print -quit
 )
 [[ -n $microsip_installed_exe ]] ||
-  die "MicroSIP hedef dizine kurulamadi."
+  die "MicroSIP could not be installed into the target directory."
 if [[ $microsip_installed_exe != "$microsip_target/microsip.exe" ]]; then
   mv "$microsip_installed_exe" "$microsip_target/microsip.exe"
 fi
@@ -162,10 +162,10 @@ runuser -u "$employee_user" -- \
 if (( microsip_smoke_rc != 0 && microsip_smoke_rc != 124 )); then
   sed -n '1,120p' "$microsip_smoke_log" >&2
   rm -f -- "$microsip_smoke_log"
-  die "MicroSIP Wine smoke testi basarisiz (kod: $microsip_smoke_rc)."
+  die "The MicroSIP Wine smoke test failed (code: $microsip_smoke_rc)."
 fi
 rm -f -- "$microsip_smoke_log"
-[[ -s $prefix/system.reg ]] || die "MicroSIP Wine prefix dogrulanamadi."
+[[ -s $prefix/system.reg ]] || die "The MicroSIP Wine prefix could not be verified."
 
 cat >"$home/.config/mimeapps.list" <<'EOF'
 [Default Applications]
@@ -217,19 +217,19 @@ install -d -m 0700 "$template_root"
 cp -a "$home" "$template_root/$employee_user"
 admin_home=$(getent passwd "$ADMIN_USER" | cut -d: -f6)
 [[ -n $admin_home && -d $admin_home ]] ||
-  die "Yonetici ev dizini bulunamadi."
+  die "Administrator home directory not found."
 cp -a "$admin_home" "$template_root/$ADMIN_USER"
 systemctl daemon-reload
 systemctl enable cachy-employee-reset.service
 systemctl enable cachy-frozen-admin-restrict.service
 systemctl is-enabled --quiet cachy-employee-reset.service ||
-  die "Calisan sifirlama servisi etkinlestirilemedi."
+  die "The managed-user reset service could not be enabled."
 systemctl is-enabled --quiet cachy-frozen-admin-restrict.service ||
-  die "Frozen yonetici kisitlama servisi etkinlestirilemedi."
+  die "The FROZEN administrator restriction service could not be enabled."
 
 printf '%s\n' \
-  "Calisan hesabi hazir: $employee_user ($employee_full_name)" \
-  "$ADMIN_USER Frozen grafik giris ekraninda gizlenecek." \
-  "Frozen modda tum yonetilen hesaplar temiz sablonlarina doner." \
-  "Hesabin CachyOS tarafindan belirlenen grup ve yetkileri degistirilmedi." \
-  "Parola kurulum sirasinda sizin girdiginiz parola olarak ayarlandi."
+  "Standard account ready: $employee_user ($employee_full_name)" \
+  "$ADMIN_USER will be hidden from the FROZEN graphical login screen." \
+  "All managed accounts return to their clean templates in FROZEN mode." \
+  "The account's CachyOS group membership and privileges were not changed." \
+  "The password was set to the value entered during setup."

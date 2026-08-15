@@ -66,7 +66,7 @@ microsip_path=$(
   grep -m1 -oE '/download/MicroSIP-[0-9.]+\.zip' <<<"$microsip_page"
 )
 [[ -n $microsip_path ]] ||
-  die "MicroSIP resmi sayfasinda portable ZIP baglantisi bulunamadi."
+  die "A portable ZIP link was not found on the official MicroSIP page."
 microsip_url="https://www.microsip.org$microsip_path"
 microsip_zip="/opt/company/microsip/${microsip_path##*/}"
 
@@ -75,23 +75,23 @@ if [[ ! -s $microsip_zip ]]; then
 fi
 microsip_size=$(stat -c %s "$microsip_zip")
 (( microsip_size >= 1048576 && microsip_size <= 104857600 )) ||
-  die "MicroSIP portable arsiv boyutu beklenmiyor: $microsip_size"
+  die "The MicroSIP portable archive has an unexpected size: $microsip_size"
 unzip -t "$microsip_zip"
 validate_zip_paths "$microsip_zip"
 unzip -Z1 "$microsip_zip" |
   grep -Eix 'MicroSIP\.exe' >/dev/null ||
-  die "MicroSIP portable arsivinde microsip.exe bulunamadi."
+  die "microsip.exe was not found in the MicroSIP portable archive."
 [[ $(unzip -Z1 "$microsip_zip" | grep -Eic '^MicroSIP\.exe$') -eq 1 ]] ||
-  die "MicroSIP portable arsivinde tek bir MicroSIP.exe olmali."
+  die "The MicroSIP portable archive must contain exactly one MicroSIP.exe."
 
 microsip_verify_stage=$(mktemp -d /tmp/cachy-microsip-verify.XXXXXX)
 trap 'rm -rf --one-file-system "$microsip_verify_stage"' EXIT
 unzip -q "$microsip_zip" -d "$microsip_verify_stage"
 file "$microsip_verify_stage/MicroSIP.exe" | grep -q 'PE32' ||
-  die "MicroSIP.exe gecerli bir Windows PE dosyasi degil."
+  die "MicroSIP.exe is not a valid Windows PE file."
 microsip_exe_sha256=$(sha256sum "$microsip_verify_stage/MicroSIP.exe" | awk '{print $1}')
 [[ $microsip_exe_sha256 =~ ^[0-9a-f]{64}$ ]] ||
-  die "MicroSIP.exe checksum olusturulamadi."
+  die "The MicroSIP.exe checksum could not be created."
 rm -rf --one-file-system "$microsip_verify_stage"
 trap - EXIT
 
@@ -126,7 +126,7 @@ install -m 0644 \
 
 for command in google-chrome-stable slack wine libreoffice zoiper anydesk; do
   command -v "$command" >/dev/null ||
-    die "Kurulum sonrasi komut bulunamadi: $command"
+    die "A required command is missing after installation: $command"
 done
 unzip -t "$microsip_zip"
 (cd /opt/company/microsip && sha256sum --check SHA256SUMS)

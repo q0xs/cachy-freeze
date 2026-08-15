@@ -6,7 +6,7 @@ readonly PROJECT_ROOT=$(cd -- "$INSTALLER_DIR/.." && pwd)
 readonly LOG=/var/log/cachyos-workstation-install.log
 
 (( EUID == 0 )) || {
-  printf 'Su sekilde calistir:\n  sudo %s\n' "$0" >&2
+  printf 'Run as root:\n  sudo %s\n' "$0" >&2
   exit 1
 }
 
@@ -17,8 +17,8 @@ if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
 fi
 
 exec > >(tee -a "$LOG") 2>&1
-trap 'rc=$?; printf "HATA: Kurulum satir %s civarinda durdu (kod: %s). Log: %s\n" "$LINENO" "$rc" "$LOG" >&2' ERR
-printf 'Kurulum basladi: %s\n' "$(date --iso-8601=seconds)"
+trap 'rc=$?; printf "ERROR: Installation stopped near line %s (code: %s). Log: %s\n" "$LINENO" "$rc" "$LOG" >&2' ERR
+printf 'Installation started: %s\n' "$(date --iso-8601=seconds)"
 
 # Validate disk and boot layout before long application downloads.
 CACHY_FREEZE_CONFIG="$PROJECT_ROOT/deepfreeze/etc/cachy-freeze.conf" \
@@ -38,7 +38,7 @@ bash "$INSTALLER_DIR/install-freeze-engine.sh"
 bash "$INSTALLER_DIR/publish-golden.sh"
 
 printf '%s\n' \
-  "Tum hazirliklar tamamlandi." \
-  "Sistem guvenlik icin Maintenance modunda birakildi." \
-  "Canli kontrollerden sonra Kurulum sayfasindan tamamlayip FROZEN yapin." \
+  "All preparation steps are complete." \
+  "The system was left in THAWED maintenance mode for safety." \
+  "After live checks, use the Setup page to enable FROZEN mode." \
   "Log: $LOG"

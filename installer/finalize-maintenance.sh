@@ -9,19 +9,19 @@ require_root
 require_maintenance
 
 [[ -r /dev/tty && -w /dev/tty ]] ||
-  die "Bakimi tamamlamak icin etkilesimli terminal gerekli."
+  die "An interactive terminal is required to finish maintenance."
 
 printf '%s\n' \
-  "Bu islem mevcut Maintenance sistemini Golden olarak yayinlayacak" \
-  "ve sonraki acilisi Frozen yapacak." >/dev/tty
-read -r -p "Bakim kontrolleri tamamlandi mi? [e/H]: " confirmed </dev/tty
-[[ ${confirmed,,} == e ]] || die "Islem iptal edildi; sistem degistirilmedi."
+  "This publishes the current maintenance system as Golden" \
+  "and schedules the next boot as FROZEN." >/dev/tty
+read -r -p "Are the maintenance checks complete? [y/N]: " confirmed </dev/tty
+[[ ${confirmed,,} == y ]] || die "Operation cancelled; the system was not changed."
 
 bash "$INSTALLER_DIR/refresh-user-templates.sh"
 bash "$INSTALLER_DIR/publish-golden.sh"
 bash "$INSTALLER_DIR/set-frozen-mode.sh"
 
 printf '%s\n' \
-  "Bakim degisiklikleri Golden'a aktarildi." \
-  "Sonraki acilis Frozen olacak." \
-  "Hazir oldugunuzda elle yeniden baslatin: sudo reboot"
+  "Maintenance changes were published to Golden." \
+  "The next boot will be FROZEN." \
+  "Reboot manually when ready: sudo reboot"

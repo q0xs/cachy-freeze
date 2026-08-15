@@ -4,6 +4,22 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-15 — final repository consistency audit — local working tree after `c5a7549`
+
+- PASS — local `main` matched GitHub `origin/main` before the audit.
+- PASS — 42/42 Python unit and GUI contract tests; Ruff check and format check.
+- PASS — repository-wide ShellCheck, Bash/static, desktop, XML/JSON, and
+  English-only first-party user-facing text checks.
+- PASS — README and installation guide expose only the complete Git clone path;
+  stale raw-script and ZIP installation references are absent.
+- PASS — Qt offscreen seven-page smoke test, isolated GRUB generation test,
+  Python bytecode compilation, and `git diff --check`.
+- FIXED — replaced the stale partial-install command in `docs/installation.md`,
+  removed the desktop category warning, and translated legacy installer/service
+  messages to English.
+- NOT RUN — privileged integration tests, physical boot-stack mutation, live
+  installation, and reboot.
+
 ## 2026-08-15 — application branding and full-clone installer — local working tree after `18b7d86`
 
 - PASS — generated 512×512 RGBA logo has a transparent background and is wired

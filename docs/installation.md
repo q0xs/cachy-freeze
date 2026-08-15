@@ -9,21 +9,24 @@
 
 The installer stops when preflight detects an unsupported layout.
 
-## One-command terminal install
+## Complete-repository terminal install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/q0xs/cachy-freeze/main/install.sh | sudo bash
+git clone --branch main https://github.com/q0xs/cachy-freeze.git
+cd cachy-freeze
+sudo ./install.sh
 ```
 
-For high-assurance environments, download and inspect `install.sh` before
-running it. The script installs required packages, clones the repository when
-run from a pipe, installs the engine and GUI, publishes the initial Golden, and
-leaves the next boot in THAWED mode.
+The installer supports only a complete Git clone. Review the repository before
+running `install.sh`; partial downloads and standalone remote-script execution
+are intentionally unsupported. The installer installs the engine and GUI,
+publishes the initial Golden, and leaves the next boot in THAWED mode.
 
 ## Graphical install
 
-Open `cachyfreeze-setup.desktop`, run preflight, confirm either recovery readiness
-or disposable-device acceptance, and select **Install CachyFreeze**.
+From the complete clone, open `cachyfreeze-setup.desktop`, run preflight, confirm
+either recovery readiness or disposable-device acceptance, and select
+**Install CachyFreeze**.
 
 ## Independent next steps
 

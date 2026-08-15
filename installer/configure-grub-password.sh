@@ -61,6 +61,6 @@ grep -q '^[[:space:]]*authenticate$' /boot/grub/grub.cfg ||
 
 printf '%s\n' \
   "GRUB Maintenance korumasi etkinlestirildi." \
-  "Kullanici adi: $AUTH_USER" \
+  "Username: $AUTH_USER" \
   "Menu moda gore FROZEN veya THAWED olarak tek giris gosterir." \
   "FROZEN parolasiz; THAWED girisi GRUB parolasiyla korunur."

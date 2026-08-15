@@ -120,8 +120,8 @@ grep -q '/usr/share/icons/hicolor/512x512/apps/cachy-freeze.png' \
   "$PROJECT_ROOT/installer/install-freeze-engine.sh"
 grep -Fq 'git clone --branch main https://github.com/q0xs/cachy-freeze.git' \
   "$PROJECT_ROOT/README.md"
-! grep -Eq 'archive/refs/heads|raw.githubusercontent.com/.*/install.sh|curl .*install.sh' \
-  "$PROJECT_ROOT/README.md"
+! grep -REq 'archive/refs/heads|raw.githubusercontent.com/.*/install.sh|curl .*install.sh' \
+  "$PROJECT_ROOT/README.md" "$PROJECT_ROOT/docs"/*.md
 for desktop in "$PROJECT_ROOT"/user/desktop/*.desktop; do
   grep -qx '\[Desktop Entry\]' "$desktop"
   grep -q '^Type=Application$' "$desktop"

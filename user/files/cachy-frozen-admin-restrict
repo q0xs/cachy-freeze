@@ -7,20 +7,20 @@ die() {
   exit 1
 }
 
-[[ -r $CONFIG ]] || die "Yapilandirma bulunamadi: $CONFIG"
-# Dosya kurulumda root tarafindan olusturulur ve yalnizca root yazabilir.
+[[ -r $CONFIG ]] || die "Configuration not found: $CONFIG"
+# The file is created by root during installation and is writable only by root.
 # shellcheck disable=SC1090
 source "$CONFIG"
 
 [[ ${ADMIN_USER:-} =~ ^[a-z][a-z0-9_-]{1,31}$ ]] ||
-  die "Gecersiz yonetici hesabi."
+  die "Invalid administrator account."
 id "$ADMIN_USER" >/dev/null 2>&1 ||
-  die "Yonetici hesabi bulunamadi: $ADMIN_USER"
+  die "Administrator account not found: $ADMIN_USER"
 
-# Parola, kabuk ve grup yetkileri degistirilmez. Boylece Polkit, calisan
-# oturumunda bu hesabin parolasini yonetici kimlik dogrulamasi icin kullanir.
-# Hesap yalnizca grafik giris ekranindan gizlenir; ev dizini ayri servis
-# tarafindan her Frozen acilista temiz sablonuna geri dondurulur.
+# Password, shell, and group privileges remain unchanged, allowing PolicyKit to
+# use this account for administrator authentication in the employee session.
+# The account is hidden only from the graphical login screen; a separate service
+# restores its home directory from the clean template on every FROZEN boot.
 admin_home=$(getent passwd "$ADMIN_USER" | cut -d: -f6)
 [[ -n $admin_home && -d $admin_home ]] && chmod 0700 "$admin_home"
 
