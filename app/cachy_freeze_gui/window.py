@@ -715,7 +715,7 @@ class MainWindow(QMainWindow):
                 "Create a snapshot before the first Golden publication."
             )
         usage = shutil.disk_usage("/")
-        self.disk_card.value.setText(f"%{round(usage.used / usage.total * 100)}")
+        self.disk_card.value.setText(f"{round(usage.used / usage.total * 100)}%")
         self.disk_card.detail.setText(f"{_human_bytes(usage.used)} / {_human_bytes(usage.total)}")
         ready = bool(status.get("golden_present")) and bool(status.get("active_present"))
         pending = bool(status.get("transaction_pending"))

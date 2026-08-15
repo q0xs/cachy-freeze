@@ -29,5 +29,5 @@ cleanup() {
   rm -rf --one-file-system "$install_root"
 }
 trap cleanup EXIT
-git clone --depth 1 "$REPOSITORY_URL" "$install_root/repository"
+git clone --depth 1 --branch main --single-branch "$REPOSITORY_URL" "$install_root/repository"
 /usr/bin/bash "$install_root/repository/installer/install-cachyfreeze.sh"

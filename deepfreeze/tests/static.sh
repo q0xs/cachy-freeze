@@ -112,6 +112,10 @@ done
 [[ -x $PROJECT_ROOT/install.sh ]]
 grep -q 'raw.githubusercontent.com/q0xs/cachy-freeze/main/install.sh' \
   "$PROJECT_ROOT/install.sh"
+grep -Fq 'https://github.com/q0xs/cachy-freeze/archive/refs/heads/main.zip' \
+  "$PROJECT_ROOT/README.md"
+grep -Fq 'git clone --depth 1 --branch main --single-branch "$REPOSITORY_URL"' \
+  "$PROJECT_ROOT/install.sh"
 for desktop in "$PROJECT_ROOT"/user/desktop/*.desktop; do
   grep -qx '\[Desktop Entry\]' "$desktop"
   grep -q '^Type=Application$' "$desktop"

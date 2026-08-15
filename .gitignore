@@ -1,12 +1,12 @@
-# Bu makinedeki geçici GitHub CLI dosyaları
+# Temporary GitHub CLI downloads
 /.tools/
 /gh_*_windows_*.zip
 /gh_*_checksums.txt
 
-# Önceki kopyalamadan kalan kökün birebir yinelenen kopyası
+# Accidental nested repository copy
 /cachy-freeze/
 
-# Çalışma zamanı ve günlük dosyaları
+# Runtime, cache, and log files
 *.log
 *.tmp
 *.bak
@@ -15,7 +15,7 @@
 __pycache__/
 *.py[cod]
 
-# İşletim sistemi ve editör dosyaları
+# Operating-system and editor files
 .DS_Store
 Thumbs.db
 /.idea/

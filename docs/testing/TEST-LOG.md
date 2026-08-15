@@ -4,6 +4,20 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-15 — installer, README and CI refresh — local working tree after `b0a391c`
+
+- PASS — Ruff 0.16.3 check and format check; 25 Python files checked.
+- PASS — 42/42 Python unit and GUI contract tests.
+- PASS — full ShellCheck 0.11.0 error-level scan of every repository Bash script.
+- PASS — Bash/static, desktop, XML/JSON, installer-link and complete-repository
+  download contracts.
+- PASS — Qt offscreen seven-page smoke test with the refreshed English UI.
+- PASS — isolated GRUB generation and syntax test; no installed GRUB file was changed.
+- PASS — Python bytecode compilation and `git diff --check`.
+- NOT RUN — privileged temporary-user/Btrfs integrations, live package installation,
+  Golden publication, GRUB/initramfs writes, and reboot. This validation pass did
+  not mutate the physical boot stack and did not restart the workstation.
+
 ## 2026-08-15 — ready-user and UI update — local working tree after `3466a8e`
 
 - PASS — 42/42 Python unit and GUI contract tests.

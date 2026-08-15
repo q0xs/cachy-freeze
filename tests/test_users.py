@@ -145,9 +145,7 @@ class UserValidationTests(unittest.TestCase):
                 patch.object(manager, "list_users", return_value=[created_user]),
                 patch.object(manager.runner, "run") as run,
             ):
-                self.assertEqual(
-                    manager.create("person_01", "Person One", "1234"), created_user
-                )
+                self.assertEqual(manager.create("person_01", "Person One", "1234"), created_user)
 
             self.assertEqual(run.call_args_list[0].args[0][0], "useradd")
             self.assertEqual(
@@ -176,7 +174,11 @@ class UserValidationTests(unittest.TestCase):
                 patch.object(
                     manager.runner,
                     "run",
-                    side_effect=[SimpleNamespace(returncode=0), RuntimeError("provision failed"), None],
+                    side_effect=[
+                        SimpleNamespace(returncode=0),
+                        RuntimeError("provision failed"),
+                        None,
+                    ],
                 ) as run,
                 self.assertRaisesRegex(RuntimeError, "provision failed"),
             ):
