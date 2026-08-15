@@ -533,9 +533,15 @@ class MainWindow(QMainWindow):
         finalize_form = QFormLayout(finalize_group)
         freeze_note = QLabel(
             "This step is independent from user creation. It protects maintenance mode, "
-            "publishes Golden, and schedules the next boot as FROZEN."
+            "publishes Golden, and schedules the next boot as FROZEN. Use the fixed "
+            "username cachyadmin with the password you set here to enter THAWED mode."
         )
         freeze_note.setWordWrap(True)
+        self.setup_grub_username = QLabel("cachyadmin")
+        self.setup_grub_username.setObjectName("cardValue")
+        self.setup_grub_username.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
         self.setup_grub_password = QLineEdit()
         self.setup_grub_password.setEchoMode(QLineEdit.EchoMode.Password)
         self.setup_grub_confirm = QLineEdit()
@@ -543,6 +549,7 @@ class MainWindow(QMainWindow):
         self.setup_finish_button = QPushButton("Publish Golden and enable FROZEN")
         self.setup_finish_button.setObjectName("primary")
         finalize_form.addRow(freeze_note)
+        finalize_form.addRow("GRUB maintenance username", self.setup_grub_username)
         finalize_form.addRow("GRUB maintenance password", self.setup_grub_password)
         finalize_form.addRow("Confirm password", self.setup_grub_confirm)
         finalize_form.addRow("", self.setup_finish_button)
@@ -1109,7 +1116,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "Weak GRUB password",
-                "The GRUB password must contain 12-256 characters and at least three classes.",
+                "Set a password of 12-256 characters with at least three character "
+                "classes. The fixed GRUB username is cachyadmin.",
             )
             return
         answer = QMessageBox.warning(

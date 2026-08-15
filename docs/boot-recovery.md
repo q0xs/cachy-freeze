@@ -5,8 +5,9 @@ and a persistent transaction journal. Early boot validates the expected Btrfs
 device and subvolume names before completing or rolling back an interrupted step.
 
 If FROZEN does not reach the graphical target repeatedly, boot-attempt tracking
-can restore the previous healthy Golden. THAWED maintenance is protected by the
-GRUB `cachyadmin` password.
+can restore the previous healthy Golden. THAWED maintenance uses the fixed GRUB
+username `cachyadmin` and the password chosen on the Setup page. `cachyadmin` is
+a GRUB-only credential, not a Linux administrator account.
 
 When recovery is needed:
 

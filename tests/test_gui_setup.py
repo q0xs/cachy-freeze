@@ -9,6 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from cachy_freeze_gui.backend import BackendClient  # noqa: E402
 from cachy_freeze_gui.window import MainWindow, UserDialog  # noqa: E402
+from PyQt6.QtCore import Qt  # noqa: E402
 from PyQt6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 
@@ -30,6 +31,11 @@ class SetupGuiTests(unittest.TestCase):
     def test_setup_page_contract_and_password_policy(self) -> None:
         self.assertEqual(self.window.pages.count(), 7)
         self.assertEqual(self.window.setup_start_button.text(), "Install CachyFreeze")
+        self.assertEqual(self.window.setup_grub_username.text(), "cachyadmin")
+        self.assertTrue(
+            self.window.setup_grub_username.textInteractionFlags()
+            & Qt.TextInteractionFlag.TextSelectableByMouse
+        )
         self.assertTrue(self.window._password_is_strong("Correct-Horse-42"))
         self.assertFalse(self.window._password_is_strong("short"))
         self.assertFalse(self.window._password_is_strong("Colon:Password42"))

@@ -32,8 +32,8 @@ if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
   unset grub_password
 else
   printf '%s\n' \
-    "GRUB Maintenance kullanicisi: $AUTH_USER" \
-    "Simdi iki kez girilecek parola ekranda gorunmez."
+    "GRUB maintenance username: $AUTH_USER" \
+    "Enter the password twice when prompted; it will not be displayed."
   hash=$(
     grub-mkpasswd-pbkdf2 |
       sed -n 's/.*\(grub\.pbkdf2\.[^[:space:]]*\).*/\1/p'
@@ -60,7 +60,7 @@ grep -q '^[[:space:]]*authenticate$' /boot/grub/grub.cfg ||
   die "The GRUB menu contains more than one entry."
 
 printf '%s\n' \
-  "GRUB Maintenance korumasi etkinlestirildi." \
-  "Username: $AUTH_USER" \
-  "Menu moda gore FROZEN veya THAWED olarak tek giris gosterir." \
-  "FROZEN parolasiz; THAWED girisi GRUB parolasiyla korunur."
+  "GRUB maintenance protection was enabled." \
+  "Fixed GRUB username: $AUTH_USER" \
+  "The menu shows one entry named FROZEN or THAWED according to the mode." \
+  "FROZEN is passwordless; THAWED requires $AUTH_USER and the GRUB password."

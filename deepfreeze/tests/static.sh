@@ -116,6 +116,11 @@ done
 [[ -x $PROJECT_ROOT/install.sh ]]
 [[ -s $PROJECT_ROOT/app/cachy_freeze_gui/assets/cachy-freeze.png ]]
 grep -q 'setWindowIcon' "$PROJECT_ROOT/app/cachy_freeze_gui/main.py"
+grep -q 'GRUB maintenance username' "$PROJECT_ROOT/app/cachy_freeze_gui/window.py"
+grep -q 'readonly AUTH_USER=cachyadmin' \
+  "$PROJECT_ROOT/installer/configure-grub-password.sh"
+grep -q 'fixed GRUB username.*cachyadmin' "$PROJECT_ROOT/README.md"
+grep -q 'always `cachyadmin`' "$PROJECT_ROOT/docs/installation.md"
 grep -q '/usr/share/icons/hicolor/512x512/apps/cachy-freeze.png' \
   "$PROJECT_ROOT/installer/install-freeze-engine.sh"
 grep -Fq 'git clone --branch main https://github.com/q0xs/cachy-freeze.git' \

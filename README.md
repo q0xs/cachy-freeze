@@ -109,7 +109,9 @@ No operation in the creation dialog reboots the computer automatically.
 | `@cachy-snapshots` | Managed recovery snapshots |
 
 FROZEN is the passwordless daily boot path. THAWED maintenance is protected by
-the GRUB `cachyadmin` credential configured during activation.
+the fixed GRUB username **`cachyadmin`** and the password configured on the
+Setup page during activation. This is a GRUB-only maintenance credential; it is
+not the Linux administrator account name.
 
 ## Repository layout
 

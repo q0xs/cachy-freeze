@@ -30,7 +30,9 @@ either recovery readiness or disposable-device acceptance, and select
 
 ## Independent next steps
 
-- Enable FROZEN immediately from Setup by choosing a strong GRUB maintenance password.
+- Enable FROZEN immediately from Setup by choosing a strong GRUB maintenance
+  password. The GRUB maintenance username is always `cachyadmin`; it is shown
+  beside the password fields and is separate from Linux user accounts.
 - Or create users first from Users, then enable FROZEN.
 - Or enable FROZEN first and add users later during THAWED maintenance.
 

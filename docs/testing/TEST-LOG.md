@@ -4,6 +4,16 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-15 — visible fixed GRUB username — local working tree after `b690f59`
+
+- PASS — Setup displays the selectable fixed GRUB maintenance username
+  `cachyadmin` beside the password fields.
+- PASS — installer output, README, installation guide, and recovery guide agree
+  that `cachyadmin` is a GRUB-only credential, not a Linux account.
+- PASS — 42/42 Python tests, Ruff check and format check, Bash/static and
+  ShellCheck, Qt offscreen smoke, isolated GRUB generation, and `git diff --check`.
+- NOT RUN — live GRUB configuration, physical boot-stack mutation, and reboot.
+
 ## 2026-08-15 — final repository consistency audit — local working tree after `c5a7549`
 
 - PASS — local `main` matched GitHub `origin/main` before the audit.
