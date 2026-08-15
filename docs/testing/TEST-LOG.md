@@ -4,6 +4,19 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-15 — application branding and full-clone installer — local working tree after `18b7d86`
+
+- PASS — generated 512×512 RGBA logo has a transparent background and is wired
+  to the Qt application, desktop entries, full installer, and live-app deployer.
+- PASS — README and static contracts expose only the complete Git repository
+  clone installation path; partial raw-script and ZIP instructions are absent.
+- PASS — Ruff check and format check; 25 Python files checked.
+- PASS — 42/42 Python unit and GUI contract tests.
+- PASS — repository-wide ShellCheck error-level scan and Bash/static contracts.
+- PASS — Qt offscreen seven-page smoke test, isolated GRUB generation test,
+  Python bytecode compilation, and `git diff --check`.
+- NOT RUN — live icon deployment, physical boot-stack mutation, and reboot.
+
 ## 2026-08-15 — installer, README and CI refresh — local working tree after `b0a391c`
 
 - PASS — Ruff 0.16.3 check and format check; 25 Python files checked.

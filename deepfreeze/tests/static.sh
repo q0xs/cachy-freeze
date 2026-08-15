@@ -77,9 +77,13 @@ grep -q 'auth_admin_keep' \
   "$PROJECT_ROOT/app/org.cachyos.cachy-freeze.policy"
 grep -q '^Exec=/usr/bin/cachy-freeze-manager$' \
   "$PROJECT_ROOT/app/cachy-freeze-manager.desktop"
+grep -q '^Icon=cachy-freeze$' \
+  "$PROJECT_ROOT/app/cachy-freeze-manager.desktop"
 grep -q '^Name=CachyFreeze Setup$' \
   "$PROJECT_ROOT/cachyfreeze-setup.desktop"
 grep -q '^Terminal=false$' \
+  "$PROJECT_ROOT/cachyfreeze-setup.desktop"
+grep -q '^Icon=cachy-freeze$' \
   "$PROJECT_ROOT/cachyfreeze-setup.desktop"
 if command -v desktop-file-validate >/dev/null; then
   desktop-file-validate \
@@ -110,12 +114,14 @@ for required_user_asset in \
 done
 
 [[ -x $PROJECT_ROOT/install.sh ]]
-grep -q 'raw.githubusercontent.com/q0xs/cachy-freeze/main/install.sh' \
-  "$PROJECT_ROOT/install.sh"
-grep -Fq 'https://github.com/q0xs/cachy-freeze/archive/refs/heads/main.zip' \
+[[ -s $PROJECT_ROOT/app/cachy_freeze_gui/assets/cachy-freeze.png ]]
+grep -q 'setWindowIcon' "$PROJECT_ROOT/app/cachy_freeze_gui/main.py"
+grep -q '/usr/share/icons/hicolor/512x512/apps/cachy-freeze.png' \
+  "$PROJECT_ROOT/installer/install-freeze-engine.sh"
+grep -Fq 'git clone --branch main https://github.com/q0xs/cachy-freeze.git' \
   "$PROJECT_ROOT/README.md"
-grep -Fq 'git clone --depth 1 --branch main --single-branch "$REPOSITORY_URL"' \
-  "$PROJECT_ROOT/install.sh"
+! grep -Eq 'archive/refs/heads|raw.githubusercontent.com/.*/install.sh|curl .*install.sh' \
+  "$PROJECT_ROOT/README.md"
 for desktop in "$PROJECT_ROOT"/user/desktop/*.desktop; do
   grep -qx '\[Desktop Entry\]' "$desktop"
   grep -q '^Type=Application$' "$desktop"

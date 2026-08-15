@@ -33,6 +33,9 @@ mv "$stage/cachy_freeze_gui" "$INSTALL_ROOT/python/cachy_freeze_gui"
 
 install -m 0755 "$PROJECT_ROOT/app/cachy-freeze-manager-helper" \
   "$INSTALL_ROOT/cachy-freeze-manager-helper"
+install -d -m 0755 /usr/share/icons/hicolor/512x512/apps
+install -m 0644 "$PROJECT_ROOT/app/cachy_freeze_gui/assets/cachy-freeze.png" \
+  /usr/share/icons/hicolor/512x512/apps/cachy-freeze.png
 install -m 0755 "$PROJECT_ROOT/installer/prepare-standard-user.sh" \
   "$INSTALL_ROOT/deployment/installer/prepare-standard-user.sh"
 install -m 0755 "$PROJECT_ROOT/user/files/company-microsip" \

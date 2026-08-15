@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QIcon
 from PyQt6.QtWidgets import QApplication
 
 from .backend import BackendClient
@@ -26,6 +26,7 @@ def main() -> int:
     application = QApplication(arguments.qt_arguments)
     application.setApplicationName("CachyFreeze Management Center")
     application.setOrganizationName("CachyOS Workstation")
+    application.setWindowIcon(QIcon(str(Path(__file__).with_name("assets") / "cachy-freeze.png")))
     application.setFont(QFont("Noto Sans", 10))
     backend = BackendClient(setup_root=arguments.setup_source)
     window = MainWindow(backend)

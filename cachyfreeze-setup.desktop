@@ -4,7 +4,7 @@ Name=CachyFreeze Setup
 GenericName=CachyOS Workstation Kurulumu
 Comment=Install and manage CachyFreeze from one application
 Exec=/usr/bin/bash -c "desktop=\\$1; desktop=\\${desktop#file://}; launcher=\\${desktop%%/*}/app/cachy-freeze-setup; IFS=; set -f; exec /usr/bin/bash \\$launcher" bootstrap %k
-Icon=system-software-install
+Icon=cachy-freeze
 Terminal=false
 Categories=System;Settings;
 Keywords=cachyos;kurulum;freeze;dondur;setup;

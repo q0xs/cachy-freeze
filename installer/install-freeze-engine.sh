@@ -52,6 +52,7 @@ install -d -m 0755 \
   /etc/systemd/system \
   /usr/local/sbin \
   /usr/share/applications \
+  /usr/share/icons/hicolor/512x512/apps \
   /usr/share/polkit-1/actions
 install -m 0755 "$DF_ROOT/bin/cachy-freeze" /usr/local/sbin/cachy-freeze
 install -d -m 0755 /usr/lib/cachy-freeze/python
@@ -86,6 +87,9 @@ install -m 0755 \
 install -m 0644 \
   "$PROJECT_ROOT/app/cachy-freeze-manager.desktop" \
   /usr/share/applications/cachy-freeze-manager.desktop
+install -m 0644 \
+  "$PROJECT_ROOT/app/cachy_freeze_gui/assets/cachy-freeze.png" \
+  /usr/share/icons/hicolor/512x512/apps/cachy-freeze.png
 install -m 0644 \
   "$PROJECT_ROOT/app/org.cachyos.cachy-freeze.policy" \
   /usr/share/polkit-1/actions/org.cachyos.cachy-freeze.policy

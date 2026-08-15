@@ -1,4 +1,8 @@
-# CachyFreeze
+<p align="center">
+  <img src="app/cachy_freeze_gui/assets/cachy-freeze.png" width="168" alt="CachyFreeze logo">
+</p>
+
+<h1 align="center">CachyFreeze</h1>
 
 [![Quality checks](https://github.com/q0xs/cachy-freeze/actions/workflows/static-tests.yml/badge.svg?branch=main)](https://github.com/q0xs/cachy-freeze/actions/workflows/static-tests.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -48,51 +52,28 @@ CachyFreeze currently requires all of the following:
 It is not a generic installer for arbitrary Arch, ext4, BIOS, systemd-boot, or
 custom Btrfs layouts.
 
-## Download the complete installer
+## Clone and install the complete repository
 
-The recommended method clones the complete repository, preserving executable
-permissions and downloading every installer, application, policy, user asset,
-test, and recovery component required by CachyFreeze:
+The supported installation method is a full Git clone. It preserves executable
+permissions and downloads the complete project—including every installer,
+application, policy, user asset, test, and recovery component required by
+CachyFreeze:
 
 ```bash
-git clone --depth 1 --branch main https://github.com/q0xs/cachy-freeze.git
+git clone --branch main https://github.com/q0xs/cachy-freeze.git
 cd cachy-freeze
 sudo ./install.sh
 ```
 
-You can also download the complete source bundle directly:
-
-**[Download the complete CachyFreeze installer (ZIP)](https://github.com/q0xs/cachy-freeze/archive/refs/heads/main.zip)**
-
-After extracting the ZIP, run this inside the extracted directory:
-
-```bash
-chmod +x install.sh app/cachy-freeze-setup app/cachy-freeze-manager-helper
-sudo ./install.sh
-```
-
 The root-level [`install.sh`](install.sh) is the public terminal installer. It
-runs the supported-layout preflight, installs the complete engine and graphical
-management application, publishes the initial Golden baseline, and leaves the
-next boot safely scheduled as THAWED.
-
-### Bootstrap installation
-
-For a disposable pilot or after reviewing the remote script, the short bootstrap
-command remains available:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/q0xs/cachy-freeze/main/install.sh | sudo bash
-```
-
-The downloaded bootstrap is not a partial installation: it installs Git, clones
-the complete `main` repository into a temporary directory, runs the same
-`installer/install-cachyfreeze.sh`, and removes only that temporary clone after
-completion.
+refuses partial or standalone-script installations. From the complete clone it
+runs the supported-layout preflight, installs the engine and graphical management
+application, publishes the initial Golden baseline, and leaves the next boot
+safely scheduled as THAWED.
 
 ### Graphical setup
 
-To start from the desktop, clone or extract the complete installer and launch
+To start from the desktop, clone the complete repository and launch
 [`cachyfreeze-setup.desktop`](cachyfreeze-setup.desktop). The graphical Setup
 page uses the same preflight and privileged installer as the terminal entrypoint.
 
