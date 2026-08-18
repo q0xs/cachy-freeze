@@ -24,7 +24,7 @@ command -v pacman >/dev/null 2>&1 || {
 [[ -r $SCRIPT_DIR/installer/install-cachyfreeze.sh ]] || {
   printf '%s\n' \
     "The complete CachyFreeze repository is required." \
-    "Clone https://github.com/q0xs/cachy-freeze.git and run sudo ./install.sh from it." >&2
+    "Download and extract the complete GitHub ZIP, then open cachyfreeze-setup.desktop." >&2
   exit 1
 }
 

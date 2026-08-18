@@ -19,6 +19,16 @@ require_maintenance() {
     die "The maintenance root is mounted read-only."
 }
 
+restore_github_zip_symlink() {
+  local path=$1 target=$2
+  if [[ ! -L $path && -f $path ]] && [[ $(<"$path") == "$target" ]]; then
+    rm -f -- "$path"
+    ln -s "$target" "$path"
+  fi
+  [[ -L $path && $(readlink "$path") == "$target" ]] ||
+    die "A reviewed archive symlink is invalid: $path"
+}
+
 aur_install() {
   local package=$1
   pacman -Q "$package" >/dev/null 2>&1 && return 0
@@ -40,6 +50,15 @@ aur_install() {
     die "The reviewed AUR revision is missing: $package"
   cp -a "$vendored/." "$build_dir/"
   chown -R goldenbuild:goldenbuild "$build_dir"
+
+  # GitHub source ZIPs materialize repository symlinks as regular files whose
+  # content is the link target. Restore the reviewed GTK 2 license link in the
+  # isolated build tree so ZIP and Git checkouts produce the same package.
+  if [[ $package == gtk2 ]]; then
+    local zero_bsd_link=$build_dir/LICENSES/0BSD.txt
+    restore_github_zip_symlink "$zero_bsd_link" ../LICENSE
+    chown -h goldenbuild:goldenbuild "$zero_bsd_link"
+  fi
 
   (
     cd "$build_dir" || exit 1

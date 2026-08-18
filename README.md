@@ -52,30 +52,25 @@ CachyFreeze currently requires all of the following:
 It is not a generic installer for arbitrary Arch, ext4, BIOS, systemd-boot, or
 custom Btrfs layouts.
 
-## Clone and install the complete repository
+## Download the ZIP and install graphically
 
-The supported installation method is a full Git clone. It preserves executable
-permissions and downloads the complete project—including every installer,
-application, policy, user asset, test, and recovery component required by
-CachyFreeze:
+The supported installation method does not require terminal commands:
 
-```bash
-git clone --branch main https://github.com/q0xs/cachy-freeze.git
-cd cachy-freeze
-sudo ./install.sh
-```
+1. Select **Code → Download ZIP** on this GitHub page, or use
+   **[Download CachyFreeze ZIP](https://github.com/q0xs/cachy-freeze/archive/refs/heads/main.zip)**.
+2. Extract the complete `cachy-freeze-main.zip` archive. Do not run files from
+   inside the archive preview and do not download individual source files.
+3. Open the extracted `cachy-freeze-main` folder.
+4. Open [`cachyfreeze-setup.desktop`](cachyfreeze-setup.desktop) and choose
+   **Execute** if KDE asks how to open it.
+5. Run **Preflight**, confirm recovery readiness or disposable-device use, then
+   select **Install CachyFreeze** and approve the administrator prompt.
 
-The root-level [`install.sh`](install.sh) is the public terminal installer. It
-refuses partial or standalone-script installations. From the complete clone it
-runs the supported-layout preflight, installs the engine and graphical management
-application, publishes the initial Golden baseline, and leaves the next boot
-safely scheduled as THAWED.
-
-### Graphical setup
-
-To start from the desktop, clone the complete repository and launch
-[`cachyfreeze-setup.desktop`](cachyfreeze-setup.desktop). The graphical Setup
-page uses the same preflight and privileged installer as the terminal entrypoint.
+The ZIP contains every installer, application, policy, user asset, test, and
+recovery component required by CachyFreeze. The graphical Setup page validates
+the supported layout, installs the engine and Management Center, publishes the
+initial Golden baseline, and leaves the next boot safely scheduled as THAWED.
+Partial or standalone-script downloads remain unsupported.
 
 ## First workstation setup
 
@@ -117,7 +112,8 @@ not the Linux administrator account name.
 
 | Path | Responsibility |
 | --- | --- |
-| `install.sh` | Public complete-repository terminal installer |
+| `cachyfreeze-setup.desktop` | Primary ZIP-based graphical installer |
+| `install.sh` | Complete-repository installer fallback |
 | `app/` | PyQt6 Management Center, launcher, PolicyKit helper, desktop files |
 | `src/cachy_freeze/` | Snapshot, boot, settings, update, audit, and user logic |
 | `deepfreeze/` | Btrfs early-boot reset, GRUB, initramfs, systemd, safe tests |

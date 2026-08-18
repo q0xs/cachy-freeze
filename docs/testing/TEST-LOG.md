@@ -4,6 +4,25 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-18 — ZIP-first graphical installation — `agent/make-zip-graphical-install-primary`
+
+- CHANGED — README and installation documentation now make GitHub **Code →
+  Download ZIP**, full extraction, and `cachyfreeze-setup.desktop` the primary
+  end-user path; no terminal command is required.
+- FIXED — reviewed GTK 2 symlink semantics are restored in the isolated AUR
+  build tree when GitHub ZIP materializes the link as a regular target-text
+  file, making application installation consistent between ZIP and Git trees.
+- PASS — Ruff check/format, 68/68 Python tests, repository-wide error-level
+  ShellCheck, static/desktop contracts including the ZIP link and executable
+  graphical launcher, Qt offscreen UI smoke, isolated GRUB generation, and
+  `git diff --check`.
+- PASS — downloaded the pushed GitHub branch ZIP through HTTPS, extracted it,
+  verified the graphical launcher retained executable mode, and reran all 68
+  Python tests plus the static gate from the extracted archive. The static gate
+  also exercised restoration of GitHub ZIP's materialized GTK 2 symlink.
+- NOT RUN — physical reinstall, boot-stack integration, reboot, and destructive
+  recovery tests; the target already has a verified live installation.
+
 ## 2026-08-18 — ready-user application preflight — `agent/guard-ready-user-applications`
 
 - FIXED — **Create ready user** now verifies the complete managed-application

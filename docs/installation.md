@@ -9,30 +9,28 @@
 
 The installer stops when preflight detects an unsupported layout.
 
-## Complete-repository terminal install
+## ZIP-based graphical install
 
-```bash
-git clone --branch main https://github.com/q0xs/cachy-freeze.git
-cd cachy-freeze
-sudo ./install.sh
-```
+1. Open <https://github.com/q0xs/cachy-freeze> in a browser.
+2. Select **Code → Download ZIP**, or use the direct
+   [CachyFreeze main ZIP](https://github.com/q0xs/cachy-freeze/archive/refs/heads/main.zip).
+3. Extract the entire archive and open the resulting `cachy-freeze-main` folder.
+   Do not launch from the compressed-file preview and do not copy only selected
+   files out of the archive.
+4. Open `cachyfreeze-setup.desktop` and choose **Execute** if KDE prompts.
+5. Run preflight, confirm either recovery readiness or disposable-device
+   acceptance, and select **Install CachyFreeze**.
 
-The installer supports only a complete Git clone. Review the repository before
-running `install.sh`; partial downloads and standalone remote-script execution
-are intentionally unsupported. The installer installs the engine and GUI,
-publishes the initial Golden, and leaves the next boot in THAWED mode.
+The launcher restores any helper execute permission lost during extraction,
+installs the graphical dependency through PolicyKit when necessary, and opens
+the unprivileged Setup page. Root operations still pass through the restricted
+PolicyKit helper. Installation publishes the initial Golden and leaves the next
+boot in THAWED mode.
 
-When `install.sh` is started from a terminal, it elevates through `sudo`. When a
-desktop file manager starts the same complete-clone entry without a terminal, it
-uses the graphical PolicyKit authentication agent instead. This prevents the
-otherwise silent `sudo: a terminal is required` failure. The dedicated graphical
-entry remains `cachyfreeze-setup.desktop`.
-
-## Graphical install
-
-From the complete clone, open `cachyfreeze-setup.desktop`, run preflight, confirm
-either recovery readiness or disposable-device acceptance, and select
-**Install CachyFreeze**.
+Only a complete project archive is supported. Individual scripts, GitHub raw
+file links, and launching directly from inside the ZIP are intentionally
+unsupported. `install.sh` remains a complete-repository fallback, but the ZIP
+and graphical Setup launcher are the documented end-user path.
 
 ## Independent next steps
 
