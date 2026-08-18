@@ -4,6 +4,30 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-18 — ready-user application preflight — `agent/guard-ready-user-applications`
+
+- FIXED — **Create ready user** now verifies the complete managed-application
+  status before displaying or collecting values in the account dialog. Missing
+  or unhealthy requirements are listed and the operator is redirected to the
+  Updates page instead of creating and rolling back a partial account.
+- FIXED — the public `install.sh` entry now uses `sudo` in a terminal and the
+  graphical PolicyKit agent when launched from a desktop file manager. This
+  addresses the observed no-terminal `sudo` failure from a complete checkout.
+- PASS — the existing physical standard account has a Wine prefix, non-empty
+  registry, official MicroSIP 3.22.12 executable matching the recorded
+  executable checksum, correct ownership, seven desktop shortcuts, and a
+  template copy. Its production launcher remained healthy until the 15-second
+  isolated X display timeout.
+- PASS — Ruff check and format, 68/68 Python unit/GUI/helper/boundary tests,
+  error-level ShellCheck/static validation, Qt offscreen UI smoke, isolated GRUB
+  generation, and `git diff --check`.
+- PASS — downloaded the pushed GitHub branch archive through HTTPS, extracted
+  it into a temporary directory, verified executable installer/helper modes,
+  and reran all 68 Python tests plus the static gate from the extracted archive.
+- NOT RUN — new privileged user creation, boot-stack integration, physical
+  reboot, and recovery tests; no disposable target was needed for these entry
+  point and GUI changes.
+
 ## 2026-08-18 — clean physical reinstall and exhaustive live validation — final working tree
 
 - PASS — removed the previous physical installation, managed snapshots, state
