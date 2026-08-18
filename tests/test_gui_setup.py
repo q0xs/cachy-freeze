@@ -143,6 +143,54 @@ class SetupGuiTests(unittest.TestCase):
             [call.args[0] for call in self.backend.run.call_args_list],
         )
 
+    def test_autologin_then_freeze_sequence_uses_only_in_memory_state(self) -> None:
+        self.window.pending_autologin_user = "person_01"
+        self.window.pending_user_freeze = True
+
+        self.window._operation_finished("user-create", True, "created")
+        self.backend.run.assert_called_once_with("user-autologin", "person_01")
+        self.assertIsNone(self.window.pending_autologin_user)
+
+        self.backend.run.reset_mock()
+        self.window._operation_finished("user-autologin", True, "enabled")
+        self.backend.run.assert_called_once_with("freeze")
+        self.assertFalse(self.window.pending_user_freeze)
+
+    def test_autologin_failure_cancels_pending_freeze(self) -> None:
+        self.window.pending_autologin_user = "person_01"
+        self.window.pending_user_freeze = True
+
+        with patch("cachy_freeze_gui.window.QMessageBox.critical"):
+            self.window._operation_finished("user-autologin", False, "failed")
+
+        self.assertIsNone(self.window.pending_autologin_user)
+        self.assertFalse(self.window.pending_user_freeze)
+        self.backend.run.assert_not_called()
+
+    def test_administrator_mutations_are_blocked_in_user_page(self) -> None:
+        self.window._users_changed(
+            [
+                {
+                    "username": "localadm",
+                    "display_name": "Administrator",
+                    "administrator": True,
+                    "groups": ["localadm", "wheel"],
+                    "locked": False,
+                    "autologin": False,
+                    "home": "/home/localadm",
+                }
+            ]
+        )
+        self.window.user_table.selectRow(0)
+
+        with patch("cachy_freeze_gui.window.QMessageBox.warning") as warning:
+            self.window._toggle_user_lock()
+            self.window._toggle_autologin()
+            self.window._delete_user()
+
+        self.assertEqual(warning.call_count, 3)
+        self.backend.run.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

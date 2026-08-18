@@ -21,9 +21,40 @@ class UserValidationTests(unittest.TestCase):
 
     def test_password_policy(self) -> None:
         UserManager.validate_password("1234")
-        for invalid in ("123", "Colon:Password42"):
+        UserManager.validate_password("x" * 256)
+        for invalid in (
+            "123",
+            "x" * 257,
+            "Colon:Password42",
+            "line\nbreak",
+            "carriage\rreturn",
+            "null\x00byte",
+        ):
             with self.subTest(invalid=invalid), self.assertRaises(CachyFreezeError):
                 UserManager.validate_password(invalid)
+
+    def test_new_username_and_display_name_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manager = UserManager(
+                state_dir=root / "state",
+                lock_file=root / "operation.lock",
+                logger=AuditLogger(root / "audit.jsonl"),
+            )
+            invalid_values = (
+                ("a", "Person"),
+                ("a" * 32, "Person"),
+                ("person01", ""),
+                ("person01", "Name:Field"),
+                ("person01", "x" * 101),
+            )
+            for username, display_name in invalid_values:
+                with (
+                    self.subTest(username=username, display_name=display_name),
+                    patch.object(manager, "require_root"),
+                    self.assertRaises(CachyFreezeError),
+                ):
+                    manager.create(username, display_name, "1234")
 
     def test_new_account_requires_normal_login_name(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -59,7 +90,11 @@ class UserValidationTests(unittest.TestCase):
             def run(self, command: list[str], **kwargs: object) -> SimpleNamespace:
                 arguments = list(command)
                 self.calls.append((arguments, kwargs))
-                return SimpleNamespace(returncode=1 if arguments[:2] == ["getent", "group"] else 0)
+                return SimpleNamespace(returncode=0)
+
+            def text(self, command: list[str], **_kwargs: object) -> str:
+                self.calls.append((list(command), {"text": True}))
+                return ""
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -71,6 +106,7 @@ class UserValidationTests(unittest.TestCase):
             (backup_dir / "account.json").write_text(
                 json.dumps(
                     {
+                        "schema": 1,
                         "username": "person_01",
                         "uid": 1234,
                         "gid": 1234,
@@ -142,6 +178,7 @@ class UserValidationTests(unittest.TestCase):
                 patch.object(manager, "_account", side_effect=[None, account]),
                 patch.object(manager, "_set_password"),
                 patch.object(manager, "_refresh_template") as refresh_template,
+                patch.object(manager, "_is_administrator", return_value=False),
                 patch.object(manager, "list_users", return_value=[created_user]),
                 patch.object(manager.runner, "run") as run,
             ):
@@ -185,6 +222,86 @@ class UserValidationTests(unittest.TestCase):
                 manager.create("person_01", "Person One", "1234")
 
             self.assertEqual(run.call_args_list[-1].args[0], ["userdel", "--remove", "person_01"])
+
+    def test_create_rejects_unexpected_administrator_membership(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / "home" / "person_01"
+            home.mkdir(parents=True)
+            provisioner = root / "prepare-standard-user.sh"
+            provisioner.touch()
+            account = SimpleNamespace(pw_dir=str(home))
+            manager = UserManager(
+                state_dir=root / "state",
+                lock_file=root / "operation.lock",
+                logger=AuditLogger(root / "audit.jsonl"),
+                template_root=root / "templates",
+                provisioner_path=provisioner,
+            )
+            with (
+                patch.object(manager, "require_root"),
+                patch.object(manager, "_account", side_effect=[None, account]),
+                patch.object(manager, "_set_password"),
+                patch.object(manager, "_is_administrator", return_value=True),
+                patch.object(manager.runner, "run") as run,
+                self.assertRaisesRegex(CachyFreezeError, "administrator membership"),
+            ):
+                manager.create("person_01", "Person One", "1234")
+
+            self.assertEqual(run.call_args_list[-1].args[0], ["userdel", "--remove", "person_01"])
+
+    def test_restore_rejects_mismatched_existing_primary_group(self) -> None:
+        class GroupRunner:
+            def __init__(self) -> None:
+                self.calls: list[list[str]] = []
+
+            def run(self, command: list[str], **_kwargs: object) -> SimpleNamespace:
+                self.calls.append(list(command))
+                return SimpleNamespace(returncode=0)
+
+            def text(self, command: list[str], **_kwargs: object) -> str:
+                self.calls.append(list(command))
+                if command == ["getent", "group", "person_01"]:
+                    return "person_01:x:9999:"
+                return ""
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            backup_id = "20260804T000000Z-person_01"
+            backup_dir = root / "state" / "user-backups" / backup_id
+            backup_dir.mkdir(parents=True)
+            (backup_dir / "account.json").write_text(
+                json.dumps(
+                    {
+                        "schema": 1,
+                        "username": "person_01",
+                        "uid": 1234,
+                        "gid": 1234,
+                        "home": "/home/person_01",
+                        "shell": "/bin/bash",
+                        "gecos": "Person One",
+                        "password_hash": "$y$j9T$salt$hash",
+                        "groups": ["person_01", "audio"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            runner = GroupRunner()
+            manager = UserManager(
+                state_dir=root / "state",
+                lock_file=root / "operation.lock",
+                logger=AuditLogger(root / "audit.jsonl"),
+                runner=runner,  # type: ignore[arg-type]
+                template_root=root / "templates",
+            )
+            with (
+                patch.object(manager, "require_root"),
+                patch.object(manager, "_account", return_value=None),
+                self.assertRaisesRegex(CachyFreezeError, "primary group"),
+            ):
+                manager.restore(backup_id)
+
+            self.assertFalse(any(command and command[0] == "useradd" for command in runner.calls))
 
 
 if __name__ == "__main__":

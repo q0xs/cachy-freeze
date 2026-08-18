@@ -23,6 +23,15 @@ die() {
   exit 1
 }
 
+require_argument_count() {
+  local expected=$1
+  shift
+  (( $# == expected )) || {
+    printf '%s\n' "ERROR: Invalid argument count." >&2
+    exit 2
+  }
+}
+
 read_employee_secret() {
   IFS= read -r SETUP_SECRET || die "Password was not received through the secure input channel."
   (( ${#SETUP_SECRET} >= 4 && ${#SETUP_SECRET} <= 256 )) ||
@@ -151,15 +160,19 @@ esac
 
 case ${1:-} in
   status)
+    require_argument_count 1 "$@"
     exec "$BACKEND" status
     ;;
   thaw)
+    require_argument_count 1 "$@"
     exec "$BACKEND" thaw
     ;;
   thaw-once)
+    require_argument_count 1 "$@"
     exec "$BACKEND" thaw-once
     ;;
   freeze)
+    require_argument_count 1 "$@"
     [[ -s /etc/cachy-freeze-grub-auth.conf ]] ||
       die "Set the GRUB maintenance password from Setup before the first FROZEN boot."
     if [[ $(findmnt -n -o SOURCE /) == *'[/@]' ]]; then
@@ -168,12 +181,15 @@ case ${1:-} in
     exec "$BACKEND" freeze
     ;;
   reboot)
+    require_argument_count 1 "$@"
     exec /usr/bin/systemctl reboot
     ;;
   snapshot-list)
+    require_argument_count 1 "$@"
     exec "$BACKEND" snapshot list
     ;;
   snapshot-create)
+    require_argument_count 2 "$@"
     [[ -n ${2:-} ]] || {
       printf '%s\n' "ERROR: A snapshot description is required." >&2
       exit 2
@@ -181,50 +197,62 @@ case ${1:-} in
     exec "$BACKEND" snapshot create --description "$2"
     ;;
   snapshot-verify)
+    require_argument_count 2 "$@"
     [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
     exec "$BACKEND" snapshot verify "$2" --full
     ;;
   snapshot-compare)
+    require_argument_count 3 "$@"
     [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
     [[ ${3:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
     exec "$BACKEND" snapshot compare "$2" "$3"
     ;;
   snapshot-delete)
+    require_argument_count 2 "$@"
     [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
     exec "$BACKEND" snapshot delete "$2"
     ;;
   snapshot-rollback)
+    require_argument_count 2 "$@"
     [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
     exec "$BACKEND" snapshot rollback "$2"
     ;;
   snapshot-export)
+    require_argument_count 2 "$@"
     [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
     exec "$BACKEND" snapshot export "$2"
     ;;
   snapshot-import)
+    require_argument_count 2 "$@"
     [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}\.btrfs$ ]] || exit 2
     exec "$BACKEND" snapshot import "$2"
     ;;
   health)
+    require_argument_count 1 "$@"
     exec "$BACKEND" health
     ;;
   updates-check)
+    require_argument_count 1 "$@"
     exec "$BACKEND" updates check
     ;;
   updates-apply)
+    require_argument_count 1 "$@"
     exec "$BACKEND" updates apply
     ;;
   applications-status)
+    require_argument_count 1 "$@"
     exec "$BACKEND" applications status
     ;;
   applications-install)
+    require_argument_count 1 "$@"
     exec "$BACKEND" applications install
     ;;
   settings-get)
+    require_argument_count 1 "$@"
     exec "$BACKEND" settings get
     ;;
   settings-set)
-    (( $# == 10 )) || exit 2
+    require_argument_count 10 "$@"
     [[ $2 =~ ^[0-9]+$ && $4 =~ ^[0-9]+$ && $7 =~ ^[0-9]+$ && $8 =~ ^[0-9]+$ ]] || exit 2
     [[ $3 == true || $3 == false ]] || exit 2
     [[ $5 == true || $5 == false ]] || exit 2
@@ -243,38 +271,50 @@ case ${1:-} in
       --theme "${10}"
     ;;
   logs)
+    require_argument_count 1 "$@"
     exec "$BACKEND" logs --limit 200
     ;;
   user-list)
+    require_argument_count 1 "$@"
     exec "$BACKEND" user list
     ;;
   user-create)
+    require_argument_count 3 "$@"
     [[ ${2:-} =~ ^[a-z][a-z0-9_-]{1,30}$ ]] ||
       die "Username must contain 2-31 lowercase letters, digits, underscores, or hyphens."
     [[ -n ${3:-} ]] || die "A display name is required."
     exec "$BACKEND" user create "$2" --display-name "$3"
     ;;
   user-delete)
+    require_argument_count 2 "$@"
     [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
     exec "$BACKEND" user delete "$2"
     ;;
   user-restore)
+    require_argument_count 2 "$@"
     [[ ${2:-} =~ ^[0-9]{8}T[0-9]{6}Z-[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
     exec "$BACKEND" user restore "$2"
     ;;
   user-password)
+    require_argument_count 2 "$@"
     [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
     exec "$BACKEND" user password "$2"
     ;;
   user-lock)
+    require_argument_count 2 "$@"
     [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
     exec "$BACKEND" user lock "$2"
     ;;
   user-unlock)
+    require_argument_count 2 "$@"
     [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
     exec "$BACKEND" user unlock "$2"
     ;;
   user-autologin)
+    (( $# == 1 || $# == 2 )) || {
+      printf '%s\n' "ERROR: Invalid argument count." >&2
+      exit 2
+    }
     [[ -z ${2:-} || ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
     if [[ -n ${2:-} ]]; then
       exec "$BACKEND" user autologin "$2"

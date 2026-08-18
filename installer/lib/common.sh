@@ -33,13 +33,13 @@ aur_install() {
   install -d -o goldenbuild -g goldenbuild -m 0750 "$build_dir"
 
   local vendored="${PROJECT_ROOT:-}/vendor/aur/$package"
-  if [[ -r $vendored/PKGBUILD ]]; then
-    cp -a "$vendored/." "$build_dir/"
-    chown -R goldenbuild:goldenbuild "$build_dir"
-  else
-    runuser -u goldenbuild -- \
-      git clone --depth 1 "https://aur.archlinux.org/$package.git" "$build_dir"
-  fi
+  [[ -r $vendored/PKGBUILD && -r ${PROJECT_ROOT:-}/vendor/aur/AUR-REVISIONS.txt ]] ||
+    die "The reviewed AUR recipe is missing: $package"
+  grep -Eq "^${package} [0-9a-f]{40}$" \
+    "${PROJECT_ROOT:-}/vendor/aur/AUR-REVISIONS.txt" ||
+    die "The reviewed AUR revision is missing: $package"
+  cp -a "$vendored/." "$build_dir/"
+  chown -R goldenbuild:goldenbuild "$build_dir"
 
   (
     cd "$build_dir"

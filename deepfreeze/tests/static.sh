@@ -54,6 +54,13 @@ grep -q 'chpasswd", "--encrypted"' \
   "$PROJECT_ROOT/src/cachy_freeze/users.py"
 grep -q 'test_encrypted_password_hash_uses_stdin_safe_payload' \
   "$PROJECT_ROOT/tests/test_users.py"
+for aur_package in google-chrome slack-desktop gtk2 zoiper-bin anydesk-bin; do
+  [[ -r $PROJECT_ROOT/vendor/aur/$aur_package/PKGBUILD ]]
+  grep -Eq "^${aur_package} [0-9a-f]{40}$" \
+    "$PROJECT_ROOT/vendor/aur/AUR-REVISIONS.txt"
+done
+! sed -n '/^aur_install()/,/^}/p' \
+  "$PROJECT_ROOT/installer/lib/common.sh" | grep -q 'git clone'
 for agent_rules in \
   "$PROJECT_ROOT/AGENTS.md" \
   "$PROJECT_ROOT/app/AGENTS.md" \

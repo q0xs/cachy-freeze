@@ -11,7 +11,8 @@
 *.toml text eol=lf
 *.html text eol=lf
 *.install text eol=lf
-*.patch text eol=lf
+# Patch payloads may intentionally preserve upstream context whitespace.
+*.patch text eol=lf whitespace=-trailing-space,-space-before-tab
 PKGBUILD text eol=lf
 .SRCINFO text eol=lf
 .gitignore text eol=lf

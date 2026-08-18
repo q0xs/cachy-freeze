@@ -66,6 +66,59 @@ class CliParserTests(unittest.TestCase):
         )
         self.assertEqual(settings.boot_failure_limit, 3)
 
+    def test_every_command_and_parameter_shape_parses(self) -> None:
+        snapshot_id = "snap-20260801T120000Z-1234abcd"
+        backup_id = "20260801T120000Z-person01"
+        commands = (
+            ["preflight"],
+            ["status"],
+            ["freeze"],
+            ["thaw"],
+            ["thaw-once"],
+            ["health"],
+            ["boot-success"],
+            ["auto-snapshot"],
+            ["updates", "check"],
+            ["updates", "apply"],
+            ["applications", "status"],
+            ["applications", "install"],
+            ["settings", "get"],
+            ["publish", "--description", "Golden"],
+            ["snapshot", "create", "--description", "Before update"],
+            ["snapshot", "list"],
+            ["snapshot", "verify", snapshot_id, "--full"],
+            ["snapshot", "delete", snapshot_id],
+            ["snapshot", "compare", snapshot_id, snapshot_id],
+            ["snapshot", "rollback", snapshot_id],
+            ["snapshot", "export", snapshot_id],
+            ["snapshot", "import", f"{snapshot_id}.btrfs"],
+            ["snapshot", "cleanup", "--keep", "20"],
+            ["logs", "--limit", "200"],
+            ["user", "list"],
+            ["user", "create", "person01", "--display-name", "Person One"],
+            ["user", "delete", "person01"],
+            ["user", "restore", backup_id],
+            ["user", "password", "person01"],
+            ["user", "lock", "person01"],
+            ["user", "unlock", "person01"],
+            ["user", "autologin"],
+            ["user", "autologin", "person01"],
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertEqual(parser().parse_args(command).command, command[0])
+
+    def test_invalid_enum_parameters_are_rejected(self) -> None:
+        for command in (
+            ["updates", "invalid"],
+            ["applications", "invalid"],
+            ["settings", "set", "--language", "invalid"],
+            ["snapshot", "invalid"],
+            ["user", "invalid"],
+        ):
+            with self.subTest(command=command), self.assertRaises(SystemExit):
+                parser().parse_args(command)
+
 
 if __name__ == "__main__":
     unittest.main()

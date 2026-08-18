@@ -132,5 +132,5 @@ unzip -t "$microsip_zip"
 (cd /opt/company/microsip && sha256sum --check SHA256SUMS)
 
 printf '%s\n' \
-  "Kurumsal uygulamalar kuruldu ve dogrulandi." \
-  "MicroSIP kullanici prefix'i hesap hazirlama adiminda olusacak."
+  "Managed applications were installed and verified." \
+  "The per-user MicroSIP prefix will be created while preparing the account."

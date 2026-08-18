@@ -4,6 +4,39 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-18 — user lifecycle and application readiness hardening — working tree based on `8866a9b`
+
+- PASS — 59/59 Python unit, GUI contract, helper allow-list, boundary, and
+  malformed-input tests; Ruff check and format check.
+- PASS — temporary privileged user lifecycle: create, native group inspection,
+  lock/unlock, automatic login, backed-up delete, UID/GID/group-preserving
+  restore, FROZEN home reset, and unprivileged-backend rejection.
+- PASS — loop-backed Btrfs engine integration with 25-snapshot stress,
+  retention, compare, export/import, rollback, FROZEN/THAWED scheduling, and
+  interrupted transaction recovery.
+- PASS — loop-backed early-boot reset, repeated Active recreation, two
+  power-loss recovery points, and automatic failed-Golden rollback.
+- PASS — reviewed AUR sources and checksums for Google Chrome 151.0.7922.137,
+  Slack 4.51.180, GTK 2.24.33, Zoiper 5.6.13, and AnyDesk 8.0.4; every generated
+  `.SRCINFO` exactly matches its vendored recipe.
+- PASS — physical target read-only preflight and health inspection: THAWED `@`,
+  UEFI/Btrfs layout supported, no pending transaction, all five existing
+  snapshots healthy, and zero reported Btrfs device errors.
+- FIXED — the privileged user integration fixture attempted to run an ELF
+  executable through Bash. It now uses a real temporary provisioner and passes.
+- FIXED — administrator protection, group visibility and restore collision
+  checks, in-memory automatic-login sequencing, exact helper arity, full
+  application prerequisites, Chrome policy equality, and MicroSIP executable
+  checksum verification.
+- FIXED — all AUR inputs are now reviewed and vendored; the installer no longer
+  clones unreviewed AUR HEAD recipes when a package directory is absent.
+- FOUND — the pre-existing physical installation has none of the managed
+  employee applications installed and cannot yet create an application-ready
+  standard account.
+- NOT RUN — clean physical reinstall, managed application installation, live
+  application-ready user provisioning, and reboot validation are the next
+  phase of this audit.
+
 ## 2026-08-15 — visible fixed GRUB username — local working tree after `b690f59`
 
 - PASS — Setup displays the selectable fixed GRUB maintenance username

@@ -122,8 +122,10 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.backend = backend
         self.settings = QSettings("CachyOS Workstation", "CachyFreeze")
+        self.settings.remove("pending_autologin")
         self.setup_preflight_ok = False
         self.pending_user_freeze = False
+        self.pending_autologin_user: str | None = None
         self.setWindowTitle("CachyFreeze Management Center")
         self.setMinimumSize(980, 640)
         self.resize(1180, 740)
@@ -366,9 +368,17 @@ class MainWindow(QMainWindow):
         note.setObjectName("muted")
         note.setWordWrap(True)
         layout.addWidget(note)
-        self.user_table = QTableWidget(0, 6)
+        self.user_table = QTableWidget(0, 7)
         self.user_table.setHorizontalHeaderLabels(
-            ["User", "Display name", "Type", "Status", "Automatic login", "Home"]
+            [
+                "User",
+                "Display name",
+                "Type",
+                "Groups",
+                "Status",
+                "Automatic login",
+                "Home",
+            ]
         )
         self.user_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.user_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -789,6 +799,7 @@ class MainWindow(QMainWindow):
                 str(user.get("username", "")),
                 str(user.get("display_name", "")),
                 "Administrator" if user.get("administrator") else "Standard",
+                ", ".join(str(group) for group in user.get("groups", [])),
                 "Locked" if user.get("locked") else "Unlocked",
                 "Enabled" if user.get("autologin") else "Disabled",
                 str(user.get("home", "")),
@@ -846,11 +857,11 @@ class MainWindow(QMainWindow):
         ):
             return
         self.pending_user_freeze = freeze_after_create
+        self.pending_autologin_user = username if dialog.autologin.isChecked() else None
         started = self.backend.run("user-create", username, display_name, secret=password)
         if not started:
             self.pending_user_freeze = False
-        if started and dialog.autologin.isChecked():
-            self.settings.setValue("pending_autologin", username)
+            self.pending_autologin_user = None
 
     def _reset_user_password(self) -> None:
         user = self._selected_user()
@@ -879,6 +890,13 @@ class MainWindow(QMainWindow):
         user = self._selected_user()
         if user is None:
             return
+        if user.get("administrator"):
+            QMessageBox.warning(
+                self,
+                "Protected administrator",
+                "Administrator accounts cannot be locked from CachyFreeze.",
+            )
+            return
         action = "user-unlock" if user.get("locked") else "user-lock"
         verb = "unlocked" if user.get("locked") else "locked"
         if (
@@ -893,6 +911,13 @@ class MainWindow(QMainWindow):
         user = self._selected_user()
         if user is None:
             return
+        if user.get("administrator"):
+            QMessageBox.warning(
+                self,
+                "Protected administrator",
+                "Automatic login cannot be enabled for an administrator.",
+            )
+            return
         if user.get("autologin"):
             self.backend.run("user-autologin")
         else:
@@ -901,6 +926,13 @@ class MainWindow(QMainWindow):
     def _delete_user(self) -> None:
         user = self._selected_user()
         if user is None:
+            return
+        if user.get("administrator"):
+            QMessageBox.warning(
+                self,
+                "Protected administrator",
+                "Administrator accounts cannot be deleted from CachyFreeze.",
+            )
             return
         if (
             QMessageBox.warning(
@@ -1229,7 +1261,10 @@ class MainWindow(QMainWindow):
     def _operation_finished(self, action: str, success: bool, message: str) -> None:
         self.statusBar().showMessage(message, 8000)
         if action == "user-create" and not success:
-            self.settings.remove("pending_autologin")
+            self.pending_autologin_user = None
+            self.pending_user_freeze = False
+        if action == "user-autologin" and not success:
+            self.pending_autologin_user = None
             self.pending_user_freeze = False
         if not success and "iptal edildi" not in message.lower():
             QMessageBox.critical(self, "CachyFreeze Error", message)
@@ -1267,8 +1302,8 @@ class MainWindow(QMainWindow):
             )
             self.backend.run("setup-status")
         if success and action == "user-create":
-            pending = str(self.settings.value("pending_autologin", ""))
-            self.settings.remove("pending_autologin")
+            pending = self.pending_autologin_user
+            self.pending_autologin_user = None
             if pending:
                 self.backend.run("user-autologin", pending)
                 return

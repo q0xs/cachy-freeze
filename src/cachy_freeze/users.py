@@ -24,6 +24,7 @@ except ImportError:  # pragma: no cover - Windows test host
 _USERNAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,30}$")
 _NEW_USERNAME_RE = re.compile(r"^[a-z][a-z0-9_-]{1,30}$")
 _BACKUP_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-[a-z_][a-z0-9_-]{0,30}$")
+_ADMIN_GROUPS = frozenset({"wheel", "sudo"})
 
 
 class UserManager:
@@ -87,6 +88,13 @@ class UserManager:
             pass
         return None
 
+    def _groups(self, username: str) -> list[str]:
+        return self.runner.text(["id", "-nG", username], check=False).split()
+
+    def _is_administrator(self, username: str, groups: list[str] | None = None) -> bool:
+        effective_groups = self._groups(username) if groups is None else groups
+        return username == "localadm" or bool(_ADMIN_GROUPS.intersection(effective_groups))
+
     def list_users(self) -> list[dict[str, Any]]:
         self.require_root()
         if pwd is None:
@@ -97,7 +105,7 @@ class UserManager:
             if account.pw_name != "localadm" and not 1000 <= account.pw_uid < 65534:
                 continue
             status = self.runner.text(["passwd", "-S", account.pw_name], check=False).split()
-            groups = self.runner.text(["id", "-nG", account.pw_name], check=False).split()
+            groups = self._groups(account.pw_name)
             result.append(
                 {
                     "username": account.pw_name,
@@ -105,7 +113,8 @@ class UserManager:
                     "uid": account.pw_uid,
                     "home": account.pw_dir,
                     "shell": account.pw_shell,
-                    "administrator": "wheel" in groups or account.pw_name == "localadm",
+                    "administrator": self._is_administrator(account.pw_name, groups),
+                    "groups": groups,
                     "locked": len(status) > 1 and status[1] == "L",
                     "autologin": account.pw_name == autologin,
                 }
@@ -199,6 +208,10 @@ class UserManager:
                 if not self.provisioner_path.is_file():
                     raise CachyFreezeError("The verified standard-user provisioner was not found.")
                 self.runner.run(["bash", str(self.provisioner_path), username])
+                if self._is_administrator(username):
+                    raise CachyFreezeError(
+                        "The new account unexpectedly received administrator membership."
+                    )
                 self._refresh_template(username, Path(account.pw_dir))
             except Exception:
                 self.runner.run(["userdel", "--remove", username], check=False)
@@ -270,12 +283,14 @@ class UserManager:
     def delete(self, username: str) -> dict[str, Any]:
         self.require_root()
         username = self.validate_username(username)
-        if username == "localadm":
-            raise CachyFreezeError("localadm is a protected administrator and cannot be deleted.")
         with ProcessLock(self.lock_file):
             account = self._account(username)
             if account is None:
                 raise CachyFreezeError("User not found.")
+            if self._is_administrator(username):
+                raise CachyFreezeError("Administrator accounts cannot be deleted.")
+            if account.pw_dir != f"/home/{username}":
+                raise CachyFreezeError("Only standard users with a normal home can be deleted.")
             backup_id = self._backup_account(account)
             if self._autologin_user() == username:
                 self._write_autologin(None)
@@ -298,35 +313,74 @@ class UserManager:
         backup_dir = self.state_dir / "user-backups" / backup_id
         try:
             metadata = json.loads((backup_dir / "account.json").read_text(encoding="utf-8"))
+            if metadata.get("schema") != 1:
+                raise CachyFreezeError("Unsupported user backup schema.")
             username = self.validate_username(str(metadata["username"]))
             password_payload = self._encrypted_password_payload(
                 username, str(metadata["password_hash"])
             )
-        except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
+            uid = int(metadata["uid"])
+            gid = int(metadata["gid"])
+            home = str(metadata["home"])
+            shell = str(metadata["shell"])
+            gecos = str(metadata["gecos"])
+            groups = metadata.get("groups")
+            if not 1000 <= uid < 65534 or not 1 <= gid < 65534:
+                raise CachyFreezeError("The user or group ID in the backup is invalid.")
+            if home != f"/home/{username}":
+                raise CachyFreezeError("The home path in the user backup is invalid.")
+            if (
+                not shell.startswith("/")
+                or any(character in shell for character in (":", "\n", "\r", "\x00"))
+                or len(gecos) > 100
+                or any(character in gecos for character in (":", "\n", "\r", "\x00"))
+            ):
+                raise CachyFreezeError("The account fields in the user backup are invalid.")
+            if (
+                not isinstance(groups, list)
+                or not all(
+                    isinstance(group, str) and _USERNAME_RE.fullmatch(group) for group in groups
+                )
+                or username not in groups
+            ):
+                raise CachyFreezeError("The group list in the user backup is invalid.")
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
             raise CachyFreezeError(f"User backup could not be read: {error}") from error
         with ProcessLock(self.lock_file):
             if self._account(username) is not None:
                 raise CachyFreezeError("The user from the backup already exists.")
             group_name = username
-            if self.runner.run(["getent", "group", group_name], check=False).returncode != 0:
-                self.runner.run(["groupadd", "--gid", str(int(metadata["gid"])), group_name])
-            self.runner.run(
-                [
-                    "useradd",
-                    "--uid",
-                    str(int(metadata["uid"])),
-                    "--gid",
-                    group_name,
-                    "--home-dir",
-                    str(metadata["home"]),
-                    "--shell",
-                    str(metadata["shell"]),
-                    "--comment",
-                    str(metadata["gecos"]),
-                    username,
-                ]
-            )
+            existing_group = self.runner.text(["getent", "group", group_name], check=False).strip()
+            created_group = False
+            if existing_group:
+                fields = existing_group.split(":")
+                if len(fields) < 3 or not fields[2].isdigit() or int(fields[2]) != gid:
+                    raise CachyFreezeError(
+                        "The existing primary group does not match the user backup."
+                    )
+            else:
+                gid_owner = self.runner.text(["getent", "group", str(gid)], check=False).strip()
+                if gid_owner:
+                    raise CachyFreezeError("The backed-up group ID is already in use.")
+                self.runner.run(["groupadd", "--gid", str(gid), group_name])
+                created_group = True
             try:
+                self.runner.run(
+                    [
+                        "useradd",
+                        "--uid",
+                        str(uid),
+                        "--gid",
+                        group_name,
+                        "--home-dir",
+                        home,
+                        "--shell",
+                        shell,
+                        "--comment",
+                        gecos,
+                        username,
+                    ]
+                )
                 self.runner.run(["chpasswd", "--encrypted"], input_data=password_payload)
                 archive = backup_dir / "home.tar"
                 if archive.is_file():
@@ -347,15 +401,13 @@ class UserManager:
                     )
                 else:
                     self._refresh_template(username, Path(str(metadata["home"])))
-                safe_groups = [
-                    group
-                    for group in metadata.get("groups", [])
-                    if group != group_name and re.fullmatch(r"[a-z_][a-z0-9_-]{0,30}", str(group))
-                ]
+                safe_groups = [group for group in groups if group != group_name]
                 if safe_groups:
                     self.runner.run(["usermod", "-aG", ",".join(safe_groups), username])
             except Exception:
                 self.runner.run(["userdel", "--remove", username], check=False)
+                if created_group:
+                    self.runner.run(["groupdel", group_name], check=False)
                 shutil.rmtree(self.template_root / username, ignore_errors=True)
                 raise
         self.logger.write(
@@ -370,20 +422,20 @@ class UserManager:
     def set_password(self, username: str, password: str) -> None:
         self.require_root()
         username = self.validate_username(username)
-        if self._account(username) is None:
-            raise CachyFreezeError("User not found.")
         with ProcessLock(self.lock_file):
+            if self._account(username) is None:
+                raise CachyFreezeError("User not found.")
             self._set_password(username, password)
         self.logger.write("WARNING", "user.password", "User password reset", username=username)
 
     def set_locked(self, username: str, locked: bool) -> None:
         self.require_root()
         username = self.validate_username(username)
-        if username == "localadm":
-            raise CachyFreezeError("The localadm administrator account cannot be locked.")
-        if self._account(username) is None:
-            raise CachyFreezeError("User not found.")
         with ProcessLock(self.lock_file):
+            if self._account(username) is None:
+                raise CachyFreezeError("User not found.")
+            if self._is_administrator(username):
+                raise CachyFreezeError("Administrator accounts cannot be locked.")
             self.runner.run(["usermod", "--lock" if locked else "--unlock", username])
         self.logger.write(
             "WARNING",
@@ -406,12 +458,15 @@ class UserManager:
         self.require_root()
         if username is not None:
             username = self.validate_username(username)
-            account = self._account(username)
-            if account is None:
-                raise CachyFreezeError("User not found.")
-            if username == "localadm":
-                raise CachyFreezeError("Automatic login cannot be enabled for an administrator.")
         with ProcessLock(self.lock_file):
+            if username is not None:
+                account = self._account(username)
+                if account is None:
+                    raise CachyFreezeError("User not found.")
+                if self._is_administrator(username):
+                    raise CachyFreezeError(
+                        "Automatic login cannot be enabled for an administrator."
+                    )
             self.autologin_path.parent.mkdir(parents=True, exist_ok=True)
             self._write_autologin(username)
         self.logger.write(

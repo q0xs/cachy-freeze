@@ -4,6 +4,7 @@ set -Eeuo pipefail
 readonly PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 readonly TEST_ROOT=$(mktemp -d /tmp/cachy-freeze-users.XXXXXX)
 readonly TEST_USER="cfstest$$"
+readonly TEST_PROVISIONER=$TEST_ROOT/prepare-standard-user.sh
 
 cleanup() {
   if [[ $TEST_USER == cfstest+([0-9]) ]]; then
@@ -21,6 +22,8 @@ fail() {
 (( EUID == 0 )) || fail "The user integration test requires root."
 shopt -s extglob
 trap cleanup EXIT
+printf '%s\n' '#!/usr/bin/env bash' 'exit 0' >"$TEST_PROVISIONER"
+chmod 0755 "$TEST_PROVISIONER"
 
 PYTHONPATH="$PROJECT_ROOT/src" python - "$TEST_ROOT" "$TEST_USER" <<'PY'
 import sys
@@ -39,11 +42,14 @@ manager = UserManager(
     runner=CommandRunner(),
     autologin_path=root / "sddm.conf",
     template_root=root / "templates",
-    provisioner_path=Path("/usr/bin/true"),
+    provisioner_path=root / "prepare-standard-user.sh",
 )
 
 created = manager.create(username, "CachyFreeze Test", "Test-Password-42")
 assert created["administrator"] is False
+created_groups = set(created["groups"])
+assert username in created_groups
+assert not {"wheel", "sudo"}.intersection(created_groups)
 assert (root / "templates" / username).is_dir()
 manager.set_locked(username, True)
 assert next(item for item in manager.list_users() if item["username"] == username)["locked"]
@@ -55,6 +61,7 @@ assert deleted["backup_id"].endswith(username)
 restored = manager.restore(deleted["backup_id"])
 assert restored["username"] == username
 assert restored["administrator"] is False
+assert set(restored["groups"]) == created_groups
 assert (root / "templates" / username).is_dir()
 PY
 
