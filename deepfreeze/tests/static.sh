@@ -63,6 +63,20 @@ for aur_package in google-chrome slack-desktop gtk2 zoiper-bin anydesk-bin; do
 done
 ! sed -n '/^aur_install()/,/^}/p' \
   "$PROJECT_ROOT/installer/lib/common.sh" | grep -q 'git clone'
+grep -q 'GitHub source ZIPs materialize repository symlinks' \
+  "$PROJECT_ROOT/installer/lib/common.sh"
+grep -q 'restore_github_zip_symlink.*zero_bsd_link.*../LICENSE' \
+  "$PROJECT_ROOT/installer/lib/common.sh"
+zip_link_test=$(mktemp -d)
+trap 'rm -rf --one-file-system "$zip_link_test"' EXIT
+printf '%s' '../LICENSE' >"$zip_link_test/0BSD.txt"
+# shellcheck source=../../installer/lib/common.sh
+source "$PROJECT_ROOT/installer/lib/common.sh"
+restore_github_zip_symlink "$zip_link_test/0BSD.txt" ../LICENSE
+[[ -L $zip_link_test/0BSD.txt ]]
+[[ $(readlink "$zip_link_test/0BSD.txt") == ../LICENSE ]]
+rm -rf --one-file-system "$zip_link_test"
+trap - EXIT
 for agent_rules in \
   "$PROJECT_ROOT/AGENTS.md" \
   "$PROJECT_ROOT/app/AGENTS.md" \
@@ -138,10 +152,13 @@ grep -q 'fixed GRUB username.*cachyadmin' "$PROJECT_ROOT/README.md"
 grep -q 'always `cachyadmin`' "$PROJECT_ROOT/docs/installation.md"
 grep -q '/usr/share/icons/hicolor/512x512/apps/cachy-freeze.png' \
   "$PROJECT_ROOT/installer/install-freeze-engine.sh"
-grep -Fq 'git clone --branch main https://github.com/q0xs/cachy-freeze.git' \
-  "$PROJECT_ROOT/README.md"
-! grep -REq 'archive/refs/heads|raw.githubusercontent.com/.*/install.sh|curl .*install.sh' \
+grep -Fq 'https://github.com/q0xs/cachy-freeze/archive/refs/heads/main.zip' \
+  "$PROJECT_ROOT/README.md" "$PROJECT_ROOT/docs/installation.md"
+grep -Fq 'Code → Download ZIP' \
+  "$PROJECT_ROOT/README.md" "$PROJECT_ROOT/docs/installation.md"
+! grep -REq 'git clone|raw.githubusercontent.com/.*/install.sh|curl .*install.sh' \
   "$PROJECT_ROOT/README.md" "$PROJECT_ROOT/docs"/*.md
+[[ -x $PROJECT_ROOT/cachyfreeze-setup.desktop ]]
 for desktop in "$PROJECT_ROOT"/user/desktop/*.desktop; do
   grep -qx '\[Desktop Entry\]' "$desktop"
   grep -q '^Type=Application$' "$desktop"
