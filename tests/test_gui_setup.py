@@ -132,6 +132,60 @@ class SetupGuiTests(unittest.TestCase):
         self.assertIn("non-administrator", dialog.layout().itemAt(0).widget().text())
         dialog.close()
 
+    def test_ready_user_creation_checks_applications_before_showing_dialog(self) -> None:
+        with patch("cachy_freeze_gui.window.UserDialog") as dialog:
+            self.window._create_user()
+
+        self.backend.run.assert_called_once_with("applications-status")
+        self.assertTrue(self.window.pending_user_create_check)
+        dialog.assert_not_called()
+
+    def test_missing_applications_redirect_ready_user_to_updates(self) -> None:
+        self.window.pending_user_create_check = True
+
+        with (
+            patch("cachy_freeze_gui.window.QMessageBox.warning") as warning,
+            patch.object(self.window, "_show_create_user_dialog") as show_dialog,
+        ):
+            self.window._result_ready(
+                "applications-status",
+                {
+                    "all_installed": False,
+                    "applications": [
+                        {"name": "Wine", "installed": False},
+                        {"name": "Archive extractor", "installed": True},
+                    ],
+                },
+            )
+
+        self.assertFalse(self.window.pending_user_create_check)
+        self.assertEqual(self.window.pages.currentIndex(), 3)
+        self.assertIn("Wine", warning.call_args.args[2])
+        show_dialog.assert_not_called()
+
+    def test_ready_applications_continue_to_user_dialog(self) -> None:
+        self.window.pending_user_create_check = True
+
+        with patch.object(self.window, "_show_create_user_dialog") as show_dialog:
+            self.window._result_ready(
+                "applications-status",
+                {
+                    "all_installed": True,
+                    "applications": [{"name": "Wine", "installed": True}],
+                },
+            )
+
+        self.assertFalse(self.window.pending_user_create_check)
+        show_dialog.assert_called_once_with()
+
+    def test_failed_application_check_cancels_pending_user_creation(self) -> None:
+        self.window.pending_user_create_check = True
+
+        with patch("cachy_freeze_gui.window.QMessageBox.critical"):
+            self.window._operation_finished("applications-status", False, "failed")
+
+        self.assertFalse(self.window.pending_user_create_check)
+
     def test_successful_user_creation_can_schedule_frozen_without_reboot(self) -> None:
         self.window.pending_user_freeze = True
         self.window._operation_finished("user-create", True, "created")

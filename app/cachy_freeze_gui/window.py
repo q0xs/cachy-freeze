@@ -126,6 +126,7 @@ class MainWindow(QMainWindow):
         self.setup_preflight_ok = False
         self.pending_user_freeze = False
         self.pending_autologin_user: str | None = None
+        self.pending_user_create_check = False
         self.setWindowTitle("CachyFreeze Management Center")
         self.setMinimumSize(980, 640)
         self.resize(1180, 740)
@@ -820,6 +821,11 @@ class MainWindow(QMainWindow):
         return value if isinstance(value, dict) else None
 
     def _create_user(self) -> None:
+        self.pending_user_create_check = True
+        if not self.backend.run("applications-status"):
+            self.pending_user_create_check = False
+
+    def _show_create_user_dialog(self) -> None:
         dialog = UserDialog(self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -1260,6 +1266,8 @@ class MainWindow(QMainWindow):
 
     def _operation_finished(self, action: str, success: bool, message: str) -> None:
         self.statusBar().showMessage(message, 8000)
+        if action == "applications-status" and not success:
+            self.pending_user_create_check = False
         if action == "user-create" and not success:
             self.pending_autologin_user = None
             self.pending_user_freeze = False
@@ -1411,6 +1419,25 @@ class MainWindow(QMainWindow):
                 for item in applications
             ]
             self.update_view.setPlainText("\n".join(lines))
+            if action == "applications-status" and self.pending_user_create_check:
+                self.pending_user_create_check = False
+                missing = [
+                    str(item.get("name", "Unknown application"))
+                    for item in applications
+                    if not item.get("installed")
+                ]
+                if not result.get("all_installed") or missing:
+                    if not missing:
+                        missing.append("Application readiness could not be verified")
+                    self._select_page(3, self.page_titles[3])
+                    QMessageBox.warning(
+                        self,
+                        "Applications required",
+                        "Install or repair the required applications before creating a "
+                        "ready user.\n\nMissing or unhealthy:\n• " + "\n• ".join(missing),
+                    )
+                    return
+                self._show_create_user_dialog()
         elif action in {"settings-get", "settings-set"}:
             self.retention_spin.setValue(int(result.get("retention_count", 20)))
             self.auto_snapshot_check.setChecked(bool(result.get("auto_snapshot_enabled")))

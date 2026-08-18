@@ -4,6 +4,19 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-18 — ready-user application preflight — `agent/guard-ready-user-applications`
+
+- FIXED — **Create ready user** now verifies the complete managed-application
+  status before displaying or collecting values in the account dialog. Missing
+  or unhealthy requirements are listed and the operator is redirected to the
+  Updates page instead of creating and rolling back a partial account.
+- PASS — Ruff check and format, 65/65 Python unit/GUI/helper/boundary tests,
+  error-level ShellCheck/static validation, Qt offscreen UI smoke, isolated GRUB
+  generation, and `git diff --check`.
+- NOT RUN — privileged user creation, boot-stack integration, physical reboot,
+  and recovery tests; this GUI-only change does not exercise those destructive
+  paths.
+
 ## 2026-08-18 — clean physical reinstall and exhaustive live validation — final working tree
 
 - PASS — removed the previous physical installation, managed snapshots, state
