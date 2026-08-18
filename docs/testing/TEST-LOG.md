@@ -16,6 +16,10 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
   ShellCheck, static/desktop contracts including the ZIP link and executable
   graphical launcher, Qt offscreen UI smoke, isolated GRUB generation, and
   `git diff --check`.
+- PASS — downloaded the pushed GitHub branch ZIP through HTTPS, extracted it,
+  verified the graphical launcher retained executable mode, and reran all 68
+  Python tests plus the static gate from the extracted archive. The static gate
+  also exercised restoration of GitHub ZIP's materialized GTK 2 symlink.
 - NOT RUN — physical reinstall, boot-stack integration, reboot, and destructive
   recovery tests; the target already has a verified live installation.
 
