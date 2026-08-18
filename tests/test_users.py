@@ -99,7 +99,7 @@ class UserValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_dir = root / "state"
-            backup_id = "20260804T000000Z-person_01"
+            backup_id = "20260804T000000Z-1234abcd-person_01"
             backup_dir = state_dir / "user-backups" / backup_id
             backup_dir.mkdir(parents=True)
             password_hash = "$y$j9T$private-salt$private-hash"

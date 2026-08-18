@@ -292,7 +292,7 @@ case ${1:-} in
     ;;
   user-restore)
     require_argument_count 2 "$@"
-    [[ ${2:-} =~ ^[0-9]{8}T[0-9]{6}Z-[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
+    [[ ${2:-} =~ ^[0-9]{8}T[0-9]{6}Z-([0-9a-f]{8}-)?[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
     exec "$BACKEND" user restore "$2"
     ;;
   user-password)

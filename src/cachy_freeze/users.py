@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import time
+import uuid
 from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,7 +24,7 @@ except ImportError:  # pragma: no cover - Windows test host
 
 _USERNAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,30}$")
 _NEW_USERNAME_RE = re.compile(r"^[a-z][a-z0-9_-]{1,30}$")
-_BACKUP_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-[a-z_][a-z0-9_-]{0,30}$")
+_BACKUP_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-(?:[0-9a-f]{8}-)?[a-z_][a-z0-9_-]{0,30}$")
 _ADMIN_GROUPS = frozenset({"wheel", "sudo"})
 
 
@@ -227,7 +228,10 @@ class UserManager:
         return next(item for item in self.list_users() if item["username"] == username)
 
     def _backup_account(self, account: pwd.struct_passwd) -> str:
-        backup_id = f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{account.pw_name}"
+        backup_id = (
+            f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-"
+            f"{uuid.uuid4().hex[:8]}-{account.pw_name}"
+        )
         backup_dir = self.state_dir / "user-backups" / backup_id
         backup_dir.mkdir(parents=True, mode=0o700)
         shadow = self.runner.text(["getent", "shadow", account.pw_name])

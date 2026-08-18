@@ -28,6 +28,8 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
   checks, in-memory automatic-login sequencing, exact helper arity, full
   application prerequisites, Chrome policy equality, and MicroSIP executable
   checksum verification.
+- FIXED — new user-backup IDs include collision-resistant entropy while restore
+  remains compatible with the earlier timestamp-only backup IDs.
 - FIXED — all AUR inputs are now reviewed and vendored; the installer no longer
   clones unreviewed AUR HEAD recipes when a package directory is absent.
 - FOUND — the pre-existing physical installation has none of the managed
