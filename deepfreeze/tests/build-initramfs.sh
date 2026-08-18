@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-readonly TEST_DIR=$(mktemp -d /tmp/cachy-freeze-initramfs.XXXXXX)
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+readonly ROOT
+TEST_DIR=$(mktemp -d /tmp/cachy-freeze-initramfs.XXXXXX)
+readonly TEST_DIR
 readonly INSTALLED_RESET=/usr/lib/cachy-freeze/cachy-freeze-reset
 readonly INSTALLED_UNIT=/usr/lib/systemd/system/cachy-freeze-reset.service
 readonly INSTALLED_HOOK=/etc/initcpio/install/cachy-freeze

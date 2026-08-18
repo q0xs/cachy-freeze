@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+readonly PROJECT_ROOT
 readonly ADMIN_USER=localadm
 # shellcheck source=lib/common.sh
 source "$PROJECT_ROOT/installer/lib/common.sh"
@@ -211,8 +212,9 @@ EOF
 chmod 0600 /etc/cachy-frozen-admin.conf
 
 template_root=/var/lib/cachy-user-template
-rm -rf --one-file-system "$template_root/$employee_user" \
-  "$template_root/$ADMIN_USER"
+rm -rf --one-file-system \
+  "${template_root:?}/${employee_user:?}" \
+  "${template_root:?}/${ADMIN_USER:?}"
 install -d -m 0700 "$template_root"
 cp -a "$home" "$template_root/$employee_user"
 admin_home=$(getent passwd "$ADMIN_USER" | cut -d: -f6)

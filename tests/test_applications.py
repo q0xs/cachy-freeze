@@ -7,11 +7,76 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from subprocess import CompletedProcess
+from unittest.mock import patch
 
+from cachy_freeze.config import Config
 from cachy_freeze.engine import FreezeEngine
 
 
+class ServiceRunner:
+    def __init__(self, returncode: int) -> None:
+        self.returncode = returncode
+        self.commands: list[list[str]] = []
+
+    def run(
+        self, command: list[str], *, check: bool = True, **_kwargs: object
+    ) -> CompletedProcess[bytes]:
+        self.commands.append(command)
+        return CompletedProcess(command, self.returncode, b"", b"")
+
+
 class ApplicationVerificationTests(unittest.TestCase):
+    def test_application_status_requires_running_anydesk_service(self) -> None:
+        for returncode, expected in ((0, True), (3, False)):
+            with self.subTest(returncode=returncode):
+                runner = ServiceRunner(returncode)
+                with (
+                    patch.object(FreezeEngine, "require_root"),
+                    patch("cachy_freeze.engine.shutil.which", return_value=Path("/bin/tool")),
+                    patch.object(
+                        FreezeEngine,
+                        "_chrome_policy_status",
+                        return_value={"name": "policy", "installed": True},
+                    ),
+                    patch.object(
+                        FreezeEngine,
+                        "_microsip_status",
+                        return_value={"name": "microsip", "installed": True},
+                    ),
+                ):
+                    status = FreezeEngine(
+                        Config(),
+                        runner=runner,  # type: ignore[arg-type]
+                        logger=None,
+                    ).application_status()
+
+                service = next(
+                    item
+                    for item in status["applications"]
+                    if item["name"] == "AnyDesk background service"
+                )
+                self.assertEqual(service["installed"], expected)
+                self.assertEqual(service["active"], expected)
+                self.assertEqual(status["all_installed"], expected)
+                self.assertEqual(
+                    runner.commands,
+                    [["systemctl", "is-active", "--quiet", "anydesk.service"]],
+                )
+
+    def test_incremental_send_dump_extracts_changed_and_renamed_paths(self) -> None:
+        output = """\
+mkfile          ./snap-new/etc/new-file
+rename          ./snap-new/o123-4-0 dest=./snap-new/etc/renamed-file
+chmod           ./snap-new/etc/new-file mode=600
+utimes          ./different-snapshot/ignored
+"""
+
+        self.assertEqual(
+            FreezeEngine._changed_paths_from_send_dump(output, "snap-new"),
+            ["etc/new-file", "etc/renamed-file"],
+        )
+
     def _microsip_bundle(self, root: Path) -> tuple[Path, dict[str, object]]:
         root.mkdir()
         archive = root / "MicroSIP-3.22.3.zip"

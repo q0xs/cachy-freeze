@@ -2,12 +2,14 @@
 set -Eeuo pipefail
 
 readonly BACKEND=/usr/local/sbin/cachy-freeze
-readonly SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+readonly SCRIPT_DIR
 if [[ -d $SCRIPT_DIR/deployment/installer ]]; then
-  readonly PROJECT_ROOT=$SCRIPT_DIR/deployment
+  PROJECT_ROOT=$SCRIPT_DIR/deployment
 else
-  readonly PROJECT_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
+  PROJECT_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
 fi
+readonly PROJECT_ROOT
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin
 unset CDPATH ENV BASH_ENV PYTHONHOME PYTHONPATH CACHY_FREEZE_CONFIG
@@ -53,7 +55,7 @@ read_grub_secret() {
 
 setup_status() {
   local manager_installed=false employee_configured=false grub_protected=false
-  local employee_user= backend_status=
+  local employee_user='' backend_status=''
   [[ -x $BACKEND ]] && manager_installed=true
   if [[ -r /etc/cachy-employee.conf ]]; then
     employee_user=$(sed -n 's/^EMPLOYEE_USER=//p' /etc/cachy-employee.conf)

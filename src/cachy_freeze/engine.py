@@ -12,6 +12,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import time
@@ -759,6 +760,19 @@ class FreezeEngine:
             {"name": name, "installed": shutil.which(command) is not None}
             for name, command in commands.items()
         ]
+        anydesk_active = (
+            self.runner.run(
+                ["systemctl", "is-active", "--quiet", "anydesk.service"], check=False
+            ).returncode
+            == 0
+        )
+        applications.append(
+            {
+                "name": "AnyDesk background service",
+                "installed": anydesk_active,
+                "active": anydesk_active,
+            }
+        )
         applications.append(self._chrome_policy_status())
         applications.append(self._microsip_status(Path("/opt/company/microsip")))
         return {
@@ -996,25 +1010,76 @@ class FreezeEngine:
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
             older_path = self._subvolume_path(older.subvolume)
             newer_path = self._subvolume_path(newer.subvolume)
-            older_details = self._subvolume_details(older_path)
-            generation = older_details.get("generation")
-            if not generation or not generation.isdigit():
-                raise IntegrityError("Older snapshot generation is unavailable")
-            output = self.runner.text(
-                ["btrfs", "subvolume", "find-new", str(newer_path), generation]
+            send_command = [
+                "btrfs",
+                "send",
+                "--no-data",
+                "-q",
+                "-p",
+                str(older_path),
+                str(newer_path),
+            ]
+            dump_command = ["btrfs", "receive", "--dump"]
+            sender = subprocess.Popen(
+                send_command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=self.runner.environment,
             )
-            changed_paths: list[str] = []
-            for line in output.splitlines():
-                marker = " path "
-                if marker in line:
-                    changed_paths.append(line.split(marker, 1)[1])
+            assert sender.stdout is not None
+            receiver = subprocess.Popen(
+                dump_command,
+                stdin=sender.stdout,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=self.runner.environment,
+            )
+            sender.stdout.close()
+            dump, receiver_stderr = receiver.communicate()
+            sender_stderr = sender.stderr.read() if sender.stderr is not None else b""
+            sender_returncode = sender.wait()
+            if sender_returncode != 0:
+                raise CommandError(
+                    send_command,
+                    sender_returncode,
+                    sender_stderr.decode("utf-8", errors="replace"),
+                )
+            if receiver.returncode != 0:
+                raise CommandError(
+                    dump_command,
+                    receiver.returncode,
+                    receiver_stderr.decode("utf-8", errors="replace"),
+                )
+            changed_paths = self._changed_paths_from_send_dump(
+                dump.decode("utf-8", errors="replace"), newer_path.name
+            )
             return {
                 "older": older_id,
                 "newer": newer_id,
-                "changed_path_count": len(set(changed_paths)),
-                "changed_paths": sorted(set(changed_paths))[:5000],
-                "truncated": len(set(changed_paths)) > 5000,
+                "changed_path_count": len(changed_paths),
+                "changed_paths": changed_paths[:5000],
+                "truncated": len(changed_paths) > 5000,
             }
+
+    @staticmethod
+    def _changed_paths_from_send_dump(output: str, snapshot_name: str) -> list[str]:
+        prefix = f"./{snapshot_name}/"
+        changed: set[str] = set()
+        for line in output.splitlines():
+            try:
+                fields = shlex.split(line)
+            except ValueError:
+                continue
+            candidates = fields[1:2]
+            candidates.extend(
+                field.removeprefix("dest=") for field in fields if field.startswith("dest=")
+            )
+            for candidate in candidates:
+                if candidate.startswith(prefix):
+                    relative = candidate.removeprefix(prefix)
+                    if relative and re.fullmatch(r"o[0-9]+-[0-9]+-[0-9]+", relative) is None:
+                        changed.add(relative)
+        return sorted(changed)
 
     def export_snapshot(self, snapshot_id: str) -> dict[str, Any]:
         self.require_root()

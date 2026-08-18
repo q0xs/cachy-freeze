@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly INSTALLER_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-readonly PROJECT_ROOT=$(cd -- "$INSTALLER_DIR/.." && pwd)
+INSTALLER_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+readonly INSTALLER_DIR
+PROJECT_ROOT=$(cd -- "$INSTALLER_DIR/.." && pwd)
+readonly PROJECT_ROOT
 # shellcheck source=lib/common.sh
 source "$INSTALLER_DIR/lib/common.sh"
 

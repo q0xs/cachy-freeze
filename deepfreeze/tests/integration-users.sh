@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-readonly TEST_ROOT=$(mktemp -d /tmp/cachy-freeze-users.XXXXXX)
+PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+readonly PROJECT_ROOT
+TEST_ROOT=$(mktemp -d /tmp/cachy-freeze-users.XXXXXX)
+readonly TEST_ROOT
 readonly TEST_USER="cfstest$$"
 readonly TEST_PROVISIONER=$TEST_ROOT/prepare-standard-user.sh
 
 cleanup() {
+  local cleanup_failed=0
   if [[ $TEST_USER == cfstest+([0-9]) ]]; then
-    userdel --remove "$TEST_USER" >/dev/null 2>&1 || true
+    loginctl terminate-user "$TEST_USER" >/dev/null 2>&1 || true
+    userdel --force --remove "$TEST_USER" >/dev/null 2>&1 || cleanup_failed=1
     groupdel "$TEST_USER" >/dev/null 2>&1 || true
+    id "$TEST_USER" >/dev/null 2>&1 && cleanup_failed=1
   fi
   rm -rf --one-file-system "$TEST_ROOT"
+  return "$cleanup_failed"
 }
 
 fail() {

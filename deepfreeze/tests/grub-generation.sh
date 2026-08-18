@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-readonly OUTPUT=$(mktemp /tmp/cachy-freeze-grub.XXXXXX.cfg)
-readonly BOOT_DIR=$(mktemp -d /tmp/cachy-freeze-boot.XXXXXX)
-readonly FAKE_BIN=$(mktemp -d /tmp/cachy-freeze-bin.XXXXXX)
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+readonly ROOT
+OUTPUT=$(mktemp /tmp/cachy-freeze-grub.XXXXXX.cfg)
+readonly OUTPUT
+BOOT_DIR=$(mktemp -d /tmp/cachy-freeze-boot.XXXXXX)
+readonly BOOT_DIR
+FAKE_BIN=$(mktemp -d /tmp/cachy-freeze-bin.XXXXXX)
+readonly FAKE_BIN
 
 cleanup() {
   rm -f "$OUTPUT"

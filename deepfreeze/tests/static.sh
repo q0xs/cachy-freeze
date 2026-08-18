@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-readonly PROJECT_ROOT=$(cd -- "$ROOT/.." && pwd)
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+readonly ROOT
+PROJECT_ROOT=$(cd -- "$ROOT/.." && pwd)
+readonly PROJECT_ROOT
 
 while IFS= read -r -d '' script; do
   bash -n "$script"
@@ -108,6 +110,12 @@ grep -q 'CACHY_SETUP_NONINTERACTIVE' \
   "$PROJECT_ROOT/installer/create-employee-user.sh"
 grep -q 'prepare-standard-user.sh' \
   "$PROJECT_ROOT/src/cachy_freeze/users.py"
+grep -q 'systemctl enable --now anydesk.service' \
+  "$PROJECT_ROOT/installer/install-applications.sh"
+grep -q 'AnyDesk background service' \
+  "$PROJECT_ROOT/src/cachy_freeze/engine.py"
+grep -q -- '--no-data' \
+  "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'cachyfreeze-finish-session' \
   "$PROJECT_ROOT/installer/create-employee-user.sh"
 ! grep -q 'cachy-kurulum-oturum-kapat' \

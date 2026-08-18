@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly TEST_ROOT=$(mktemp -d /tmp/cachy-freeze-engine.XXXXXX)
+TEST_ROOT=$(mktemp -d /tmp/cachy-freeze-engine.XXXXXX)
+readonly TEST_ROOT
 readonly IMAGE=$TEST_ROOT/btrfs.img
 readonly TOP=$TEST_ROOT/top
 readonly STATE=$TEST_ROOT/state
 readonly CONFIG=$TEST_ROOT/cachy-freeze.conf
-readonly PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+readonly PROJECT_ROOT
 readonly BACKEND=$PROJECT_ROOT/deepfreeze/bin/cachy-freeze
 LOOP_DEVICE=
 

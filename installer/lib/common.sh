@@ -42,7 +42,7 @@ aur_install() {
   chown -R goldenbuild:goldenbuild "$build_dir"
 
   (
-    cd "$build_dir"
+    cd "$build_dir" || exit 1
     runuser -u goldenbuild -- \
       env MAKEFLAGS="-j$(nproc)" makepkg --noconfirm --cleanbuild
   )

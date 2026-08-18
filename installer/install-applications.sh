@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+readonly PROJECT_ROOT
 # shellcheck source=lib/common.sh
 source "$PROJECT_ROOT/installer/lib/common.sh"
 
@@ -53,7 +54,11 @@ aur_install gtk2
 aur_install zoiper-bin
 aur_install anydesk-bin
 if systemctl list-unit-files anydesk.service >/dev/null 2>&1; then
-  systemctl enable anydesk.service
+  systemctl enable --now anydesk.service
+  systemctl is-active --quiet anydesk.service ||
+    die "The AnyDesk background service could not be started."
+else
+  die "The AnyDesk package did not install its systemd service."
 fi
 
 install -d -m 0755 /opt/company/microsip

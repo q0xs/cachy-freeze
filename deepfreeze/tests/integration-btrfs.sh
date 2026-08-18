@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly TEST_ROOT=$(mktemp -d /tmp/cachy-freeze-test.XXXXXX)
+TEST_ROOT=$(mktemp -d /tmp/cachy-freeze-test.XXXXXX)
+readonly TEST_ROOT
 readonly IMAGE=$TEST_ROOT/btrfs.img
 readonly TOP=$TEST_ROOT/top
 readonly CONFIG=$TEST_ROOT/initrd.conf
-readonly SCRIPT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/initcpio/cachy-freeze-reset
+SCRIPT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/initcpio/cachy-freeze-reset
+readonly SCRIPT
 LOOP_DEVICE=
 
 cleanup() {

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+readonly PROJECT_ROOT
 readonly INSTALL_ROOT=/usr/lib/cachy-freeze
 
 die() {
@@ -13,13 +14,19 @@ die() {
 [[ $(findmnt -n -o SOURCE /) == *'[/@]' ]] ||
   die "Live application deployment is allowed only in THAWED maintenance mode."
 [[ -d $INSTALL_ROOT/python/cachy_freeze ]] || die "CachyFreeze is not installed."
+[[ -d $INSTALL_ROOT/deployment ]] || die "CachyFreeze deployment files are missing."
 
-readonly stage=$(mktemp -d "$INSTALL_ROOT/app-update.XXXXXX")
+stage=$(mktemp -d "$INSTALL_ROOT/app-update.XXXXXX")
+readonly stage
 cleanup() { rm -rf --one-file-system "$stage"; }
 trap cleanup EXIT
 
 cp -a "$PROJECT_ROOT/src/cachy_freeze" "$stage/cachy_freeze"
 cp -a "$PROJECT_ROOT/app/cachy_freeze_gui" "$stage/cachy_freeze_gui"
+install -d -m 0755 "$stage/deployment"
+for tree in installer policies vendor deepfreeze user; do
+  cp -a "$PROJECT_ROOT/$tree" "$stage/deployment/"
+done
 find "$stage" -type d -name __pycache__ -prune -exec rm -rf --one-file-system {} +
 python -m compileall -q "$stage/cachy_freeze" "$stage/cachy_freeze_gui"
 chown -R root:root "$stage"
@@ -30,14 +37,23 @@ mv "$INSTALL_ROOT/python/cachy_freeze" "$INSTALL_ROOT/python/cachy_freeze.previo
 mv "$INSTALL_ROOT/python/cachy_freeze_gui" "$INSTALL_ROOT/python/cachy_freeze_gui.previous"
 mv "$stage/cachy_freeze" "$INSTALL_ROOT/python/cachy_freeze"
 mv "$stage/cachy_freeze_gui" "$INSTALL_ROOT/python/cachy_freeze_gui"
+rm -rf --one-file-system "$INSTALL_ROOT/deployment.previous"
+mv "$INSTALL_ROOT/deployment" "$INSTALL_ROOT/deployment.previous"
+mv "$stage/deployment" "$INSTALL_ROOT/deployment"
 
+install -m 0755 "$PROJECT_ROOT/deepfreeze/bin/cachy-freeze" \
+  /usr/local/sbin/cachy-freeze
+install -m 0755 "$PROJECT_ROOT/app/cachy-freeze-manager" \
+  /usr/bin/cachy-freeze-manager
 install -m 0755 "$PROJECT_ROOT/app/cachy-freeze-manager-helper" \
   "$INSTALL_ROOT/cachy-freeze-manager-helper"
 install -d -m 0755 /usr/share/icons/hicolor/512x512/apps
+install -m 0644 "$PROJECT_ROOT/app/cachy-freeze-manager.desktop" \
+  /usr/share/applications/cachy-freeze-manager.desktop
+install -m 0644 "$PROJECT_ROOT/app/org.cachyos.cachy-freeze.policy" \
+  /usr/share/polkit-1/actions/org.cachyos.cachy-freeze.policy
 install -m 0644 "$PROJECT_ROOT/app/cachy_freeze_gui/assets/cachy-freeze.png" \
   /usr/share/icons/hicolor/512x512/apps/cachy-freeze.png
-install -m 0755 "$PROJECT_ROOT/installer/prepare-standard-user.sh" \
-  "$INSTALL_ROOT/deployment/installer/prepare-standard-user.sh"
 install -m 0755 "$PROJECT_ROOT/user/files/company-microsip" \
   /usr/local/bin/company-microsip
 install -m 0755 "$PROJECT_ROOT/user/files/cachyfreeze-finish-session" \
@@ -57,6 +73,9 @@ cmp -s "$PROJECT_ROOT/app/cachy_freeze_gui/window.py" \
   "$INSTALL_ROOT/python/cachy_freeze_gui/window.py" || die "GUI verification failed."
 cmp -s "$PROJECT_ROOT/app/cachy_freeze_gui/styles.py" \
   "$INSTALL_ROOT/python/cachy_freeze_gui/styles.py" || die "Style verification failed."
+cmp -s "$PROJECT_ROOT/installer/install-applications.sh" \
+  "$INSTALL_ROOT/deployment/installer/install-applications.sh" ||
+  die "Deployment verification failed."
 
 printf '%s\n' \
   "CachyFreeze application files were updated successfully." \

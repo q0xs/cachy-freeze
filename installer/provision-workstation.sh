@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly INSTALLER_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-readonly PROJECT_ROOT=$(cd -- "$INSTALLER_DIR/.." && pwd)
+INSTALLER_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+readonly INSTALLER_DIR
+PROJECT_ROOT=$(cd -- "$INSTALLER_DIR/.." && pwd)
+readonly PROJECT_ROOT
 readonly LOG=/var/log/cachyos-workstation-install.log
 
 (( EUID == 0 )) || {
@@ -17,7 +19,12 @@ if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
 fi
 
 exec > >(tee -a "$LOG") 2>&1
-trap 'rc=$?; printf "ERROR: Installation stopped near line %s (code: %s). Log: %s\n" "$LINENO" "$rc" "$LOG" >&2' ERR
+installation_error() {
+  local rc=$?
+  printf "ERROR: Installation stopped near line %s (code: %s). Log: %s\n" \
+    "$LINENO" "$rc" "$LOG" >&2
+}
+trap installation_error ERR
 printf 'Installation started: %s\n' "$(date --iso-8601=seconds)"
 
 # Validate disk and boot layout before long application downloads.

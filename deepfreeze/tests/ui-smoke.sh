@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-readonly TEST_ROOT=$(mktemp -d /tmp/cachy-freeze-ui.XXXXXX)
+PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+readonly PROJECT_ROOT
+TEST_ROOT=$(mktemp -d /tmp/cachy-freeze-ui.XXXXXX)
+readonly TEST_ROOT
 trap 'rm -rf --one-file-system "$TEST_ROOT"' EXIT
 
 QT_QPA_PLATFORM=offscreen \

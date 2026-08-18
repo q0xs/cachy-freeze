@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+readonly PROJECT_ROOT
 
 die() {
   printf 'ERROR: %s\n' "$*" >&2
@@ -33,7 +34,8 @@ done
 
 readonly microsip_root=/opt/company/microsip
 [[ -s $microsip_root/CURRENT ]] || die "The verified MicroSIP archive is not installed."
-readonly microsip_archive_name=$(<"$microsip_root/CURRENT")
+microsip_archive_name=$(<"$microsip_root/CURRENT")
+readonly microsip_archive_name
 [[ ${microsip_archive_name##*/} == "$microsip_archive_name" ]] ||
   die "The MicroSIP archive name is invalid."
 readonly microsip_archive=$microsip_root/$microsip_archive_name
@@ -79,7 +81,8 @@ runuser -u "$username" -- env WINEPREFIX="$prefix" wineserver -k >/dev/null 2>&1
   die "MicroSIP Wine initialization failed (code: $wineboot_rc)."
 [[ -s $prefix/system.reg ]] || die "The MicroSIP Wine prefix was not created."
 
-readonly stage=$(mktemp -d /tmp/cachy-microsip-user.XXXXXX)
+stage=$(mktemp -d /tmp/cachy-microsip-user.XXXXXX)
+readonly stage
 cleanup() { rm -rf --one-file-system "$stage"; }
 trap cleanup EXIT
 unzip -q "$microsip_archive" -d "$stage"

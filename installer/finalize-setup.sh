@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly INSTALLER_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-readonly PROJECT_ROOT=$(cd -- "$INSTALLER_DIR/.." && pwd)
+INSTALLER_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+readonly INSTALLER_DIR
 readonly LOG=/var/log/cachyos-workstation-install.log
 # shellcheck source=lib/common.sh
 source "$INSTALLER_DIR/lib/common.sh"
@@ -27,7 +27,12 @@ EOF
 fi
 
 exec > >(tee -a "$LOG") 2>&1
-trap 'rc=$?; printf "ERROR: FROZEN activation stopped near line %s (code: %s). Log: %s\n" "$LINENO" "$rc" "$LOG" >&2' ERR
+activation_error() {
+  local rc=$?
+  printf "ERROR: FROZEN activation stopped near line %s (code: %s). Log: %s\n" \
+    "$LINENO" "$rc" "$LOG" >&2
+}
+trap activation_error ERR
 printf 'FROZEN activation started: %s\n' "$(date --iso-8601=seconds)"
 
 if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then

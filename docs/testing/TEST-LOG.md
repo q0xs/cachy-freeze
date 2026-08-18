@@ -4,6 +4,70 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-18 — clean physical reinstall and exhaustive live validation — final working tree
+
+- PASS — removed the previous physical installation, managed snapshots, state
+  subvolume, boot hook, services, policies, and application files; rebuilt the
+  standard initramfs and GRUB configuration, then verified zero managed
+  subvolumes or boot-hook remnants before reinstalling from a fresh GitHub clone.
+- PASS — temporary initramfs installation test built and inspected images for
+  both installed kernels before the clean physical install.
+- PASS — application installation and a second idempotency run installed and
+  verified Google Chrome 151.0.7922.137, Slack 4.51.180, Wine 11.15,
+  LibreOffice 26.2.5, Zoiper 5.6.13, AnyDesk 8.0.4, Xvfb, unzip, rsync,
+  runuser, the exact managed Chrome policy, and MicroSIP 3.22.12 with archive
+  and executable checksums. The AnyDesk service is enabled, active, and now a
+  required application-status item.
+- PASS — live temporary standard-user provisioning: exact display name, normal
+  home and shell, standard-only initial group, seven validated desktop entries,
+  KDE and MIME defaults, Chrome policy, Wine prefix, exact MicroSIP executable,
+  ownership, permissions, and byte/metadata-identical reset template.
+- PASS — live user operations: password change through stdin, lock/unlock,
+  automatic-login enable/disable, administrator mutation rejection,
+  unprivileged-backend rejection, duplicate-create rejection, FROZEN home reset,
+  supplemental-group reporting, backed-up deletion, UID/GID/password/group
+  preserving restore, duplicate-restore rejection, and immediate second delete
+  with a distinct collision-resistant backup ID. All synthetic accounts,
+  groups, backups, homes, and templates were removed afterward.
+- PASS — every settings field changed together and restored exactly; minimum
+  numeric boundaries, both locale/theme choices, disabled/enabled update paths,
+  and automatic-snapshot created/interval-suppressed paths passed live.
+- PASS — physical snapshots passed list, metadata verification, full Btrfs-send
+  stream hashing, deletion, retention cleanup, and path comparison. A real
+  15.8 GB stream passed export permissions, manifest/checksum validation,
+  import, and imported-snapshot verification; all export/test artifacts were
+  removed afterward.
+- FIXED — `btrfs subvolume find-new` returned zero paths between independent
+  read-only snapshots despite a verified root-path change. Comparison now uses
+  a no-data incremental Btrfs send decoded through `btrfs receive --dump`, and
+  the same physical snapshot pair reports the changed path correctly.
+- FIXED — the application installer enabled but did not start AnyDesk, while
+  status checked only for its executable. Installation now starts and verifies
+  the service; status requires the live daemon.
+- FIXED — the privileged-user integration cleanup suppressed a failed deletion
+  and could leave its synthetic account. Cleanup now terminates its session,
+  force-removes only the validated test account, fails if it remains, and left
+  zero accounts in the retest.
+- FIXED — root CLI execution could write root-owned bytecode into the source
+  clone. The CLI now disables bytecode writes, and the live deployer atomically
+  synchronizes the complete deployment tree plus launchers and policy files.
+- PASS — final quality gate: Ruff check/format, 61/61 unit/GUI/helper/boundary
+  tests, static/desktop/XML/JSON checks, Qt offscreen UI, GRUB generation,
+  Python compilation, diff check, and warning-level ShellCheck across all 33
+  first-party Bash files. Vendored AUR files remained byte-for-byte upstream.
+- PASS — privileged loop integrations: early-boot Active recreation and
+  power-loss recovery, automatic failed-Golden rollback, 25-snapshot stress,
+  retention, compare, export/import, rollback, and transaction recovery.
+- PASS — final physical state: source and installed trees match, only the
+  administrator account remains, application status reports all 13 items ready,
+  Btrfs health is clean with zero device errors, GRUB authentication is hashed,
+  both initramfs images contain the reset program, two clean Golden-history
+  snapshots remain, no transaction is pending, and the next boot is FROZEN.
+- NOT RUN — a physical reboot and post-login visual session check. Rebooting the
+  user's active workstation was intentionally not performed without a separate
+  explicit confirmation; the destructive early-boot paths were exercised in
+  loop-backed integrations instead.
+
 ## 2026-08-18 — user lifecycle and application readiness hardening — working tree based on `8866a9b`
 
 - PASS — 59/59 Python unit, GUI contract, helper allow-list, boundary, and

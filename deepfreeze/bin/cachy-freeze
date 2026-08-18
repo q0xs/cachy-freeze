@@ -15,5 +15,6 @@ fi
 
 export PYTHONPATH=$python_root
 export PYTHONNOUSERSITE=1
+export PYTHONDONTWRITEBYTECODE=1
 unset PYTHONHOME
 exec /usr/bin/python -s -m cachy_freeze.cli "$@"
