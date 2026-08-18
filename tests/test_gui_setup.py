@@ -70,6 +70,14 @@ class SetupGuiTests(unittest.TestCase):
 
         self.backend.run.assert_called_once_with("setup-install")
 
+    def test_install_completion_directs_operator_to_application_setup(self) -> None:
+        with patch("cachy_freeze_gui.window.QMessageBox.information") as information:
+            self.window._operation_finished("setup-install", True, "installed")
+
+        message = information.call_args.args[2]
+        self.assertIn("Updates", message)
+        self.assertIn("Install / repair applications", message)
+
     def test_disposable_device_requires_explicit_data_loss_confirmation(self) -> None:
         self.window.setup_preflight_ok = True
         self.window.setup_disposable_check.setChecked(True)

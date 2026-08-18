@@ -1305,8 +1305,9 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 "Installation complete",
-                "CachyFreeze is installed in THAWED mode. You may enable FROZEN now or "
-                "create users first; the two operations are independent.",
+                "CachyFreeze is installed in THAWED mode. Before creating a ready user, "
+                "open Updates and run Install / repair applications. You may enable "
+                "FROZEN before or after that independent application step.",
             )
             self.backend.run("setup-status")
         if success and action == "user-create":

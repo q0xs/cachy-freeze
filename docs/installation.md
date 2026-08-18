@@ -22,6 +22,12 @@ running `install.sh`; partial downloads and standalone remote-script execution
 are intentionally unsupported. The installer installs the engine and GUI,
 publishes the initial Golden, and leaves the next boot in THAWED mode.
 
+When `install.sh` is started from a terminal, it elevates through `sudo`. When a
+desktop file manager starts the same complete-clone entry without a terminal, it
+uses the graphical PolicyKit authentication agent instead. This prevents the
+otherwise silent `sudo: a terminal is required` failure. The dedicated graphical
+entry remains `cachyfreeze-setup.desktop`.
+
 ## Graphical install
 
 From the complete clone, open `cachyfreeze-setup.desktop`, run preflight, confirm

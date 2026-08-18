@@ -10,12 +10,20 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
   status before displaying or collecting values in the account dialog. Missing
   or unhealthy requirements are listed and the operator is redirected to the
   Updates page instead of creating and rolling back a partial account.
-- PASS — Ruff check and format, 65/65 Python unit/GUI/helper/boundary tests,
+- FIXED — the public `install.sh` entry now uses `sudo` in a terminal and the
+  graphical PolicyKit agent when launched from a desktop file manager. This
+  addresses the observed no-terminal `sudo` failure from a complete checkout.
+- PASS — the existing physical standard account has a Wine prefix, non-empty
+  registry, official MicroSIP 3.22.12 executable matching the recorded
+  executable checksum, correct ownership, seven desktop shortcuts, and a
+  template copy. Its production launcher remained healthy until the 15-second
+  isolated X display timeout.
+- PASS — Ruff check and format, 68/68 Python unit/GUI/helper/boundary tests,
   error-level ShellCheck/static validation, Qt offscreen UI smoke, isolated GRUB
   generation, and `git diff --check`.
-- NOT RUN — privileged user creation, boot-stack integration, physical reboot,
-  and recovery tests; this GUI-only change does not exercise those destructive
-  paths.
+- NOT RUN — new privileged user creation, boot-stack integration, physical
+  reboot, and recovery tests; no disposable target was needed for these entry
+  point and GUI changes.
 
 ## 2026-08-18 — clean physical reinstall and exhaustive live validation — final working tree
 
