@@ -21,6 +21,9 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
 - PASS — Ruff check and format, 68/68 Python unit/GUI/helper/boundary tests,
   error-level ShellCheck/static validation, Qt offscreen UI smoke, isolated GRUB
   generation, and `git diff --check`.
+- PASS — downloaded the pushed GitHub branch archive through HTTPS, extracted
+  it into a temporary directory, verified executable installer/helper modes,
+  and reran all 68 Python tests plus the static gate from the extracted archive.
 - NOT RUN — new privileged user creation, boot-stack integration, physical
   reboot, and recovery tests; no disposable target was needed for these entry
   point and GUI changes.
