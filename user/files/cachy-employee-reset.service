@@ -3,6 +3,7 @@ Description=Reset all managed user homes for frozen boot
 ConditionKernelCommandLine=cachy.freeze=1
 Before=display-manager.service
 After=home.mount
+RequiresMountsFor=/var/lib/cachy-freeze
 
 [Service]
 Type=oneshot

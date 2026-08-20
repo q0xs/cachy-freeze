@@ -14,6 +14,8 @@ python - <<'PY'
 from PyQt6.QtWidgets import QApplication
 
 from cachy_freeze_gui.backend import BackendClient
+from cachy_freeze_gui.i18n import configure
+from cachy_freeze_gui.widgets import retranslate_tree
 from cachy_freeze_gui.window import MainWindow
 
 application = QApplication([])
@@ -28,6 +30,11 @@ assert window.setup_start_button.text()
 assert window.setup_finish_button.text()
 assert window._password_is_strong("Correct-Horse-42")
 assert not window._password_is_strong("short")
+configure("tr")
+retranslate_tree(window)
+assert "Genel Bakış" in window.nav_buttons[0].text()
+assert window.language_combo.itemText(1) == "Türkçe"
+configure("en")
 window.close()
 application.quit()
 PY

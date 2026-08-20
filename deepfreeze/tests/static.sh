@@ -31,7 +31,8 @@ if command -v shellcheck >/dev/null; then
     "$ROOT/initcpio/cachy-freeze-reset" \
     "$ROOT/initcpio/install-hook" \
     "$ROOT/grub/01_cachy_auth" \
-    "$ROOT/grub/40_cachy_freeze"
+    "$ROOT/grub/40_cachy_freeze" \
+    "$ROOT/tests/boot-acceptance-vm.sh"
 else
   printf '%s\n' "WARNING: ShellCheck is unavailable; only Bash syntax was tested."
 fi
@@ -48,8 +49,10 @@ grep -q 'ConditionKernelCommandLine=cachy.freeze=1' \
   "$ROOT/../user/files/cachy-frozen-admin-restrict.service"
 grep -q 'def preflight' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'begin_transaction' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
-grep -Fq '"$BACKEND" publish --description "Golden publication from the GUI" >&2' \
+grep -Fq 'exec "$BACKEND" finalize request "$REQUEST_USER" --uid "$REQUEST_UID"' \
   "$PROJECT_ROOT/app/cachy-freeze-manager-helper"
+! sed -n '/freeze-prepare)/,/;;/p' \
+  "$PROJECT_ROOT/app/cachy-freeze-manager-helper" | grep -q '"$BACKEND" publish'
 grep -q 'chpasswd", "--encrypted"' \
   "$PROJECT_ROOT/src/cachy_freeze/users.py"
 ! grep -q '"--password"' \
@@ -127,7 +130,7 @@ grep -q 'prepare-standard-user.sh' \
 grep -q 'systemctl enable --now anydesk.service' \
   "$PROJECT_ROOT/installer/install-applications.sh"
 grep -q 'AnyDesk background service' \
-  "$PROJECT_ROOT/src/cachy_freeze/engine.py"
+  "$PROJECT_ROOT/src/cachy_freeze/applications.py"
 grep -q -- '--no-data' \
   "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'cachyfreeze-finish-session' \
@@ -138,7 +141,8 @@ for required_user_asset in \
   "$PROJECT_ROOT/user/files/company-microsip" \
   "$PROJECT_ROOT/user/files/cachyfreeze-finish-session" \
   "$PROJECT_ROOT/installer/prepare-standard-user.sh" \
-  "$PROJECT_ROOT/installer/deploy-live-app.sh"; do
+  "$PROJECT_ROOT/installer/deploy-live-app.sh" \
+  "$PROJECT_ROOT/deepfreeze/tests/boot-acceptance-vm.sh"; do
   [[ -x $required_user_asset ]]
 done
 
@@ -161,6 +165,19 @@ grep -q 'migrate-display-manager-autologin.sh' \
   "$PROJECT_ROOT/installer/deploy-live-app.sh"
 grep -q 'plasmalogin.service' \
   "$PROJECT_ROOT/installer/migrate-display-manager-autologin.sh"
+grep -q '90-cachy-freeze-autologin.conf' \
+  "$PROJECT_ROOT/src/cachy_freeze/users.py" \
+  "$PROJECT_ROOT/installer/migrate-display-manager-autologin.sh"
+grep -q 'cachy-freeze-idle-power.service' \
+  "$PROJECT_ROOT/installer/install-freeze-engine.sh" \
+  "$PROJECT_ROOT/installer/deploy-live-app.sh"
+grep -q '^1.0.0rc1$' "$PROJECT_ROOT/VERSION"
+grep -q 'class StateMigrationManager' \
+  "$PROJECT_ROOT/src/cachy_freeze/versioning.py"
+grep -q 'class DiagnosticBundleBuilder' \
+  "$PROJECT_ROOT/src/cachy_freeze/diagnostics.py"
+grep -q 'class BootValidationManager' \
+  "$PROJECT_ROOT/src/cachy_freeze/validation.py"
 grep -Fq 'https://github.com/q0xs/cachy-freeze/archive/refs/heads/main.zip' \
   "$PROJECT_ROOT/README.md" "$PROJECT_ROOT/docs/installation.md"
 grep -Fq 'Code → Download ZIP' \
@@ -195,6 +212,8 @@ if command -v systemd-analyze >/dev/null; then
     "$ROOT/systemd/cachy-freeze-boot-health.service" \
     "$ROOT/systemd/cachy-freeze-auto-snapshot.service" \
     "$ROOT/systemd/cachy-freeze-auto-snapshot.timer" \
+    "$ROOT/systemd/cachy-freeze-finalize.service" \
+    "$ROOT/systemd/cachy-freeze-idle-power.service" \
     "$PROJECT_ROOT/user/files/cachy-employee-reset.service" \
     "$PROJECT_ROOT/user/files/cachy-frozen-admin-restrict.service" 2>&1); then
     unexpected_output=$(grep -Ev 'SO_PASSRIGHTS|SO_PASSCRED' \

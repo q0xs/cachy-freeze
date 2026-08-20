@@ -72,18 +72,20 @@ class UserValidationTests(unittest.TestCase):
                 ):
                     manager.create(invalid, "Invalid User", "1234")
 
-    def test_plasma_login_manager_autologin_preserves_other_configuration(self) -> None:
+    def test_plasma_login_manager_autologin_uses_owned_drop_in(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             manager_unit = root / "plasmalogin.service"
             manager_unit.touch()
             display_manager = root / "display-manager.service"
             display_manager.symlink_to(manager_unit)
-            config = root / "plasmalogin.conf"
-            config.write_text(
+            main_config = root / "plasmalogin.conf"
+            main_config.write_text(
                 "# preserved comment\n[Autologin]\nSession=plasma\n\n[General]\nNamespaces=\n",
                 encoding="utf-8",
             )
+            original = main_config.read_text(encoding="utf-8")
+            config = root / "plasmalogin.conf.d" / "90-cachy-freeze-autologin.conf"
             manager = UserManager(
                 state_dir=root / "state",
                 lock_file=root / "operation.lock",
@@ -93,21 +95,23 @@ class UserValidationTests(unittest.TestCase):
                 sddm_path=root / "sddm.conf",
             )
 
-            self.assertEqual(manager.autologin_kind, "plasmalogin")
+            self.assertEqual(manager.autologin_kind, "plasmalogin-drop-in")
             manager._write_autologin("person_01")
             enabled = config.read_text(encoding="utf-8")
-            self.assertIn("# preserved comment", enabled)
-            self.assertIn("User=person_01", enabled)
-            self.assertIn("Session=plasma", enabled)
-            self.assertIn("Relogin=true", enabled)
-            self.assertIn("[General]\nNamespaces=", enabled)
+            self.assertEqual(
+                enabled,
+                "[Autologin]\nUser=person_01\nSession=plasma\nRelogin=true\n",
+            )
+            self.assertEqual(main_config.read_text(encoding="utf-8"), original)
             self.assertEqual(manager._autologin_user(), "person_01")
 
             manager._write_autologin(None)
             disabled = config.read_text(encoding="utf-8")
-            self.assertIn("User=\n", disabled)
-            self.assertIn("Relogin=false", disabled)
-            self.assertIn("Session=plasma", disabled)
+            self.assertEqual(
+                disabled,
+                "[Autologin]\nUser=\nSession=plasma\nRelogin=false\n",
+            )
+            self.assertEqual(main_config.read_text(encoding="utf-8"), original)
             self.assertIsNone(manager._autologin_user())
 
     def test_sddm_autologin_uses_managed_drop_in(self) -> None:

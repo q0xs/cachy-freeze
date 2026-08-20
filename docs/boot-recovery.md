@@ -9,6 +9,12 @@ can restore the previous healthy Golden. THAWED maintenance uses the fixed GRUB
 username `cachyadmin` and the password chosen on the Setup page. `cachyadmin` is
 a GRUB-only credential, not a Linux administrator account.
 
+Publishing a new Golden arms a first-FROZEN validation record. That boot is not
+accepted merely because the graphical target started: its boot ID, FROZEN mode,
+`@active` mount, Golden/Active presence, managed-home reset, administrator
+restriction, and expected graphical session must all agree. Until then, attempt
+tracking stays armed and setup does not report completion.
+
 When recovery is needed:
 
 1. Preserve the current and previous boot journals.

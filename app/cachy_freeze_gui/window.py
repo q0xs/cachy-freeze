@@ -4,112 +4,44 @@ from __future__ import annotations
 
 import re
 import shutil
-from datetime import datetime
 from typing import Any
 
-from PyQt6.QtCore import QSettings, Qt
+from PyQt6.QtCore import QProcess, QSettings, Qt
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QProgressBar,
+    QScrollArea,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
+
+from .backend import BackendClient
+from .components import MetricCard, UserDialog, human_bytes, local_date
+from .i18n import configure, tr
+from .styles import DARK_STYLE, LIGHT_STYLE
+from .widgets import (
     QCheckBox,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
     QFormLayout,
-    QFrame,
-    QGridLayout,
     QGroupBox,
-    QHBoxLayout,
     QInputDialog,
     QLabel,
     QLineEdit,
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
-    QProgressBar,
     QPushButton,
-    QScrollArea,
     QSpinBox,
-    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
+    retranslate_tree,
 )
-
-from .backend import BackendClient
-from .styles import DARK_STYLE, LIGHT_STYLE
-
-
-def _human_bytes(value: int) -> str:
-    amount = float(value)
-    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
-        if amount < 1024 or unit == "TiB":
-            return f"{amount:.1f} {unit}"
-        amount /= 1024
-    return f"{amount:.1f} TiB"
-
-
-def _date(value: str) -> str:
-    try:
-        return datetime.fromisoformat(value).astimezone().strftime("%d.%m.%Y %H:%M")
-    except ValueError:
-        return value or "—"
-
-
-class MetricCard(QFrame):
-    def __init__(self, caption: str) -> None:
-        super().__init__()
-        self.setObjectName("card")
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 15, 18, 15)
-        caption_label = QLabel(caption.upper())
-        caption_label.setObjectName("cardCaption")
-        self.value = QLabel("—")
-        self.value.setObjectName("cardValue")
-        self.detail = QLabel("")
-        self.detail.setObjectName("muted")
-        self.detail.setWordWrap(True)
-        layout.addWidget(caption_label)
-        layout.addWidget(self.value)
-        layout.addWidget(self.detail)
-
-
-class UserDialog(QDialog):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Create application-ready user")
-        self.setMinimumWidth(480)
-        layout = QFormLayout(self)
-        intro = QLabel(
-            "Creates a standard, non-administrator account and prepares its desktop, "
-            "KDE settings, application shortcuts, and verified MicroSIP profile."
-        )
-        intro.setObjectName("muted")
-        intro.setWordWrap(True)
-        layout.addRow(intro)
-        self.username = QLineEdit()
-        self.username.setPlaceholderText("wrw21166")
-        self.username.setToolTip(
-            "Lowercase letters, digits, underscores, and hyphens; must start with a letter."
-        )
-        self.display_name = QLineEdit()
-        self.password = QLineEdit()
-        self.password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.password_confirm = QLineEdit()
-        self.password_confirm.setEchoMode(QLineEdit.EchoMode.Password)
-        self.autologin = QCheckBox("Sign in automatically as this user")
-        layout.addRow("Username", self.username)
-        layout.addRow("Display name", self.display_name)
-        layout.addRow("Password", self.password)
-        layout.addRow("Confirm password", self.password_confirm)
-        layout.addRow("", self.autologin)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addRow(buttons)
 
 
 class MainWindow(QMainWindow):
@@ -204,7 +136,7 @@ class MainWindow(QMainWindow):
         shell.addWidget(sidebar)
         shell.addWidget(content, 1)
         self.setCentralWidget(central)
-        self.statusBar().showMessage("Ready")
+        self.statusBar().showMessage(tr("Ready"))
 
     def open_setup_page(self) -> None:
         index = len(self.page_titles) - 1
@@ -472,9 +404,12 @@ class MainWindow(QMainWindow):
         self.update_checks_check = QCheckBox("Enabled")
         self.network_checks_check = QCheckBox("Allow online operations")
         self.log_retention_spin = self._setting_spin(100, 100000, " lines")
+        self.power_policy_label = QLabel("1 hour idle → sleep; 1 more unattended hour → shutdown")
+        self.power_policy_label.setWordWrap(True)
         system_form.addRow("Update checks", self.update_checks_check)
         system_form.addRow("Network", self.network_checks_check)
         system_form.addRow("Log retention", self.log_retention_spin)
+        system_form.addRow("Idle power policy", self.power_policy_label)
 
         appearance_group = QGroupBox("Appearance and language")
         appearance_form = QFormLayout(appearance_group)
@@ -483,6 +418,7 @@ class MainWindow(QMainWindow):
         self.theme_combo.addItem("Light", "light")
         self.language_combo = QComboBox()
         self.language_combo.addItem("English", "en")
+        self.language_combo.addItem("Turkish", "tr")
         appearance_form.addRow("Theme", self.theme_combo)
         appearance_form.addRow("Language", self.language_combo)
 
@@ -604,9 +540,11 @@ class MainWindow(QMainWindow):
         description = QLabel("Shows the latest 200 root operations with level and context.")
         description.setObjectName("muted")
         self.logs_button = QPushButton("Refresh logs")
+        self.diagnostics_button = QPushButton("Export redacted diagnostics")
         row.addWidget(description)
         row.addStretch()
         row.addWidget(self.logs_button)
+        row.addWidget(self.diagnostics_button)
         layout.addLayout(row)
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
@@ -634,6 +572,7 @@ class MainWindow(QMainWindow):
         self.export_button.clicked.connect(self._export_snapshot)
         self.import_button.clicked.connect(self._import_snapshot)
         self.logs_button.clicked.connect(lambda: self.backend.run("logs"))
+        self.diagnostics_button.clicked.connect(lambda: self.backend.run("diagnostics"))
         self.user_refresh_button.clicked.connect(lambda: self.backend.run("user-list"))
         self.user_app_install_button.clicked.connect(self._confirm_application_install)
         self.user_create_button.clicked.connect(self._create_user)
@@ -700,6 +639,7 @@ class MainWindow(QMainWindow):
             self.export_button,
             self.import_button,
             self.logs_button,
+            self.diagnostics_button,
             self.user_app_install_button,
             self.user_create_button,
             self.user_password_button,
@@ -722,7 +662,7 @@ class MainWindow(QMainWindow):
             self.setup_finish_button,
         ):
             button.setDisabled(busy)
-        self.statusBar().showMessage("Operation in progress…" if busy else "Ready")
+        self.statusBar().showMessage(tr("Operation in progress…" if busy else "Ready"))
 
     def _status_changed(self, status: dict[str, Any]) -> None:
         mode = str(status.get("running_mode", "unknown"))
@@ -743,7 +683,7 @@ class MainWindow(QMainWindow):
         )
         last = status.get("last_snapshot")
         if isinstance(last, dict):
-            self.snapshot_card.value.setText(_date(str(last.get("created_at", ""))))
+            self.snapshot_card.value.setText(local_date(str(last.get("created_at", ""))))
             self.snapshot_card.detail.setText(str(last.get("description", "")))
         else:
             self.snapshot_card.value.setText("None yet")
@@ -752,13 +692,30 @@ class MainWindow(QMainWindow):
             )
         usage = shutil.disk_usage("/")
         self.disk_card.value.setText(f"{round(usage.used / usage.total * 100)}%")
-        self.disk_card.detail.setText(f"{_human_bytes(usage.used)} / {_human_bytes(usage.total)}")
+        self.disk_card.detail.setText(f"{human_bytes(usage.used)} / {human_bytes(usage.total)}")
         ready = bool(status.get("golden_present")) and bool(status.get("active_present"))
         pending = bool(status.get("transaction_pending"))
-        self.health_card.value.setText("Attention" if pending or not ready else "Ready")
+        validation = status.get("boot_validation", {})
+        if not isinstance(validation, dict):
+            validation = {}
+        validation_status = str(validation.get("status", "idle"))
+        validation_attention = validation_status in {
+            "awaiting-frozen-boot",
+            "verifying",
+            "failed",
+        }
+        self.health_card.value.setText(
+            "Attention" if pending or not ready or validation_attention else "Ready"
+        )
         self.health_card.detail.setText(
             "An interrupted operation was detected."
             if pending
+            else "The published Golden still needs a real FROZEN boot validation."
+            if validation_status in {"awaiting-frozen-boot", "verifying"}
+            else "The first real FROZEN boot validation failed."
+            if validation_status == "failed"
+            else "The first real FROZEN boot was verified."
+            if validation_status == "verified"
             else "Golden and Active verified."
             if ready
             else "Golden or Active is not ready yet."
@@ -776,16 +733,34 @@ class MainWindow(QMainWindow):
             )
         if status.get("failed_golden_present"):
             alerts.append("Failed Golden retained for diagnosis after automatic rollback.")
+        if validation_status in {"awaiting-frozen-boot", "verifying"}:
+            alerts.append("Golden awaits its first real FROZEN boot validation.")
+        elif validation_status == "failed":
+            error = str(validation.get("error", "Unknown validation error"))
+            alerts.append(f"First FROZEN boot validation failed: {error}")
+        power_policy = status.get("power_policy", {})
+        if isinstance(power_policy, dict):
+            if power_policy.get("supported") is False:
+                self.power_policy_label.setText(
+                    "Unavailable: RTC wake support is required for the automatic shutdown."
+                )
+                alerts.append(
+                    "Idle power policy is disabled because RTC wake support is unavailable."
+                )
+            else:
+                self.power_policy_label.setText(
+                    "Enabled: 1 hour idle → sleep; 1 more unattended hour → shutdown"
+                )
         self.alert_label.setText("  •  ".join(alerts) if alerts else "No warnings.")
 
     def _snapshots_changed(self, snapshots: list[dict[str, Any]]) -> None:
         self.snapshot_table.setRowCount(len(snapshots))
         for row, snapshot in enumerate(snapshots):
             values = (
-                _date(str(snapshot.get("created_at", ""))),
+                local_date(str(snapshot.get("created_at", ""))),
                 str(snapshot.get("description", "")),
                 str(snapshot.get("created_by", "")),
-                _human_bytes(int(snapshot.get("apparent_size_bytes", 0))),
+                human_bytes(int(snapshot.get("apparent_size_bytes", 0))),
                 str(snapshot.get("kernel", "")),
                 str(snapshot.get("health", "unknown")),
                 str(snapshot.get("rollback_count", 0)),
@@ -803,7 +778,7 @@ class MainWindow(QMainWindow):
         for entry in logs:
             context = entry.get("context", {})
             lines.append(
-                f"{_date(str(entry.get('timestamp', '')))}  "
+                f"{local_date(str(entry.get('timestamp', '')))}  "
                 f"{str(entry.get('level', '')).ljust(7)}  "
                 f"{entry.get('action', '')}: {entry.get('message', '')}  "
                 f"{context if context else ''}"
@@ -1009,7 +984,7 @@ class MainWindow(QMainWindow):
             ("Rollback count", "rollback_count"),
             ("Creation duration (ms)", "creation_duration_ms"),
             ("Health", "health"),
-            ("Kaynak", "source_subvolume"),
+            ("Source", "source_subvolume"),
         )
         QMessageBox.information(
             self,
@@ -1060,7 +1035,7 @@ class MainWindow(QMainWindow):
             snapshot_id
             and QMessageBox.warning(
                 self,
-                "Snapshot sil",
+                "Delete snapshot",
                 "The selected snapshot will be permanently deleted. Continue?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
@@ -1174,8 +1149,9 @@ class MainWindow(QMainWindow):
         answer = QMessageBox.warning(
             self,
             "Publish Golden and enable FROZEN",
-            "Existing managed-user templates will be refreshed, Golden published, and the "
-            "next boot set to FROZEN. Do not power off during the operation.",
+            "CachyFreeze will request a normal logout, wait for managed sessions to stop, "
+            "then refresh templates, publish Golden and schedule FROZEN. Save your work "
+            "before continuing.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
@@ -1260,15 +1236,31 @@ class MainWindow(QMainWindow):
         if (
             QMessageBox.warning(
                 self,
-                "Publish Golden and freeze",
-                "The maintenance system will be archived as a snapshot and new "
-                "Golden/Active subvolumes published atomically. Do not power off.",
+                "Finalize, log out and freeze",
+                "Save your work and close applications first. CachyFreeze will request "
+                "a normal logout, wait until every managed session and process has "
+                "stopped, then publish Golden and schedule FROZEN. If logout does not "
+                "finish safely, nothing will be frozen.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
             == QMessageBox.StandardButton.Yes
         ):
-            self.backend.run("freeze")
+            self.backend.run("freeze-prepare")
+
+    def _start_safe_logout(self) -> None:
+        started, _process_id = QProcess.startDetached(
+            "/usr/local/bin/cachyfreeze-finish-session",
+            [],
+        )
+        if not started:
+            QMessageBox.warning(
+                self,
+                "Logout required",
+                "The finalization request is waiting, but the Plasma logout screen could "
+                "not be opened automatically. Log out from the application menu. Golden "
+                "will not be published while this session remains open.",
+            )
 
     def _confirm_reboot(self) -> None:
         if (
@@ -1278,25 +1270,28 @@ class MainWindow(QMainWindow):
             self.backend.run("reboot")
 
     def _operation_finished(self, action: str, success: bool, message: str) -> None:
-        self.statusBar().showMessage(message, 8000)
+        self.statusBar().showMessage(tr(message), 8000)
         if action == "applications-status" and not success:
             self.pending_user_create_check = False
         if action == "user-create" and not success:
             self.pending_autologin_user = None
         if action == "user-autologin" and not success:
             self.pending_autologin_user = None
-        if not success and "iptal edildi" not in message.lower():
+        cancelled = any(
+            marker in message.lower() for marker in ("iptal edildi", "cancelled", "canceled")
+        )
+        if not success and not cancelled:
             QMessageBox.critical(self, "CachyFreeze Error", message)
-        elif success and action == "setup-freeze":
-            answer = QMessageBox.question(
+        elif success and action in {"setup-freeze", "freeze-prepare"}:
+            QMessageBox.information(
                 self,
-                "Setup complete",
-                f"{message}\n\nReboot now for the first FROZEN test?",
+                "Safe finalization queued",
+                f"{message}\n\nCachyFreeze will now open the normal Plasma logout flow. "
+                "After the session closes, a system service will capture the clean home "
+                "template, publish Golden and schedule FROZEN. Reboot only after the "
+                "operation reports completion.",
             )
-            if answer == QMessageBox.StandardButton.Yes:
-                self.backend.run("reboot")
-            else:
-                self.backend.run("setup-status")
+            self._start_safe_logout()
         elif success and action in {
             "freeze",
             "thaw",
@@ -1366,7 +1361,11 @@ class MainWindow(QMainWindow):
                     "CachyFreeze is installed in THAWED mode. User creation is optional; "
                     "FROZEN can be enabled at any time."
                 ),
-                "complete": "Setup is complete. The next boot is ready for FROZEN.",
+                "validating": (
+                    "Golden publication is in progress or the first real FROZEN boot still "
+                    "needs validation. Check the overview warning for details."
+                ),
+                "complete": "Setup is complete and the first real FROZEN boot was verified.",
             }
             employee = str(result.get("employee_user", ""))
             detail = labels.get(phase, "Setup status is unknown; inspect the logs.")
@@ -1398,14 +1397,22 @@ class MainWindow(QMainWindow):
             healthy = bool(result.get("healthy"))
             self.health_card.value.setText("Ready" if healthy else "Error")
             self.health_card.detail.setText(
-                "Btrfs counters and all snapshots verified."
+                "Btrfs, snapshots, and RTC power policy verified."
                 if healthy
-                else "An unhealthy snapshot or Btrfs device error was found."
+                else "A snapshot, Btrfs, or RTC power-policy error was found."
             )
             QMessageBox.information(
                 self,
                 "System health scan",
                 "Healthy" if healthy else f"Attention required:\n{result}",
+            )
+        elif action == "diagnostics":
+            QMessageBox.information(
+                self,
+                "Diagnostic bundle ready",
+                "A redacted support bundle was created. Device identifiers, account "
+                "identities, addresses, and secrets were removed.\n\n"
+                f"Path: {result.get('path', '')}",
             )
         elif action == "updates-check":
             packages = [str(item) for item in result.get("packages", [])]
@@ -1470,6 +1477,10 @@ class MainWindow(QMainWindow):
             language = self.language_combo.findData(str(result.get("language", "en")))
             if language >= 0:
                 self.language_combo.setCurrentIndex(language)
+            selected_language = str(result.get("language", "en"))
+            self.settings.setValue("language", selected_language)
+            configure(selected_language)
+            retranslate_tree(self)
             theme = str(result.get("theme", self.settings.value("theme", "dark")))
             theme_index = self.theme_combo.findData(theme)
             if theme_index >= 0:

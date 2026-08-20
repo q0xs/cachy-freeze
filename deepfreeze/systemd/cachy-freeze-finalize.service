@@ -1,0 +1,9 @@
+[Unit]
+Description=Publish CachyFreeze Golden after managed users log out
+After=systemd-user-sessions.service var-lib-cachy\x2dfreeze.mount
+RequiresMountsFor=/var/lib/cachy-freeze
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cachy-freeze finalize run --timeout 180
+TimeoutStartSec=240

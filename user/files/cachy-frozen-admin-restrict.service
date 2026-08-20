@@ -3,6 +3,7 @@ Description=Hide administrator from the graphical login in CachyOS frozen mode
 ConditionKernelCommandLine=cachy.freeze=1
 After=local-fs.target
 Before=systemd-user-sessions.service display-manager.service sshd.service
+RequiresMountsFor=/var/lib/cachy-freeze
 
 [Service]
 Type=oneshot

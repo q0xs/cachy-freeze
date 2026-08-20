@@ -38,7 +38,7 @@ class UserManager:
         runner: CommandRunner | None = None,
         autologin_path: Path | None = None,
         display_manager_path: Path = Path("/etc/systemd/system/display-manager.service"),
-        plasmalogin_path: Path = Path("/etc/plasmalogin.conf"),
+        plasmalogin_path: Path = Path("/etc/plasmalogin.conf.d/90-cachy-freeze-autologin.conf"),
         sddm_path: Path = Path("/etc/sddm.conf.d/cachy-autologin.conf"),
         template_root: Path = Path("/var/lib/cachy-user-template"),
         provisioner_path: Path = Path(
@@ -73,7 +73,7 @@ class UserManager:
         except OSError:
             manager_name = ""
         if manager_name == "plasmalogin.service":
-            return "plasmalogin", plasmalogin_path
+            return "plasmalogin-drop-in", plasmalogin_path
         return "managed-file", sddm_path
 
     @staticmethod
@@ -120,6 +120,11 @@ class UserManager:
         except OSError:
             pass
         return None
+
+    def autologin_user(self) -> str | None:
+        """Return the currently configured non-secret automatic-login identity."""
+
+        return self._autologin_user()
 
     def _groups(self, username: str) -> list[str]:
         return self.runner.text(["id", "-nG", username], check=False).split()
@@ -481,8 +486,15 @@ class UserManager:
         )
 
     def _write_autologin(self, username: str | None) -> None:
-        if self.autologin_kind == "plasmalogin":
-            self._write_plasmalogin_autologin(username)
+        if self.autologin_kind == "plasmalogin-drop-in":
+            atomic_text_write(
+                self.autologin_path,
+                "[Autologin]\n"
+                f"User={username or ''}\n"
+                "Session=plasma\n"
+                f"Relogin={'true' if username else 'false'}\n",
+                mode=0o644,
+            )
             return
         if username is None:
             self.autologin_path.unlink(missing_ok=True)
@@ -490,62 +502,6 @@ class UserManager:
         atomic_text_write(
             self.autologin_path,
             f"[Autologin]\nUser={username}\nSession=plasma.desktop\nRelogin=true\n",
-            mode=0o644,
-        )
-
-    def _write_plasmalogin_autologin(self, username: str | None) -> None:
-        try:
-            original = self.autologin_path.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            original = ""
-        except OSError as error:
-            raise CachyFreezeError(
-                f"Plasma Login Manager configuration could not be read: {error}"
-            ) from error
-
-        lines = original.splitlines()
-        section_start: int | None = None
-        section_end = len(lines)
-        for index, line in enumerate(lines):
-            stripped = line.strip()
-            if not (stripped.startswith("[") and stripped.endswith("]")):
-                continue
-            if section_start is not None:
-                section_end = index
-                break
-            if stripped.casefold() == "[autologin]":
-                section_start = index
-
-        if section_start is None:
-            if lines and lines[-1]:
-                lines.append("")
-            section_start = len(lines)
-            lines.append("[Autologin]")
-            section_end = len(lines)
-
-        values = {
-            "user": f"User={username or ''}",
-            "relogin": f"Relogin={'true' if username else 'false'}",
-        }
-        if username:
-            values["session"] = "Session=plasma"
-        found: set[str] = set()
-        for index in range(section_start + 1, section_end):
-            if "=" not in lines[index]:
-                continue
-            key = lines[index].split("=", 1)[0].strip().casefold()
-            if key in values:
-                lines[index] = values[key]
-                found.add(key)
-        insert_at = section_end
-        for key, value in values.items():
-            if key not in found:
-                lines.insert(insert_at, value)
-                insert_at += 1
-
-        atomic_text_write(
-            self.autologin_path,
-            "\n".join(lines).rstrip("\n") + "\n",
             mode=0o644,
         )
 

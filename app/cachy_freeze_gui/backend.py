@@ -211,6 +211,7 @@ class BackendClient(QObject):
             "thaw": "The next boot was set to THAWED maintenance mode.",
             "thaw-once": "Only the next boot was set to THAWED.",
             "freeze": "Golden was published and the next boot was set to FROZEN.",
+            "freeze-prepare": "Safe finalization was queued; log out to continue.",
             "snapshot-list": "Snapshot list refreshed.",
             "snapshot-create": "Snapshot created.",
             "snapshot-verify": "Snapshot verification completed.",
@@ -219,6 +220,7 @@ class BackendClient(QObject):
             "snapshot-export": "Snapshot written to the export directory.",
             "snapshot-import": "Snapshot imported after checksum verification.",
             "health": "System health check completed.",
+            "diagnostics": "Redacted diagnostic bundle created.",
             "logs": "Audit log refreshed.",
             "user-list": "User list refreshed.",
             "user-create": "Standard user created.",
@@ -237,7 +239,7 @@ class BackendClient(QObject):
             "setup-status": "Setup status refreshed.",
             "setup-preflight": "CachyOS, UEFI, Btrfs, and GRUB preflight passed.",
             "setup-install": "CachyFreeze was installed in THAWED mode.",
-            "setup-freeze": "Golden was published and the next boot was set to FROZEN.",
+            "setup-freeze": "GRUB protection is ready; log out to publish Golden safely.",
             "reboot": "System is rebooting.",
         }
         return messages.get(action, "Operation completed successfully.")

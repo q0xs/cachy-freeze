@@ -4,6 +4,36 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-20 — local v1 hardening and UEFI acceptance — working tree based on `dc8a675`
+
+- FIXED — Golden/FROZEN finalization now waits for normal managed-session logout,
+  publishes and schedules FROZEN under one operation lock, fails closed on
+  timeout, and validates the first real FROZEN boot before clearing boot-attempt
+  state.
+- FIXED — persistent state has an application version and schema migration;
+  local deployment stages and compile-checks candidates, creates a bounded
+  managed-path backup, verifies migration and installed files, and rolls back
+  only its explicit allow-list on failure.
+- FIXED — Plasma Login Manager automatic login now uses the owned
+  `90-cachy-freeze-autologin.conf` drop-in. The migration preserves unrelated
+  administrator configuration and compatible SDDM systems keep their owned
+  drop-in path.
+- ADDED — a redacted diagnostic ZIP, English/Turkish live GUI translation, and
+  an installed power service implementing one hour idle, one hour timed sleep,
+  then shutdown. Early manual wake cancels shutdown; absent RTC support fails
+  safe and is visible in health/status.
+- PASS — Ruff 0.16.3 check and format, 96/96 Python unit/GUI/helper tests,
+  ShellCheck 0.11.0 error-level validation, repository static contracts, English
+  and Turkish Qt offscreen UI smoke, and isolated GRUB generation/syntax checks.
+- PASS — disposable OVMF/QEMU UEFI acceptance proved a wrong THAWED password
+  cannot reach the protected load region, the test-only correct password can,
+  and FROZEN reaches it without authentication. No production credential was
+  used or recorded.
+- NOT RUN — physical suspend, RTC wake, shutdown, real initramfs/GRUB deployment,
+  reboot, or FROZEN reset. The active workstation was inspected read-only for
+  `rtcwake`, writable RTC wake-alarm support, logind idle hints, and suspend mode,
+  but was not power-state or boot-stack mutated.
+
 ## 2026-08-20 — fail-closed GRUB and ready-user workflow — working tree based on `6ecf6e8`
 
 - FIXED — the managed GRUB entry now gates every kernel/initramfs load behind an

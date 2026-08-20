@@ -44,12 +44,36 @@ class SetupGuiTests(unittest.TestCase):
         helper = (Path(__file__).parents[1] / "app/cachy-freeze-manager-helper").read_text()
         freeze_case = helper.split("setup-freeze)", 1)[1].split(";;", 1)[0]
         self.assertNotIn("/etc/cachy-employee.conf", freeze_case)
-        self.assertIn("finalize-setup.sh", freeze_case)
+        self.assertIn("finalize request", freeze_case)
 
     def test_regular_freeze_requires_grub_protection(self) -> None:
         helper = (Path(__file__).parents[1] / "app/cachy-freeze-manager-helper").read_text()
         freeze_case = helper.split("  freeze)", 1)[1].split(";;", 1)[0]
         self.assertIn("/etc/cachy-freeze-grub-auth.conf", freeze_case)
+
+    def test_regular_gui_freeze_queues_logout_aware_finalization(self) -> None:
+        with patch(
+            "cachy_freeze_gui.window.QMessageBox.warning",
+            return_value=QMessageBox.StandardButton.Yes,
+        ):
+            self.window._confirm_freeze()
+
+        self.backend.run.assert_called_once_with("freeze-prepare")
+
+    def test_successful_finalization_request_starts_normal_logout(self) -> None:
+        with (
+            patch("cachy_freeze_gui.window.QMessageBox.information"),
+            patch(
+                "cachy_freeze_gui.window.QProcess.startDetached",
+                return_value=(True, 1234),
+            ) as start_detached,
+        ):
+            self.window._operation_finished("freeze-prepare", True, "queued")
+
+        start_detached.assert_called_once_with(
+            "/usr/local/bin/cachyfreeze-finish-session",
+            [],
+        )
 
     def test_provision_requires_preflight(self) -> None:
         with patch("cachy_freeze_gui.window.QMessageBox.warning") as warning:

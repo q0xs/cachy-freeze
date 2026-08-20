@@ -36,6 +36,17 @@ known-good state.
   operations to an explicit helper allow-list.
 - Passwords and reusable password hashes travel through stdin, never through
   command arguments, environment variables, or logs.
+- Golden publication waits for the managed desktop session to close, then
+  publishes and schedules FROZEN under one operation lock; the first FROZEN boot
+  must pass reset, mount, restriction, and graphical-session validation before
+  setup is reported complete.
+- The fixed idle-power policy sleeps after one hour without input and, if that
+  timed sleep is not interrupted, powers off after one further hour. An early
+  manual wake cancels shutdown and requires a fresh idle period.
+- English and Turkish are available at runtime, and a bounded, redacted support
+  bundle can be exported without exposing account, device, or credential data.
+- Versioned persistent state, pre-deployment backups, migrations, verification,
+  and allow-listed rollback protect local upgrades.
 
 ## Supported system
 
@@ -51,6 +62,11 @@ CachyFreeze currently requires all of the following:
 
 It is not a generic installer for arbitrary Arch, ext4, BIOS, systemd-boot, or
 custom Btrfs layouts.
+
+The automatic one-hour sleep plus one-hour shutdown policy additionally needs a
+working RTC wake alarm at `/sys/class/rtc/rtc0/wakealarm`. Installation still
+completes safely without it, but the policy remains disabled and visibly reports
+that its hardware prerequisite is unavailable.
 
 ## Download the ZIP and install graphically
 
@@ -91,8 +107,9 @@ and MicroSIP before capturing the clean home template. Failure removes the
 partial account and candidate template. CachyFreeze does not rewrite the
 account's native group membership.
 User creation never publishes Golden or schedules FROZEN. Automatic login is
-written to the active display manager (Plasma Login Manager on current CachyOS,
-with SDDM retained for compatible older installations).
+written to a CachyFreeze-owned drop-in for the active display manager (Plasma
+Login Manager on current CachyOS, with SDDM retained for compatible older
+installations). The display manager's main configuration is left untouched.
 
 No operation in the creation dialog reboots the computer automatically.
 
@@ -138,11 +155,14 @@ PYTHONPATH=src:app python -m unittest discover -s tests -v
 SHELLCHECK_OPTS=--severity=error bash deepfreeze/tests/static.sh
 QT_QPA_PLATFORM=offscreen bash deepfreeze/tests/ui-smoke.sh
 bash deepfreeze/tests/grub-generation.sh
+bash deepfreeze/tests/boot-acceptance-vm.sh
 ```
 
-Loop-backed Btrfs, initramfs, reboot, recovery, and power-loss tests must run only
-on a disposable VM or an explicitly approved pilot device. Executed evidence is
-recorded in [`docs/testing/TEST-LOG.md`](docs/testing/TEST-LOG.md).
+The final command exercises wrong-password THAWED, correct-password THAWED, and
+passwordless FROZEN paths in disposable OVMF/QEMU guests. Loop-backed Btrfs,
+initramfs, reboot, recovery, suspend/poweroff, and power-loss tests must run only
+on a disposable VM or an explicitly approved pilot device. Executed evidence
+is recorded in [`docs/testing/TEST-LOG.md`](docs/testing/TEST-LOG.md).
 
 ## Documentation
 

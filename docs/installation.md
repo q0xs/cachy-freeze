@@ -8,6 +8,9 @@
 - AC power, physical access, recovery media, and a restorable backup
 
 The installer stops when preflight detects an unsupported layout.
+The idle power policy additionally requires an RTC wake alarm exposed at
+`/sys/class/rtc/rtc0/wakealarm`; missing RTC support does not make the Btrfs
+freeze engine unsafe, so it is reported separately instead of aborting setup.
 
 ## ZIP-based graphical install
 
@@ -48,3 +51,17 @@ Sign in to the prepared account, finish its desktop checks, and only then publis
 Golden / enable FROZEN from that session.
 After an operation finishes, use the application's reboot confirmation. Never
 interrupt package, initramfs, GRUB, or Golden writes.
+
+## Automatic idle power policy
+
+Installation enables `cachy-freeze-idle-power.service` automatically. With no
+keyboard or pointer activity for one hour, the workstation enters a timed sleep.
+If it remains asleep for the following hour, the RTC wakes it and CachyFreeze
+powers it off, for two hours total unattended time. Waking it manually before
+the deadline cancels shutdown; another complete one-hour idle period is required
+before sleep can be scheduled again.
+
+If RTC wake support is unavailable or unwritable, CachyFreeze reports the policy
+as unsupported and does not suspend the workstation, because sleep without a
+reliable shutdown deadline would violate the requested policy. Support status is
+visible in Management Center and in the redacted diagnostic bundle.

@@ -10,6 +10,7 @@ from PyQt6.QtGui import QFont, QIcon
 from PyQt6.QtWidgets import QApplication
 
 from .backend import BackendClient
+from .i18n import configure, preferred_language
 from .window import MainWindow
 
 
@@ -28,6 +29,7 @@ def main() -> int:
     application.setOrganizationName("CachyOS Workstation")
     application.setWindowIcon(QIcon(str(Path(__file__).with_name("assets") / "cachy-freeze.png")))
     application.setFont(QFont("Noto Sans", 10))
+    configure(preferred_language())
     backend = BackendClient(setup_root=arguments.setup_source)
     window = MainWindow(backend)
     window.show()

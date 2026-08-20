@@ -17,19 +17,24 @@ import shutil
 import subprocess
 import time
 import uuid
-import zipfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .applications import ApplicationVerifier
 from .catalog import AuditLogger, SnapshotCatalog, atomic_json_write, atomic_text_write
 from .config import Config
+from .diagnostics import DiagnosticBundleBuilder
 from .errors import CachyFreezeError, CommandError, IntegrityError
+from .finalization import FinalizationManager
 from .models import SnapshotMetadata
+from .power import IdlePowerManager
 from .runner import CommandRunner, ProcessLock
 from .settings import SettingsStore
+from .validation import BootValidationManager
+from .versioning import APP_VERSION, STATE_SCHEMA_VERSION, StateMigrationManager
 
 try:
     import pwd
@@ -534,8 +539,26 @@ class FreezeEngine:
                 )
             except (OSError, json.JSONDecodeError):
                 boot_health = {}
+            finalization = FinalizationManager(
+                state_dir,
+                self.logger,
+                runner=self.runner,
+            ).status()
+            boot_validation = BootValidationManager(
+                state_dir,
+                self.logger,
+                runner=self.runner,
+            ).status()
+            state_schema = StateMigrationManager(state_dir, self.logger).status()
+            power_policy = IdlePowerManager(
+                state_dir,
+                self.logger,
+                runner=self.runner,
+            ).status()
             return {
-                "schema": 1,
+                "schema": 2,
+                "application_version": APP_VERSION,
+                "state_schema": state_schema,
                 "running_mode": self._current_mode(),
                 "scheduled_mode": (
                     "thawed-once"
@@ -555,7 +578,40 @@ class FreezeEngine:
                 "boot_failure_limit": self.config.BOOT_FAILURE_LIMIT,
                 "last_successful_boot": boot_health.get("last_successful_boot"),
                 "last_automatic_recovery": boot_health.get("last_automatic_recovery"),
+                "finalization": finalization,
+                "boot_validation": boot_validation,
+                "power_policy": power_policy,
             }
+
+    def power_policy_status(self) -> dict[str, Any]:
+        self.require_root()
+        return IdlePowerManager(
+            Path(self.config.STATE_DIR), self.logger, runner=self.runner
+        ).status()
+
+    def run_power_policy(self, poll_seconds: int = 15) -> dict[str, Any]:
+        self.require_root()
+        manager = IdlePowerManager(Path(self.config.STATE_DIR), self.logger, runner=self.runner)
+        manager.run_forever(poll_seconds)
+        raise AssertionError("Idle power policy returned unexpectedly")
+
+    def version_info(self) -> dict[str, Any]:
+        """Return code and persistent-state compatibility information."""
+
+        state = StateMigrationManager(Path(self.config.STATE_DIR), self.logger).status()
+        return {
+            "application_version": APP_VERSION,
+            "supported_state_schema": STATE_SCHEMA_VERSION,
+            "installed_state_schema": state["state_schema"],
+            "migration_required": state["migration_required"],
+        }
+
+    def migrate_state(self) -> dict[str, Any]:
+        """Run state migrations under the global mutation lock."""
+
+        self.require_root()
+        with ProcessLock(Path(self.config.LOCK_FILE)):
+            return StateMigrationManager(Path(self.config.STATE_DIR), self.logger).migrate()
 
     def mark_boot_successful(self) -> dict[str, Any]:
         """Confirm graphical userspace reached its healthy target.
@@ -567,6 +623,20 @@ class FreezeEngine:
 
         self.require_root()
         state_dir = Path(self.config.STATE_DIR)
+        validation_manager = BootValidationManager(
+            state_dir,
+            self.logger,
+            runner=self.runner,
+        )
+        validation = validation_manager.status()
+        if validation.get("status") not in {"idle", "verified"}:
+            with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
+                validation = validation_manager.validate(
+                    running_mode=self._current_mode(),
+                    current_subvolume=self._root_subvolume(),
+                    golden_present=self._subvolume_exists(self.config.GOLDEN_SUBVOL),
+                    active_present=self._subvolume_exists(self.config.ACTIVE_SUBVOL),
+                )
         event_path = state_dir / "recovery-event"
         event = ""
         try:
@@ -608,6 +678,7 @@ class FreezeEngine:
         )
         return {
             "healthy": True,
+            "boot_validation": validation,
             "automatic_recovery": automatic_recovery,
             "confirmed_at": now,
             "one_time_thaw_cleared": one_time_thaw_cleared,
@@ -744,119 +815,23 @@ class FreezeEngine:
 
     def application_status(self) -> dict[str, Any]:
         self.require_root()
-        commands = {
-            "Google Chrome": "google-chrome-stable",
-            "Slack": "slack",
-            "Wine": "wine",
-            "LibreOffice": "libreoffice",
-            "Zoiper": "zoiper",
-            "AnyDesk": "anydesk",
-            "X virtual framebuffer": "xvfb-run",
-            "Archive extractor": "unzip",
-            "Template synchronizer": "rsync",
-            "User session launcher": "runuser",
-        }
-        applications = [
-            {"name": name, "installed": shutil.which(command) is not None}
-            for name, command in commands.items()
-        ]
-        anydesk_active = (
-            self.runner.run(
-                ["systemctl", "is-active", "--quiet", "anydesk.service"], check=False
-            ).returncode
-            == 0
-        )
-        applications.append(
-            {
-                "name": "AnyDesk background service",
-                "installed": anydesk_active,
-                "active": anydesk_active,
-            }
-        )
-        applications.append(self._chrome_policy_status())
-        applications.append(self._microsip_status(Path("/opt/company/microsip")))
-        return {
-            "applications": applications,
-            "all_installed": all(item["installed"] for item in applications),
-        }
+        return ApplicationVerifier(
+            self.runner,
+            which=shutil.which,
+            chrome_check=self._chrome_policy_status,
+            microsip_check=self._microsip_status,
+        ).status()
 
     @staticmethod
     def _chrome_policy_status(
         installed: Path = Path("/etc/opt/chrome/policies/managed/company.json"),
         expected: Path = Path("/usr/lib/cachy-freeze/deployment/policies/chrome/managed.json"),
     ) -> dict[str, Any]:
-        valid = False
-        try:
-            installed_document = json.loads(installed.read_text(encoding="utf-8"))
-            expected_document = json.loads(expected.read_text(encoding="utf-8"))
-            valid = isinstance(installed_document, dict) and installed_document == expected_document
-        except (OSError, json.JSONDecodeError):
-            pass
-        return {"name": "Managed Chrome policy", "installed": valid, "valid": valid}
+        return ApplicationVerifier.chrome_policy_status(installed, expected)
 
     @staticmethod
     def _microsip_status(microsip_root: Path) -> dict[str, Any]:
-        microsip_valid = False
-        microsip_version = ""
-        try:
-            archive_name = (microsip_root / "CURRENT").read_text(encoding="utf-8").strip()
-            if (
-                Path(archive_name).name != archive_name
-                or re.fullmatch(r"MicroSIP-[0-9]+(?:\.[0-9]+)+\.zip", archive_name) is None
-            ):
-                raise IntegrityError("MicroSIP CURRENT contains an invalid filename")
-            checksum_line = (microsip_root / "SHA256SUMS").read_text(encoding="utf-8").strip()
-            expected, recorded_name = checksum_line.split(None, 1)
-            metadata = json.loads((microsip_root / "metadata.json").read_text(encoding="utf-8"))
-            archive = microsip_root / archive_name
-            archive_size = archive.stat().st_size
-            digest = hashlib.sha256()
-            with archive.open("rb") as handle:
-                for block in iter(lambda: handle.read(1024 * 1024), b""):
-                    digest.update(block)
-            with zipfile.ZipFile(archive) as bundle:
-                executable_names = [
-                    name
-                    for name in bundle.namelist()
-                    if Path(name).name.casefold() == "microsip.exe"
-                ]
-                if len(executable_names) != 1 or executable_names[0].casefold() != "microsip.exe":
-                    raise IntegrityError(
-                        "MicroSIP archive does not contain exactly one root executable"
-                    )
-                executable_digest = hashlib.sha256()
-                with bundle.open(executable_names[0]) as executable:
-                    for block in iter(lambda: executable.read(1024 * 1024), b""):
-                        executable_digest.update(block)
-            source_url = metadata.get("source_url")
-            executable_checksum = metadata.get("executable_sha256")
-            microsip_valid = (
-                metadata.get("schema") == 1
-                and recorded_name.strip() == archive_name
-                and re.fullmatch(r"[0-9a-f]{64}", expected) is not None
-                and digest.hexdigest() == expected
-                and metadata.get("archive_sha256") == expected
-                and isinstance(executable_checksum, str)
-                and executable_digest.hexdigest() == executable_checksum
-                and isinstance(source_url, str)
-                and source_url.startswith("https://www.microsip.org/download/")
-                and 1048576 <= archive_size <= 104857600
-            )
-            microsip_version = archive_name.removeprefix("MicroSIP-").removesuffix(".zip")
-        except (
-            OSError,
-            ValueError,
-            IntegrityError,
-            json.JSONDecodeError,
-            zipfile.BadZipFile,
-        ):
-            pass
-        return {
-            "name": "MicroSIP",
-            "installed": microsip_valid,
-            "version": microsip_version,
-            "checksum_valid": microsip_valid,
-        }
+        return ApplicationVerifier.microsip_status(microsip_root)
 
     def install_applications(self) -> dict[str, Any]:
         self.require_root()
@@ -1266,14 +1241,23 @@ class FreezeEngine:
                 if raw_value.isdigit():
                     device_errors[key] = int(raw_value)
             scrub = self.runner.text(["btrfs", "scrub", "status", self._root_device()], check=False)
+            power_policy = IdlePowerManager(
+                Path(self.config.STATE_DIR), self.logger, runner=self.runner
+            ).status()
             unhealthy = [
                 result["snapshot_id"] for result in snapshot_results if not result["healthy"]
             ]
             result = {
-                "healthy": not unhealthy and not any(device_errors.values()),
+                "healthy": (
+                    not unhealthy
+                    and not any(device_errors.values())
+                    and bool(power_policy["supported"])
+                    and power_policy["status"] not in {"failed", "unsupported"}
+                ),
                 "unhealthy_snapshots": unhealthy,
                 "device_errors": device_errors,
                 "scrub_status": scrub,
+                "power_policy": power_policy,
             }
             self.logger.write(
                 "INFO" if result["healthy"] else "ERROR",
@@ -1283,38 +1267,92 @@ class FreezeEngine:
             )
             return result
 
+    def _publish_locked(self, description: str) -> SnapshotMetadata:
+        from .users import UserManager
+
+        self._recover_transaction_locked()
+        user_manager = UserManager(
+            state_dir=Path(self.config.STATE_DIR),
+            lock_file=Path(self.config.LOCK_FILE),
+            logger=self.logger,
+            runner=self.runner,
+        )
+        user_manager.refresh_templates(already_locked=True)
+        archived = self._create_snapshot_locked(
+            self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
+            description,
+            frozen=True,
+        )
+        self._publish_source_locked(
+            self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
+            "publish",
+            archived.snapshot_id,
+        )
+        self._cleanup_snapshots_locked(self._retention_count())
+        BootValidationManager(
+            Path(self.config.STATE_DIR),
+            self.logger,
+            runner=self.runner,
+        ).arm(archived.snapshot_id, user_manager.autologin_user())
+        self.logger.write(
+            "INFO",
+            "publish",
+            "New Golden and Active snapshots published atomically",
+            snapshot_id=archived.snapshot_id,
+        )
+        return archived
+
     def publish(self, description: str) -> SnapshotMetadata:
         self.require_root()
         if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
             raise CachyFreezeError("Golden can be published only in THAWED mode.")
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            from .users import UserManager
+            return self._publish_locked(description)
 
-            self._recover_transaction_locked()
-            UserManager(
-                state_dir=Path(self.config.STATE_DIR),
-                lock_file=Path(self.config.LOCK_FILE),
-                logger=self.logger,
-                runner=self.runner,
-            ).refresh_templates(already_locked=True)
-            archived = self._create_snapshot_locked(
-                self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                description,
-                frozen=True,
-            )
-            self._publish_source_locked(
-                self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                "publish",
-                archived.snapshot_id,
-            )
-            self._cleanup_snapshots_locked(self._retention_count())
+    def publish_and_freeze(self, description: str) -> SnapshotMetadata:
+        """Publish Golden and schedule FROZEN under one operation lock."""
+
+        self.require_root()
+        if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
+            raise CachyFreezeError("Golden can be published only in THAWED mode.")
+        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
+            archived = self._publish_locked(description)
+            self._set_boot_mode_locked("frozen")
             self.logger.write(
                 "INFO",
-                "publish",
-                "New Golden and Active snapshots published atomically",
+                "publish.freeze",
+                "Golden published and the next boot set to FROZEN atomically",
                 snapshot_id=archived.snapshot_id,
             )
             return archived
+
+    def request_finalization(self, username: str, uid: int) -> dict[str, Any]:
+        self.require_root()
+        if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
+            raise CachyFreezeError("Finalization can be requested only in THAWED mode.")
+        return FinalizationManager(
+            Path(self.config.STATE_DIR),
+            self.logger,
+            runner=self.runner,
+        ).request(username, uid)
+
+    def run_pending_finalization(self, timeout_seconds: int = 180) -> dict[str, Any]:
+        self.require_root()
+        if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
+            raise CachyFreezeError("Finalization can run only in THAWED mode.")
+        return FinalizationManager(
+            Path(self.config.STATE_DIR),
+            self.logger,
+            runner=self.runner,
+        ).run(self.publish_and_freeze, timeout_seconds=timeout_seconds)
+
+    def finalization_status(self) -> dict[str, Any]:
+        self.require_root()
+        return FinalizationManager(
+            Path(self.config.STATE_DIR),
+            self.logger,
+            runner=self.runner,
+        ).status()
 
     def rollback(self, snapshot_id: str) -> SnapshotMetadata:
         self.require_root()
@@ -1435,6 +1473,25 @@ class FreezeEngine:
             if isinstance(item, dict):
                 entries.append(item)
         return entries
+
+    def diagnostics(self) -> dict[str, Any]:
+        """Create a bounded support bundle with identities and identifiers removed."""
+
+        self.require_root()
+        status = self.status()
+        result = DiagnosticBundleBuilder(
+            state_dir=Path(self.config.STATE_DIR),
+            export_dir=Path(self.config.EXPORT_DIR),
+            log_file=Path(self.config.LOG_FILE),
+            runner=self.runner,
+        ).build(status)
+        self.logger.write(
+            "INFO",
+            "diagnostics.export",
+            "Redacted diagnostic bundle created",
+            filename=result["filename"],
+        )
+        return result
 
     def write_status_cache(self, status: dict[str, Any]) -> None:
         cache = Path(self.config.STATE_DIR) / "status.json"

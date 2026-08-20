@@ -23,13 +23,31 @@ def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="cachy-freeze")
     subcommands = result.add_subparsers(dest="command", required=True)
     subcommands.add_parser("preflight")
+    subcommands.add_parser("version")
+    subcommands.add_parser("migrate")
     subcommands.add_parser("status")
     subcommands.add_parser("freeze")
     subcommands.add_parser("thaw")
     subcommands.add_parser("thaw-once")
     subcommands.add_parser("health")
+    subcommands.add_parser("diagnostics")
     subcommands.add_parser("boot-success")
     subcommands.add_parser("auto-snapshot")
+
+    finalize = subcommands.add_parser("finalize")
+    finalize_commands = finalize.add_subparsers(dest="finalize_command", required=True)
+    finalize_request = finalize_commands.add_parser("request")
+    finalize_request.add_argument("username")
+    finalize_request.add_argument("--uid", type=int, required=True)
+    finalize_run = finalize_commands.add_parser("run")
+    finalize_run.add_argument("--timeout", type=int, default=180)
+    finalize_commands.add_parser("status")
+
+    idle_power = subcommands.add_parser("idle-power")
+    idle_power_commands = idle_power.add_subparsers(dest="idle_power_command", required=True)
+    idle_power_commands.add_parser("status")
+    idle_power_run = idle_power_commands.add_parser("run")
+    idle_power_run.add_argument("--poll", type=int, default=15)
 
     updates = subcommands.add_parser("updates")
     updates.add_argument("operation", choices=("check", "apply"))
@@ -109,6 +127,10 @@ def _config_path() -> Path:
 def dispatch(engine: FreezeEngine, arguments: argparse.Namespace) -> Any:
     if arguments.command == "preflight":
         return engine.preflight()
+    if arguments.command == "version":
+        return engine.version_info()
+    if arguments.command == "migrate":
+        return engine.migrate_state()
     if arguments.command == "status":
         status = engine.status()
         engine.write_status_cache(status)
@@ -124,10 +146,22 @@ def dispatch(engine: FreezeEngine, arguments: argparse.Namespace) -> Any:
         return {"mode": "thawed-once"}
     if arguments.command == "health":
         return engine.health()
+    if arguments.command == "diagnostics":
+        return engine.diagnostics()
     if arguments.command == "boot-success":
         return engine.mark_boot_successful()
     if arguments.command == "auto-snapshot":
         return engine.automatic_snapshot()
+    if arguments.command == "finalize":
+        if arguments.finalize_command == "request":
+            return engine.request_finalization(arguments.username, arguments.uid)
+        if arguments.finalize_command == "run":
+            return engine.run_pending_finalization(arguments.timeout)
+        return engine.finalization_status()
+    if arguments.command == "idle-power":
+        if arguments.idle_power_command == "run":
+            return engine.run_power_policy(arguments.poll)
+        return engine.power_policy_status()
     if arguments.command == "updates":
         return engine.check_updates() if arguments.operation == "check" else engine.apply_updates()
     if arguments.command == "applications":
@@ -229,6 +263,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         value = dispatch(engine, arguments)
         if (
             arguments.command in {"freeze", "thaw", "thaw-once", "publish"}
+            or (
+                arguments.command == "finalize" and arguments.finalize_command in {"request", "run"}
+            )
             or (
                 arguments.command == "snapshot"
                 and arguments.snapshot_command

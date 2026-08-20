@@ -12,6 +12,11 @@ die() {
 
 (( EUID == 0 )) || die "Run as root: sudo $0"
 [[ -r $DF_ROOT/bin/cachy-freeze ]] || die "CachyFreeze repository files are missing."
+[[ -r $PROJECT_ROOT/VERSION ]] || die "The release VERSION file is missing."
+release_version=$(<"$PROJECT_ROOT/VERSION")
+[[ $release_version =~ ^[0-9]+\.[0-9]+\.[0-9]+(rc[0-9]+)?$ ]] ||
+  die "The release VERSION is invalid."
+readonly release_version
 command -v python >/dev/null || die "Python was not found."
 python -c 'import PyQt6' 2>/dev/null ||
   die "PyQt6 was not found. Install python-pyqt6 first."
@@ -56,6 +61,7 @@ install -d -m 0755 \
   /usr/share/icons/hicolor/512x512/apps \
   /usr/share/polkit-1/actions
 install -m 0755 "$DF_ROOT/bin/cachy-freeze" /usr/local/sbin/cachy-freeze
+install -m 0644 "$PROJECT_ROOT/VERSION" /usr/lib/cachy-freeze/VERSION
 install -d -m 0755 /usr/lib/cachy-freeze/python
 cp -a "$PROJECT_ROOT/src/cachy_freeze" /usr/lib/cachy-freeze/python/
 cp -a "$PROJECT_ROOT/app/cachy_freeze_gui" /usr/lib/cachy-freeze/python/
@@ -109,6 +115,12 @@ install -m 0644 \
 install -m 0644 \
   "$DF_ROOT/systemd/cachy-freeze-auto-snapshot.timer" \
   /usr/lib/systemd/system/cachy-freeze-auto-snapshot.timer
+install -m 0644 \
+  "$DF_ROOT/systemd/cachy-freeze-finalize.service" \
+  /usr/lib/systemd/system/cachy-freeze-finalize.service
+install -m 0644 \
+  "$DF_ROOT/systemd/cachy-freeze-idle-power.service" \
+  /usr/lib/systemd/system/cachy-freeze-idle-power.service
 install -m 0755 \
   "$PROJECT_ROOT/user/files/cachy-employee-reset" \
   /usr/local/sbin/cachy-employee-reset
@@ -199,7 +211,9 @@ systemctl enable cachy-freeze-boot-health.service
 systemctl enable --now cachy-freeze-auto-snapshot.timer
 systemctl enable cachy-employee-reset.service
 systemctl enable cachy-frozen-admin-restrict.service
+systemctl enable cachy-freeze-idle-power.service
 mountpoint -q "$state_mount" || die "The persistent CachyFreeze state could not be mounted."
+/usr/local/sbin/cachy-freeze migrate
 systemctl is-enabled --quiet cachy-freeze-boot-health.service ||
   die "The boot-health service could not be enabled."
 systemctl is-enabled --quiet cachy-freeze-auto-snapshot.timer ||
@@ -208,6 +222,8 @@ systemctl is-enabled --quiet cachy-employee-reset.service ||
   die "The managed-user reset service could not be enabled."
 systemctl is-enabled --quiet cachy-frozen-admin-restrict.service ||
   die "The FROZEN administrator restriction service could not be enabled."
+systemctl is-enabled --quiet cachy-freeze-idle-power.service ||
+  die "The idle sleep and shutdown policy could not be enabled."
 
 if ! grep -Eq '^HOOKS=.*\bcachy-freeze\b' /etc/mkinitcpio.conf; then
   sed -i -E \
@@ -265,6 +281,8 @@ grep -q -- "--id 'cachyos-current'" /boot/grub/grub.cfg ||
     die "The CachyFreeze application-menu entry was not installed."
 [[ -r /usr/lib/cachy-freeze/python/cachy_freeze/cli.py ]] ||
   die "The CachyFreeze Python backend was not installed."
+cmp -s "$PROJECT_ROOT/VERSION" /usr/lib/cachy-freeze/VERSION ||
+  die "The CachyFreeze release version was not installed correctly."
 
 /usr/local/sbin/cachy-freeze thaw
 bash "$PROJECT_ROOT/installer/migrate-display-manager-autologin.sh"
@@ -285,7 +303,7 @@ systemctl reset-failed grub-btrfs-snapper.service grub-btrfsd.service 2>/dev/nul
 trap - ERR
 
 printf '%s\n' \
-  "CachyFreeze was installed and verified." \
+  "CachyFreeze $release_version was installed and verified." \
   "Safe default: THAWED maintenance mode." \
   "Golden has not been published by this internal step." \
   "Use the public installer or management app to complete setup."

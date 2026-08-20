@@ -53,6 +53,16 @@ read_grub_secret() {
   (( classes >= 3 )) || die "Password must contain at least three character classes."
 }
 
+requester_identity() {
+  REQUEST_UID=${PKEXEC_UID:-${SUDO_UID:-}}
+  [[ $REQUEST_UID =~ ^[0-9]+$ && $REQUEST_UID -gt 0 ]] ||
+    die "The requesting desktop user could not be identified."
+  REQUEST_USER=$(getent passwd "$REQUEST_UID" | cut -d: -f1)
+  [[ $REQUEST_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] ||
+    die "The requesting desktop account is invalid."
+  readonly REQUEST_UID REQUEST_USER
+}
+
 setup_status() {
   local manager_installed=false employee_configured=false grub_protected=false
   local employee_user='' backend_status=''
@@ -91,8 +101,22 @@ except (json.JSONDecodeError, AttributeError):
 
 golden = bool(status.get("golden_present"))
 scheduled_frozen = status.get("scheduled_mode") == "frozen"
-if manager and golden and grub and scheduled_frozen:
+validation = status.get("boot_validation", {})
+if not isinstance(validation, dict):
+    validation = {}
+validation_status = str(validation.get("status", "idle"))
+device_validated = validation_status == "verified"
+finalization = status.get("finalization", {})
+if not isinstance(finalization, dict):
+    finalization = {}
+finalization_status = str(finalization.get("status", "idle"))
+if manager and golden and grub and scheduled_frozen and device_validated:
     phase = "complete"
+elif manager and (
+    finalization_status in {"pending", "waiting-for-logout", "publishing"}
+    or validation_status in {"awaiting-frozen-boot", "verifying", "failed"}
+):
+    phase = "validating"
 elif manager:
     phase = "installed"
 elif not manager and not employee and not grub:
@@ -110,6 +134,9 @@ print(json.dumps({
         "golden_present": golden,
         "grub_protected": grub,
         "scheduled_frozen": scheduled_frozen,
+        "device_validated": device_validated,
+        "boot_validation_status": validation_status,
+        "finalization_status": finalization_status,
     },
 }, ensure_ascii=False, sort_keys=True))
 PY
@@ -146,15 +173,15 @@ case ${1:-} in
     [[ -x $BACKEND ]] || die "Install CachyFreeze before enabling FROZEN mode."
     [[ ! -s /etc/cachy-freeze-grub-auth.conf ]] ||
       die "FROZEN mode is already activated. Use the Overview page to publish changes."
-    [[ -r $PROJECT_ROOT/installer/finalize-setup.sh ]] ||
-      die "Verified FROZEN activation package was not found."
+    [[ -r $PROJECT_ROOT/installer/configure-grub-password.sh ]] ||
+      die "Verified GRUB activation package was not found."
     read_grub_secret
     printf '%s\n' "$SETUP_SECRET" |
       CACHY_SETUP_NONINTERACTIVE=1 \
-        bash "$PROJECT_ROOT/installer/finalize-setup.sh" >&2
+        bash "$PROJECT_ROOT/installer/configure-grub-password.sh" >&2
     unset SETUP_SECRET
-    printf '%s\n' '{"ok":true,"result":{"phase":"complete"}}'
-    exit 0
+    requester_identity
+    exec "$BACKEND" finalize request "$REQUEST_USER" --uid "$REQUEST_UID"
     ;;
 esac
 
@@ -177,10 +204,15 @@ case ${1:-} in
     require_argument_count 1 "$@"
     [[ -s /etc/cachy-freeze-grub-auth.conf ]] ||
       die "Set the GRUB maintenance password from Setup before the first FROZEN boot."
-    if [[ $(findmnt -n -o SOURCE /) == *'[/@]' ]]; then
-      "$BACKEND" publish --description "Golden publication from the GUI" >&2
-    fi
-    exec "$BACKEND" freeze
+    requester_identity
+    exec "$BACKEND" finalize request "$REQUEST_USER" --uid "$REQUEST_UID"
+    ;;
+  freeze-prepare)
+    require_argument_count 1 "$@"
+    [[ -s /etc/cachy-freeze-grub-auth.conf ]] ||
+      die "Set the GRUB maintenance password from Setup before the first FROZEN boot."
+    requester_identity
+    exec "$BACKEND" finalize request "$REQUEST_USER" --uid "$REQUEST_UID"
     ;;
   reboot)
     require_argument_count 1 "$@"
@@ -232,6 +264,10 @@ case ${1:-} in
   health)
     require_argument_count 1 "$@"
     exec "$BACKEND" health
+    ;;
+  diagnostics)
+    require_argument_count 1 "$@"
+    exec "$BACKEND" diagnostics
     ;;
   updates-check)
     require_argument_count 1 "$@"

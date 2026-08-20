@@ -13,16 +13,19 @@ require_maintenance
   die "An interactive terminal is required to finish maintenance."
 
 printf '%s\n' \
-  "This publishes the current maintenance system as Golden" \
-  "and schedules the next boot as FROZEN." >/dev/tty
+  "This queues Golden publication after all managed users log out" \
+  "and schedules FROZEN only after a quiescent template capture." >/dev/tty
 read -r -p "Are the maintenance checks complete? [y/N]: " confirmed </dev/tty
 [[ ${confirmed,,} == y ]] || die "Operation cancelled; the system was not changed."
 
-bash "$INSTALLER_DIR/refresh-user-templates.sh"
-bash "$INSTALLER_DIR/publish-golden.sh"
-bash "$INSTALLER_DIR/set-frozen-mode.sh"
+request_uid=${SUDO_UID:-}
+[[ $request_uid =~ ^[0-9]+$ && $request_uid -gt 0 ]] ||
+  die "Run this command through sudo from the desktop user that will log out."
+request_user=$(getent passwd "$request_uid" | cut -d: -f1)
+[[ $request_user =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] ||
+  die "The requesting desktop account is invalid."
+/usr/local/sbin/cachy-freeze finalize request "$request_user" --uid "$request_uid"
 
 printf '%s\n' \
-  "Maintenance changes were published to Golden." \
-  "The next boot will be FROZEN." \
-  "Reboot manually when ready: sudo reboot"
+  "Maintenance finalization is waiting for managed sessions to close." \
+  "Log out now. Reboot only after finalization status reports complete."

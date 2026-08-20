@@ -11,9 +11,13 @@ ruff format --check src app/cachy_freeze_gui tests
 PYTHONPATH=src:app python -m unittest discover -s tests -v
 SHELLCHECK_OPTS=--severity=error bash deepfreeze/tests/static.sh
 QT_QPA_PLATFORM=offscreen bash deepfreeze/tests/ui-smoke.sh
+bash deepfreeze/tests/grub-generation.sh
+bash deepfreeze/tests/boot-acceptance-vm.sh
 ```
 
-Safe disposable-target integration scripts live in `deepfreeze/tests/`.
+The UEFI authentication acceptance script uses temporary OVMF/QEMU guests and
+requires `qemu-system-x86_64`, OVMF, Expect, and GRUB EFI tools. Safe
+disposable-target integration scripts live in `deepfreeze/tests/`.
 Never run Btrfs loop, initramfs, GRUB, reboot, recovery, or power-loss tests on
 an ordinary workstation. Record every actual result in `testing/TEST-LOG.md`.
 

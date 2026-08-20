@@ -163,6 +163,15 @@ main() {
     mv "$TOP/$ACTIVE_SUBVOL" "$TOP/$PREVIOUS_SUBVOL"
   fi
   mv "$TOP/$NEXT_SUBVOL" "$TOP/$ACTIVE_SUBVOL"
+  boot_id=$(cat /proc/sys/kernel/random/boot_id)
+  case $boot_id in
+    ????????-????-????-????-????????????) ;;
+    *) fail "The current boot id is invalid" ;;
+  esac
+  marker="$TOP/$STATE_SUBVOL/active-reset-boot-id"
+  temporary="$TOP/$STATE_SUBVOL/.active-reset-boot-id.$$"
+  printf '%s\n' "$boot_id" >"$temporary"
+  mv "$temporary" "$marker"
   sync
 
   log "New $ACTIVE_SUBVOL is ready"

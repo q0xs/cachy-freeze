@@ -1,13 +1,13 @@
 [Unit]
 Description=Confirm a healthy CachyFreeze graphical boot
-After=display-manager.service var-lib-cachy\x2dfreeze.mount
-Wants=display-manager.service
+After=display-manager.service var-lib-cachy\x2dfreeze.mount cachy-employee-reset.service cachy-frozen-admin-restrict.service
+Wants=display-manager.service cachy-employee-reset.service cachy-frozen-admin-restrict.service
 RequiresMountsFor=/var/lib/cachy-freeze
 
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/cachy-freeze boot-success
-TimeoutStartSec=30
+TimeoutStartSec=150
 
 [Install]
 WantedBy=graphical.target

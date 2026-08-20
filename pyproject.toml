@@ -1,6 +1,6 @@
 [project]
 name = "cachyfreeze"
-version = "0.2.0"
+version = "1.0.0rc1"
 description = "Btrfs-based system freeze and recovery manager for CachyOS"
 readme = "README.md"
 requires-python = ">=3.11"
