@@ -6,6 +6,7 @@ import tomllib
 import unittest
 from pathlib import Path
 
+from cachy_freeze import __version__
 from cachy_freeze.catalog import AuditLogger
 from cachy_freeze.errors import IntegrityError
 from cachy_freeze.versioning import APP_VERSION, STATE_SCHEMA_VERSION, StateMigrationManager
@@ -52,6 +53,7 @@ class StateMigrationTests(unittest.TestCase):
         release = (project_root / "VERSION").read_text(encoding="utf-8").strip()
         pyproject = tomllib.loads((project_root / "pyproject.toml").read_text(encoding="utf-8"))
         self.assertEqual(release, APP_VERSION)
+        self.assertEqual(__version__, APP_VERSION)
         self.assertEqual(pyproject["project"]["version"], APP_VERSION)
 
 

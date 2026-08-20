@@ -7,10 +7,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from . import __version__ as APP_VERSION
 from .catalog import AuditLogger, atomic_json_write
 from .errors import IntegrityError
 
-APP_VERSION = "1.0.0rc1"
 STATE_SCHEMA_VERSION = 1
 
 
