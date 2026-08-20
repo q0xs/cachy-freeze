@@ -26,8 +26,8 @@ verified Golden baseline, and a disposable FROZEN daily runtime.
 - Golden publication waits for managed sessions to log out and fails closed if
   users or processes do not stop cleanly.
 - The first real FROZEN boot is validated before setup is marked complete.
-- GRUB protects THAWED maintenance with the fixed user `cachyadmin`; FROZEN is
-  passwordless.
+- GRUB protects THAWED maintenance with the fixed GRUB username `cachyadmin`;
+  FROZEN is passwordless.
 - Users are provisioned only after the verified application set is installed.
 - English and Turkish UI translations, redacted diagnostics, versioned state,
   migrations, backups, and allow-listed rollback are included.
