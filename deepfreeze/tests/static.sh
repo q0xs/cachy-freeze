@@ -152,6 +152,15 @@ grep -q 'fixed GRUB username.*cachyadmin' "$PROJECT_ROOT/README.md"
 grep -q 'always `cachyadmin`' "$PROJECT_ROOT/docs/installation.md"
 grep -q '/usr/share/icons/hicolor/512x512/apps/cachy-freeze.png' \
   "$PROJECT_ROOT/installer/install-freeze-engine.sh"
+grep -q 'systemctl disable --now "\$conflicting_unit"' \
+  "$PROJECT_ROOT/installer/install-freeze-engine.sh"
+grep -q 'grub-btrfs-snapper.path grub-btrfsd.service' \
+  "$PROJECT_ROOT/installer/install-freeze-engine.sh"
+grep -q 'migrate-display-manager-autologin.sh' \
+  "$PROJECT_ROOT/installer/install-freeze-engine.sh" \
+  "$PROJECT_ROOT/installer/deploy-live-app.sh"
+grep -q 'plasmalogin.service' \
+  "$PROJECT_ROOT/installer/migrate-display-manager-autologin.sh"
 grep -Fq 'https://github.com/q0xs/cachy-freeze/archive/refs/heads/main.zip' \
   "$PROJECT_ROOT/README.md" "$PROJECT_ROOT/docs/installation.md"
 grep -Fq 'Code → Download ZIP' \

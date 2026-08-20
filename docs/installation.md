@@ -41,9 +41,10 @@ and graphical Setup launcher are the documented end-user path.
 - Or enable FROZEN first and add users later during THAWED maintenance.
 
 User creation is never a prerequisite for installation or FROZEN activation.
-Before creating an application-ready user, open Updates and run **Install / repair
-applications**. The Users dialog can then create a standard account, enable
-automatic sign-in if requested, publish the prepared account into Golden, and
-schedule the next boot as FROZEN. It never reboots automatically.
+The Users page presents the intended order directly: first run **1. Install /
+repair applications**, then **2. Create ready user**. Account creation can enable
+automatic sign-in, but it never publishes Golden, schedules FROZEN, or reboots.
+Sign in to the prepared account, finish its desktop checks, and only then publish
+Golden / enable FROZEN from that session.
 After an operation finishes, use the application's reboot confirmation. Never
 interrupt package, initramfs, GRUB, or Golden writes.

@@ -99,16 +99,11 @@ class UserDialog(QDialog):
         self.password_confirm = QLineEdit()
         self.password_confirm.setEchoMode(QLineEdit.EchoMode.Password)
         self.autologin = QCheckBox("Sign in automatically as this user")
-        self.freeze_after_create = QCheckBox(
-            "Publish Golden and schedule FROZEN mode after creation"
-        )
-        self.freeze_after_create.setChecked(True)
         layout.addRow("Username", self.username)
         layout.addRow("Display name", self.display_name)
         layout.addRow("Password", self.password)
         layout.addRow("Confirm password", self.password_confirm)
         layout.addRow("", self.autologin)
-        layout.addRow("", self.freeze_after_create)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -124,7 +119,6 @@ class MainWindow(QMainWindow):
         self.settings = QSettings("CachyOS Workstation", "CachyFreeze")
         self.settings.remove("pending_autologin")
         self.setup_preflight_ok = False
-        self.pending_user_freeze = False
         self.pending_autologin_user: str | None = None
         self.pending_user_create_check = False
         self.setWindowTitle("CachyFreeze Management Center")
@@ -339,9 +333,32 @@ class MainWindow(QMainWindow):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 4, 0, 0)
-        buttons = QHBoxLayout()
-        self.user_create_button = QPushButton("Create ready user")
+
+        workflow = QGroupBox("Ready-user workflow")
+        workflow_layout = QVBoxLayout(workflow)
+        workflow_note = QLabel(
+            "First install and verify the managed applications, then create the account. "
+            "User creation never publishes Golden or schedules FROZEN. Sign in to the new "
+            "account, finish its checks, and enable FROZEN from that session when ready."
+        )
+        workflow_note.setObjectName("muted")
+        workflow_note.setWordWrap(True)
+        workflow_buttons = QHBoxLayout()
+        self.user_app_install_button = QPushButton("1. Install / repair applications")
+        self.user_create_button = QPushButton("2. Create ready user")
         self.user_create_button.setObjectName("primary")
+        workflow_buttons.addWidget(self.user_app_install_button)
+        workflow_buttons.addWidget(self.user_create_button)
+        workflow_buttons.addStretch()
+        self.user_application_status = QLabel("Application readiness has not been checked yet.")
+        self.user_application_status.setObjectName("muted")
+        self.user_application_status.setWordWrap(True)
+        workflow_layout.addWidget(workflow_note)
+        workflow_layout.addLayout(workflow_buttons)
+        workflow_layout.addWidget(self.user_application_status)
+        layout.addWidget(workflow)
+
+        buttons = QHBoxLayout()
         self.user_password_button = QPushButton("Reset password")
         self.user_lock_button = QPushButton("Lock / Unlock")
         self.user_autologin_button = QPushButton("Automatic login")
@@ -350,7 +367,6 @@ class MainWindow(QMainWindow):
         self.user_restore_button = QPushButton("Restore backup")
         self.user_refresh_button = QPushButton("Refresh")
         for button in (
-            self.user_create_button,
             self.user_password_button,
             self.user_lock_button,
             self.user_autologin_button,
@@ -619,6 +635,7 @@ class MainWindow(QMainWindow):
         self.import_button.clicked.connect(self._import_snapshot)
         self.logs_button.clicked.connect(lambda: self.backend.run("logs"))
         self.user_refresh_button.clicked.connect(lambda: self.backend.run("user-list"))
+        self.user_app_install_button.clicked.connect(self._confirm_application_install)
         self.user_create_button.clicked.connect(self._create_user)
         self.user_password_button.clicked.connect(self._reset_user_password)
         self.user_lock_button.clicked.connect(self._toggle_user_lock)
@@ -683,6 +700,7 @@ class MainWindow(QMainWindow):
             self.export_button,
             self.import_button,
             self.logs_button,
+            self.user_app_install_button,
             self.user_create_button,
             self.user_password_button,
             self.user_lock_button,
@@ -853,20 +871,15 @@ class MainWindow(QMainWindow):
                 "The password must contain 4-256 characters and cannot contain a colon.",
             )
             return
-        freeze_after_create = dialog.freeze_after_create.isChecked()
         summary = f"Create the standard user '{username}' and prepare all verified applications?"
-        if freeze_after_create:
-            summary += "\n\nGolden will then be published and the next boot scheduled as FROZEN."
         if (
             QMessageBox.question(self, "Create application-ready user", summary)
             != QMessageBox.StandardButton.Yes
         ):
             return
-        self.pending_user_freeze = freeze_after_create
         self.pending_autologin_user = username if dialog.autologin.isChecked() else None
         started = self.backend.run("user-create", username, display_name, secret=password)
         if not started:
-            self.pending_user_freeze = False
             self.pending_autologin_user = None
 
     def _reset_user_password(self) -> None:
@@ -1270,10 +1283,8 @@ class MainWindow(QMainWindow):
             self.pending_user_create_check = False
         if action == "user-create" and not success:
             self.pending_autologin_user = None
-            self.pending_user_freeze = False
         if action == "user-autologin" and not success:
             self.pending_autologin_user = None
-            self.pending_user_freeze = False
         if not success and "iptal edildi" not in message.lower():
             QMessageBox.critical(self, "CachyFreeze Error", message)
         elif success and action == "setup-freeze":
@@ -1292,7 +1303,6 @@ class MainWindow(QMainWindow):
             "thaw-once",
             "snapshot-rollback",
             "updates-apply",
-            "applications-install",
         }:
             answer = QMessageBox.question(
                 self,
@@ -1306,24 +1316,26 @@ class MainWindow(QMainWindow):
                 self,
                 "Installation complete",
                 "CachyFreeze is installed in THAWED mode. Before creating a ready user, "
-                "open Updates and run Install / repair applications. You may enable "
-                "FROZEN before or after that independent application step.",
+                "open Users and run step 1: Install / repair applications. Then create "
+                "the user in step 2. User creation will not enable FROZEN.",
             )
             self.backend.run("setup-status")
+        if success and action == "applications-install":
+            QMessageBox.information(
+                self,
+                "Applications ready",
+                "The managed applications were installed and verified. Continue with "
+                "step 2 on the Users page to create the account.",
+            )
         if success and action == "user-create":
             pending = self.pending_autologin_user
             self.pending_autologin_user = None
             if pending:
                 self.backend.run("user-autologin", pending)
                 return
-            if self.pending_user_freeze:
-                self.pending_user_freeze = False
-                self.backend.run("freeze")
-                return
-        if success and action == "user-autologin" and self.pending_user_freeze:
-            self.pending_user_freeze = False
-            self.backend.run("freeze")
-            return
+            self._show_user_ready_next_step()
+        if success and action == "user-autologin":
+            self._show_user_ready_next_step()
         if success and action.startswith("user-") and action != "user-list":
             self.backend.run("user-list")
 
@@ -1420,6 +1432,12 @@ class MainWindow(QMainWindow):
                 for item in applications
             ]
             self.update_view.setPlainText("\n".join(lines))
+            ready = bool(result.get("all_installed"))
+            self.user_application_status.setText(
+                "Applications are installed and verified. Ready for step 2."
+                if ready
+                else "Applications are missing or unhealthy. Run step 1 before creating a user."
+            )
             if action == "applications-status" and self.pending_user_create_check:
                 self.pending_user_create_check = False
                 missing = [
@@ -1430,12 +1448,12 @@ class MainWindow(QMainWindow):
                 if not result.get("all_installed") or missing:
                     if not missing:
                         missing.append("Application readiness could not be verified")
-                    self._select_page(3, self.page_titles[3])
                     QMessageBox.warning(
                         self,
                         "Applications required",
-                        "Install or repair the required applications before creating a "
-                        "ready user.\n\nMissing or unhealthy:\n• " + "\n• ".join(missing),
+                        "Use step 1 on this Users page to install or repair the required "
+                        "applications before creating a ready user.\n\nMissing or unhealthy:\n• "
+                        + "\n• ".join(missing),
                     )
                     return
                 self._show_create_user_dialog()
@@ -1463,6 +1481,15 @@ class MainWindow(QMainWindow):
                 "User backup created",
                 f"Restore ID: {result.get('backup_id', '')}",
             )
+
+    def _show_user_ready_next_step(self) -> None:
+        QMessageBox.information(
+            self,
+            "Ready user created",
+            "The account is ready. Golden was not published and FROZEN was not scheduled. "
+            "Sign in to the new account, complete its desktop checks, then open CachyFreeze "
+            "and publish Golden / enable FROZEN from that session.",
+        )
 
     def _toggle_theme(self) -> None:
         current = str(self.settings.value("theme", "dark"))

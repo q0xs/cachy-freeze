@@ -72,6 +72,63 @@ class UserValidationTests(unittest.TestCase):
                 ):
                     manager.create(invalid, "Invalid User", "1234")
 
+    def test_plasma_login_manager_autologin_preserves_other_configuration(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manager_unit = root / "plasmalogin.service"
+            manager_unit.touch()
+            display_manager = root / "display-manager.service"
+            display_manager.symlink_to(manager_unit)
+            config = root / "plasmalogin.conf"
+            config.write_text(
+                "# preserved comment\n[Autologin]\nSession=plasma\n\n[General]\nNamespaces=\n",
+                encoding="utf-8",
+            )
+            manager = UserManager(
+                state_dir=root / "state",
+                lock_file=root / "operation.lock",
+                logger=AuditLogger(root / "audit.jsonl"),
+                display_manager_path=display_manager,
+                plasmalogin_path=config,
+                sddm_path=root / "sddm.conf",
+            )
+
+            self.assertEqual(manager.autologin_kind, "plasmalogin")
+            manager._write_autologin("person_01")
+            enabled = config.read_text(encoding="utf-8")
+            self.assertIn("# preserved comment", enabled)
+            self.assertIn("User=person_01", enabled)
+            self.assertIn("Session=plasma", enabled)
+            self.assertIn("Relogin=true", enabled)
+            self.assertIn("[General]\nNamespaces=", enabled)
+            self.assertEqual(manager._autologin_user(), "person_01")
+
+            manager._write_autologin(None)
+            disabled = config.read_text(encoding="utf-8")
+            self.assertIn("User=\n", disabled)
+            self.assertIn("Relogin=false", disabled)
+            self.assertIn("Session=plasma", disabled)
+            self.assertIsNone(manager._autologin_user())
+
+    def test_sddm_autologin_uses_managed_drop_in(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / "cachy-autologin.conf"
+            manager = UserManager(
+                state_dir=root / "state",
+                lock_file=root / "operation.lock",
+                logger=AuditLogger(root / "audit.jsonl"),
+                autologin_path=config,
+            )
+
+            manager._write_autologin("person_01")
+            self.assertEqual(
+                config.read_text(encoding="utf-8"),
+                "[Autologin]\nUser=person_01\nSession=plasma.desktop\nRelogin=true\n",
+            )
+            manager._write_autologin(None)
+            self.assertFalse(config.exists())
+
     def test_encrypted_password_hash_uses_stdin_safe_payload(self) -> None:
         password_hash = "$y$j9T$example-salt$example-hash"
         self.assertEqual(

@@ -43,15 +43,22 @@ else
 fi
 
 menuentry "\${cachy_title}" --class cachyos --class gnu-linux --class os --id 'cachyos-current' --unrestricted {
+    set cachy_boot_authorized="false"
     if [ "\${cachy_effective_mode}" = "thawed" ]; then
-        authenticate
+        if authenticate; then
+            set cachy_boot_authorized="true"
+        fi
+    else
+        set cachy_boot_authorized="true"
     fi
-    insmod gzio
-    insmod part_gpt
-    insmod btrfs
-    search --no-floppy --fs-uuid --set=root $root_uuid
-    linux /\$cachy_subvol/boot/$kernel root=UUID=$root_uuid rw rootflags=subvol=\$cachy_subvol \$cachy_freeze_arg $kernel_args
-    initrd $initrd_line
+    if [ "\${cachy_boot_authorized}" = "true" ]; then
+        insmod gzio
+        insmod part_gpt
+        insmod btrfs
+        search --no-floppy --fs-uuid --set=root $root_uuid
+        linux /\$cachy_subvol/boot/$kernel root=UUID=$root_uuid rw rootflags=subvol=\$cachy_subvol \$cachy_freeze_arg $kernel_args
+        initrd $initrd_line
+    fi
 }
 EOF
 }

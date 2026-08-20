@@ -267,6 +267,20 @@ grep -q -- "--id 'cachyos-current'" /boot/grub/grub.cfg ||
   die "The CachyFreeze Python backend was not installed."
 
 /usr/local/sbin/cachy-freeze thaw
+bash "$PROJECT_ROOT/installer/migrate-display-manager-autologin.sh"
+
+# CachyFreeze deliberately disables third-party GRUB entry generators. The
+# grub-btrfs snapshot watcher otherwise keeps executing its now non-executable
+# generator and produces a recurring failed systemd unit on every Snapper
+# change. Stop both supported grub-btrfs regeneration mechanisms and clear the
+# stale failure after the managed GRUB configuration has been verified.
+for conflicting_unit in grub-btrfs-snapper.path grub-btrfsd.service; do
+  if systemctl list-unit-files "$conflicting_unit" --no-legend 2>/dev/null |
+    grep -q "^${conflicting_unit}[[:space:]]"; then
+    systemctl disable --now "$conflicting_unit"
+  fi
+done
+systemctl reset-failed grub-btrfs-snapper.service grub-btrfsd.service 2>/dev/null || true
 
 trap - ERR
 

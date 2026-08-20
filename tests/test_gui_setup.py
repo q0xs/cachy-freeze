@@ -75,7 +75,8 @@ class SetupGuiTests(unittest.TestCase):
             self.window._operation_finished("setup-install", True, "installed")
 
         message = information.call_args.args[2]
-        self.assertIn("Updates", message)
+        self.assertIn("Users", message)
+        self.assertIn("step 1", message)
         self.assertIn("Install / repair applications", message)
 
     def test_disposable_device_requires_explicit_data_loss_confirmation(self) -> None:
@@ -136,9 +137,16 @@ class SetupGuiTests(unittest.TestCase):
     def test_ready_user_dialog_matches_username_contract(self) -> None:
         dialog = UserDialog(self.window)
         self.assertEqual(dialog.username.placeholderText(), "wrw21166")
-        self.assertTrue(dialog.freeze_after_create.isChecked())
+        self.assertFalse(hasattr(dialog, "freeze_after_create"))
         self.assertIn("non-administrator", dialog.layout().itemAt(0).widget().text())
         dialog.close()
+
+    def test_users_page_exposes_application_install_before_user_creation(self) -> None:
+        self.assertEqual(
+            self.window.user_app_install_button.text(),
+            "1. Install / repair applications",
+        )
+        self.assertEqual(self.window.user_create_button.text(), "2. Create ready user")
 
     def test_ready_user_creation_checks_applications_before_showing_dialog(self) -> None:
         with patch("cachy_freeze_gui.window.UserDialog") as dialog:
@@ -148,8 +156,9 @@ class SetupGuiTests(unittest.TestCase):
         self.assertTrue(self.window.pending_user_create_check)
         dialog.assert_not_called()
 
-    def test_missing_applications_redirect_ready_user_to_updates(self) -> None:
+    def test_missing_applications_keep_ready_user_on_users_workflow(self) -> None:
         self.window.pending_user_create_check = True
+        self.window.pages.setCurrentIndex(2)
 
         with (
             patch("cachy_freeze_gui.window.QMessageBox.warning") as warning,
@@ -167,7 +176,8 @@ class SetupGuiTests(unittest.TestCase):
             )
 
         self.assertFalse(self.window.pending_user_create_check)
-        self.assertEqual(self.window.pages.currentIndex(), 3)
+        self.assertEqual(self.window.pages.currentIndex(), 2)
+        self.assertIn("step 1", warning.call_args.args[2])
         self.assertIn("Wine", warning.call_args.args[2])
         show_dialog.assert_not_called()
 
@@ -194,39 +204,41 @@ class SetupGuiTests(unittest.TestCase):
 
         self.assertFalse(self.window.pending_user_create_check)
 
-    def test_successful_user_creation_can_schedule_frozen_without_reboot(self) -> None:
-        self.window.pending_user_freeze = True
-        self.window._operation_finished("user-create", True, "created")
+    def test_application_install_continues_to_user_step_without_reboot(self) -> None:
+        with patch("cachy_freeze_gui.window.QMessageBox.information") as information:
+            self.window._operation_finished("applications-install", True, "installed")
 
-        self.backend.run.assert_called_once_with("freeze")
-        self.assertFalse(self.window.pending_user_freeze)
-        self.assertNotIn(
-            "reboot",
-            [call.args[0] for call in self.backend.run.call_args_list],
-        )
+        self.backend.run.assert_not_called()
+        self.assertIn("step 2", information.call_args.args[2])
 
-    def test_autologin_then_freeze_sequence_uses_only_in_memory_state(self) -> None:
+    def test_successful_user_creation_never_schedules_frozen(self) -> None:
+        with patch("cachy_freeze_gui.window.QMessageBox.information") as information:
+            self.window._operation_finished("user-create", True, "created")
+
+        self.backend.run.assert_called_once_with("user-list")
+        self.assertNotIn("freeze", [call.args[0] for call in self.backend.run.call_args_list])
+        self.assertIn("was not scheduled", information.call_args.args[2])
+
+    def test_autologin_after_creation_never_chains_freeze(self) -> None:
         self.window.pending_autologin_user = "person_01"
-        self.window.pending_user_freeze = True
 
         self.window._operation_finished("user-create", True, "created")
         self.backend.run.assert_called_once_with("user-autologin", "person_01")
         self.assertIsNone(self.window.pending_autologin_user)
 
         self.backend.run.reset_mock()
-        self.window._operation_finished("user-autologin", True, "enabled")
-        self.backend.run.assert_called_once_with("freeze")
-        self.assertFalse(self.window.pending_user_freeze)
+        with patch("cachy_freeze_gui.window.QMessageBox.information"):
+            self.window._operation_finished("user-autologin", True, "enabled")
+        self.backend.run.assert_called_once_with("user-list")
+        self.assertNotIn("freeze", [call.args[0] for call in self.backend.run.call_args_list])
 
-    def test_autologin_failure_cancels_pending_freeze(self) -> None:
+    def test_autologin_failure_clears_pending_user(self) -> None:
         self.window.pending_autologin_user = "person_01"
-        self.window.pending_user_freeze = True
 
         with patch("cachy_freeze_gui.window.QMessageBox.critical"):
             self.window._operation_finished("user-autologin", False, "failed")
 
         self.assertIsNone(self.window.pending_autologin_user)
-        self.assertFalse(self.window.pending_user_freeze)
         self.backend.run.assert_not_called()
 
     def test_administrator_mutations_are_blocked_in_user_page(self) -> None:

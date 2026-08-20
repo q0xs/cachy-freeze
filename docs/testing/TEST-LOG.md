@@ -4,6 +4,36 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-20 — fail-closed GRUB and ready-user workflow — working tree based on `6ecf6e8`
+
+- FIXED — the managed GRUB entry now gates every kernel/initramfs load behind an
+  explicit authorization result in THAWED mode. A rejected or cancelled
+  `authenticate` command leaves the guard false and returns to the menu, while
+  the FROZEN path remains passwordless.
+- FIXED — Users now presents **1. Install / repair applications** followed by
+  **2. Create ready user**. Missing prerequisites stay on the Users workflow,
+  and successful user creation no longer publishes Golden or schedules FROZEN.
+- FIXED — automatic login detects the active display manager. Current Plasma
+  Login Manager installations update `/etc/plasmalogin.conf` without discarding
+  unrelated settings; SDDM retains its managed drop-in. An existing valid
+  CachyFreeze SDDM selection is migrated during installation or live deployment.
+- FIXED — installation stops the grub-btrfs Snapper path and daemon that conflict
+  with CachyFreeze's single managed GRUB entry, then clears their stale failures.
+  This addresses the recurring `grub-btrfs-snapper.service` error caused by its
+  attempt to execute the intentionally disabled `41_snapshots-btrfs` generator.
+- PASS — Ruff 0.16.3 check and format, 72/72 Python unit/GUI/helper/boundary
+  tests, ShellCheck 0.11.0 error-level validation of 35 first-party scripts,
+  static/desktop/XML/JSON contracts, Qt offscreen UI smoke and Users-page visual
+  capture, isolated GRUB generation plus syntax validation, and Python compile.
+- PASS — read-only physical diagnosis confirmed a THAWED `@` boot, Plasma Login
+  Manager as the active display manager, a dormant CachyFreeze SDDM automatic-
+  login selection, and the enabled grub-btrfs Snapper path repeatedly failing
+  with permission denied on the disabled snapshot generator.
+- NOT RUN — privileged live deployment, physical GRUB regeneration, initramfs
+  build, reboot, and wrong-password boot validation. No non-interactive root
+  channel was available, and the active workstation was not rebooted or
+  boot-stack-mutated during this pass.
+
 ## 2026-08-18 — ZIP-first graphical installation — `agent/make-zip-graphical-install-primary`
 
 - CHANGED — README and installation documentation now make GitHub **Code →

@@ -78,18 +78,21 @@ Installation, application installation, user creation, and FROZEN activation
 are deliberately independent:
 
 1. Install CachyFreeze. The machine remains in THAWED maintenance mode.
-2. Open **Updates** and select **Install / repair applications**.
-3. Open **Users** and select **Create ready user**.
+2. Open **Users** and select **1. Install / repair applications**.
+3. On the same page, select **2. Create ready user**.
 4. Use a lowercase login such as `wrw21166`; the account is created with native
    CachyOS standard-user defaults and is rejected if it unexpectedly has
    administrator membership.
-5. Keep **Publish Golden and schedule FROZEN mode after creation** enabled if the
-   next manually initiated reboot should present the prepared employee account.
+5. Sign in to the prepared account, finish its desktop checks, then open
+   CachyFreeze from that session and publish Golden / enable FROZEN.
 
 User provisioning verifies Chrome, Slack, LibreOffice, Zoiper, AnyDesk, Wine,
 and MicroSIP before capturing the clean home template. Failure removes the
 partial account and candidate template. CachyFreeze does not rewrite the
 account's native group membership.
+User creation never publishes Golden or schedules FROZEN. Automatic login is
+written to the active display manager (Plasma Login Manager on current CachyOS,
+with SDDM retained for compatible older installations).
 
 No operation in the creation dialog reboots the computer automatically.
 

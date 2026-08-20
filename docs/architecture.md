@@ -29,6 +29,11 @@ defaults, creates the per-user MicroSIP Wine prefix, rejects unexpected
 administrator membership, and only then captures the FROZEN home template.
 Provisioning failure removes the partial account and candidate template.
 
+Automatic-login settings target the display manager that is actually enabled:
+Plasma Login Manager uses `/etc/plasmalogin.conf`, while compatible SDDM systems
+use the CachyFreeze-owned SDDM drop-in. User creation itself never publishes
+Golden or changes the scheduled boot mode.
+
 Golden/Active replacement uses staged subvolumes and a durable transaction
 journal. Early boot can roll forward interrupted publication. Boot-health resets
 the failure counter after graphical startup; repeated failures can restore the

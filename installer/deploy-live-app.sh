@@ -66,6 +66,7 @@ printf '%s\n' 'ADMIN_USER=localadm' >/etc/cachy-frozen-admin.conf
 chmod 0600 /etc/cachy-frozen-admin.conf
 systemctl daemon-reload
 systemctl enable cachy-frozen-admin-restrict.service
+bash "$PROJECT_ROOT/installer/migrate-display-manager-autologin.sh"
 
 cmp -s "$PROJECT_ROOT/src/cachy_freeze/users.py" \
   "$INSTALL_ROOT/python/cachy_freeze/users.py" || die "Backend verification failed."
