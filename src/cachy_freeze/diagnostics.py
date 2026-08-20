@@ -112,7 +112,7 @@ class DiagnosticBundleBuilder:
                 str(item_key): self.redact(item, key=str(item_key))
                 for item_key, item in value.items()
             }
-        if isinstance(value, (list, tuple)):
+        if isinstance(value, list | tuple):
             return [self.redact(item, key=key) for item in value]
         if isinstance(value, str):
             return self._redact_text(value)
