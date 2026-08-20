@@ -4,114 +4,85 @@
 
 <h1 align="center">CachyFreeze</h1>
 
+[![Version](https://img.shields.io/badge/version-1.0.0rc1-blue.svg)](VERSION)
 [![Quality checks](https://github.com/q0xs/cachy-freeze/actions/workflows/static-tests.yml/badge.svg?branch=main)](https://github.com/q0xs/cachy-freeze/actions/workflows/static-tests.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-CachyOS-5865F2.svg)](https://cachyos.org/)
 
 CachyFreeze is a graphical Btrfs freeze and recovery manager for managed
-CachyOS workstations. Administrators maintain a persistent system in THAWED
-mode, publish a verified Golden baseline, and return each FROZEN boot to that
-known-good state.
+CachyOS workstations. It keeps a persistent THAWED maintenance system, a
+verified Golden baseline, and a disposable FROZEN daily runtime.
 
 ![CachyFreeze Management Center](docs/images/cachy-freeze-management-center-preview.png)
 
 > [!CAUTION]
 > CachyFreeze changes Btrfs subvolumes, initramfs, GRUB, and the boot process.
-> Use a backed-up pilot device with physical access and recovery media. The
-> installer intentionally stops on unsupported disk or boot layouts.
+> Use a backed-up pilot device with physical access and recovery media.
 
-## What it provides
+## Highlights
 
-- FROZEN mode recreates writable `@active` from read-only `@golden` on boot.
-- THAWED mode boots the persistent `@` maintenance system.
-- Interrupted Golden and Active rotations use durable transaction recovery.
-- Repeated boot failures can restore the previous healthy Golden baseline.
-- Snapshots can be created, verified, compared, exported, imported, retained,
-  rolled back, and published from one desktop application.
-- Application-ready standard users receive verified desktop shortcuts, KDE
-  defaults, Chrome policy, and an isolated MicroSIP Wine profile.
-- The administrator remains fully privileged but is hidden from the graphical
-  login screen during FROZEN operation.
-- PolicyKit keeps the graphical application unprivileged and restricts root
-  operations to an explicit helper allow-list.
-- Passwords and reusable password hashes travel through stdin, never through
-  command arguments, environment variables, or logs.
-- Golden publication waits for the managed desktop session to close, then
-  publishes and schedules FROZEN under one operation lock; the first FROZEN boot
-  must pass reset, mount, restriction, and graphical-session validation before
-  setup is reported complete.
-- The fixed idle-power policy sleeps after one hour without input and, if that
-  timed sleep is not interrupted, powers off after one further hour. An early
-  manual wake cancels shutdown and requires a fresh idle period.
-- English and Turkish are available at runtime, and a bounded, redacted support
-  bundle can be exported without exposing account, device, or credential data.
-- Versioned persistent state, pre-deployment backups, migrations, verification,
-  and allow-listed rollback protect local upgrades.
+- FROZEN boots recreate `@active` from read-only `@golden`.
+- THAWED maintenance boots the persistent `@` subvolume.
+- Golden publication waits for managed sessions to log out and fails closed if
+  users or processes do not stop cleanly.
+- The first real FROZEN boot is validated before setup is marked complete.
+- GRUB protects THAWED maintenance with the fixed user `cachyadmin`; FROZEN is
+  passwordless.
+- Users are provisioned only after the verified application set is installed.
+- English and Turkish UI translations, redacted diagnostics, versioned state,
+  migrations, backups, and allow-listed rollback are included.
 
-## Supported system
+## Automatic idle power policy
 
-CachyFreeze currently requires all of the following:
+When enabled during installation, CachyFreeze applies this fixed policy:
 
-- CachyOS with KDE Plasma
-- UEFI firmware
+1. One hour without keyboard or pointer activity → timed sleep.
+2. One further unattended hour asleep → RTC wake and automatic poweroff.
+3. Manual early wake → shutdown is cancelled and a new idle cycle is required.
+
+The policy requires a writable RTC wake alarm at
+`/sys/class/rtc/rtc0/wakealarm`. Without RTC support, the freeze engine remains
+safe and the policy reports itself as unavailable instead of suspending without
+a reliable shutdown deadline.
+
+## Requirements
+
+- CachyOS/Arch Linux with KDE Plasma
+- UEFI firmware and GRUB
 - Btrfs root using the `@` subvolume
-- GRUB with the EFI system partition mounted at `/boot/efi`
+- EFI system partition mounted at `/boot/efi`
 - no separate `/boot` filesystem
 - an existing `localadm` administrator account
 - AC power, recovery media, and a restorable backup
 
-It is not a generic installer for arbitrary Arch, ext4, BIOS, systemd-boot, or
-custom Btrfs layouts.
+Unsupported layouts include ext4, BIOS, systemd-boot, and custom Btrfs layouts.
 
-The automatic one-hour sleep plus one-hour shutdown policy additionally needs a
-working RTC wake alarm at `/sys/class/rtc/rtc0/wakealarm`. Installation still
-completes safely without it, but the policy remains disabled and visibly reports
-that its hardware prerequisite is unavailable.
+## Installation
 
-## Download the ZIP and install graphically
+The supported end-user path is graphical:
 
-The supported installation method does not require terminal commands:
+1. Download the complete archive with **Code → Download ZIP** or use the
+   [CachyFreeze ZIP](https://github.com/q0xs/cachy-freeze/archive/refs/heads/main.zip).
+2. Extract it completely; do not run files from inside the ZIP preview.
+3. Open [`cachyfreeze-setup.desktop`](cachyfreeze-setup.desktop) and choose
+   **Execute** if KDE asks.
+4. Run **Preflight**, confirm backup/recovery readiness or disposable-device
+   use, then select **Install CachyFreeze**.
 
-1. Select **Code → Download ZIP** on this GitHub page, or use
-   **[Download CachyFreeze ZIP](https://github.com/q0xs/cachy-freeze/archive/refs/heads/main.zip)**.
-2. Extract the complete `cachy-freeze-main.zip` archive. Do not run files from
-   inside the archive preview and do not download individual source files.
-3. Open the extracted `cachy-freeze-main` folder.
-4. Open [`cachyfreeze-setup.desktop`](cachyfreeze-setup.desktop) and choose
-   **Execute** if KDE asks how to open it.
-5. Run **Preflight**, confirm recovery readiness or disposable-device use, then
-   select **Install CachyFreeze** and approve the administrator prompt.
-
-The ZIP contains every installer, application, policy, user asset, test, and
-recovery component required by CachyFreeze. The graphical Setup page validates
-the supported layout, installs the engine and Management Center, publishes the
-initial Golden baseline, and leaves the next boot safely scheduled as THAWED.
-Partial or standalone-script downloads remain unsupported.
+Installation leaves the next boot in safe THAWED maintenance mode.
 
 ## First workstation setup
 
-Installation, application installation, user creation, and FROZEN activation
-are deliberately independent:
+The intended order is shown directly in the Users page:
 
-1. Install CachyFreeze. The machine remains in THAWED maintenance mode.
-2. Open **Users** and select **1. Install / repair applications**.
-3. On the same page, select **2. Create ready user**.
-4. Use a lowercase login such as `wrw21166`; the account is created with native
-   CachyOS standard-user defaults and is rejected if it unexpectedly has
-   administrator membership.
-5. Sign in to the prepared account, finish its desktop checks, then open
-   CachyFreeze from that session and publish Golden / enable FROZEN.
+1. Select **1. Install / repair applications**.
+2. Select **2. Create ready user**.
+3. Sign in to the prepared standard account and finish its desktop checks.
+4. From that account, publish Golden and enable FROZEN.
 
-User provisioning verifies Chrome, Slack, LibreOffice, Zoiper, AnyDesk, Wine,
-and MicroSIP before capturing the clean home template. Failure removes the
-partial account and candidate template. CachyFreeze does not rewrite the
-account's native group membership.
-User creation never publishes Golden or schedules FROZEN. Automatic login is
-written to a CachyFreeze-owned drop-in for the active display manager (Plasma
-Login Manager on current CachyOS, with SDDM retained for compatible older
-installations). The display manager's main configuration is left untouched.
-
-No operation in the creation dialog reboots the computer automatically.
+User creation does not publish Golden, change boot mode, or reboot the machine.
+Automatic login uses a CachyFreeze-owned display-manager drop-in and leaves the
+main Plasma Login Manager/SDDM configuration untouched.
 
 ## Boot model
 
@@ -119,34 +90,11 @@ No operation in the creation dialog reboots the computer automatically.
 | --- | --- |
 | `@` | Persistent THAWED maintenance root |
 | `@golden` | Read-only known-good baseline |
-| `@active` | Disposable writable FROZEN runtime |
+| `@active` | Disposable FROZEN runtime |
 | `@cachy-state` | Persistent settings, audit, health, and transaction state |
 | `@cachy-snapshots` | Managed recovery snapshots |
 
-FROZEN is the passwordless daily boot path. THAWED maintenance is protected by
-the fixed GRUB username **`cachyadmin`** and the password configured on the
-Setup page during activation. This is a GRUB-only maintenance credential; it is
-not the Linux administrator account name.
-
-## Repository layout
-
-| Path | Responsibility |
-| --- | --- |
-| `cachyfreeze-setup.desktop` | Primary ZIP-based graphical installer |
-| `install.sh` | Complete-repository installer fallback |
-| `app/` | PyQt6 Management Center, launcher, PolicyKit helper, desktop files |
-| `src/cachy_freeze/` | Snapshot, boot, settings, update, audit, and user logic |
-| `deepfreeze/` | Btrfs early-boot reset, GRUB, initramfs, systemd, safe tests |
-| `installer/` | Internal verified installation and maintenance operations |
-| `user/` | Managed-user desktop assets and FROZEN home reset integration |
-| `policies/` | Managed application policies |
-| `vendor/aur/` | Reviewed AUR build inputs used by application installation |
-| `tests/` | Python and graphical contract tests |
-| `docs/` | Architecture, installation, recovery, development, and test evidence |
-
 ## Validation
-
-The normal local quality gate is:
 
 ```bash
 ruff check src app/cachy_freeze_gui tests
@@ -158,11 +106,10 @@ bash deepfreeze/tests/grub-generation.sh
 bash deepfreeze/tests/boot-acceptance-vm.sh
 ```
 
-The final command exercises wrong-password THAWED, correct-password THAWED, and
-passwordless FROZEN paths in disposable OVMF/QEMU guests. Loop-backed Btrfs,
-initramfs, reboot, recovery, suspend/poweroff, and power-loss tests must run only
-on a disposable VM or an explicitly approved pilot device. Executed evidence
-is recorded in [`docs/testing/TEST-LOG.md`](docs/testing/TEST-LOG.md).
+The UEFI acceptance test runs disposable OVMF/QEMU guests for wrong-password
+THAWED, correct-password THAWED, and passwordless FROZEN scenarios. Physical
+boot, recovery, suspend, poweroff, and power-loss tests require a disposable
+target or explicit pilot-device approval.
 
 ## Documentation
 
@@ -174,7 +121,5 @@ is recorded in [`docs/testing/TEST-LOG.md`](docs/testing/TEST-LOG.md).
 
 ## License
 
-Copyright 2026 Atilla Mert Akkaya.
-
-Licensed under the Apache License 2.0. See [LICENSE](LICENSE) and
-[NOTICE](NOTICE).
+Copyright 2026 Atilla Mert Akkaya. Licensed under the Apache License 2.0.
+See [LICENSE](LICENSE) and [NOTICE](NOTICE).
