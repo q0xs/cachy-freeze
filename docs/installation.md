@@ -21,8 +21,9 @@ freeze engine unsafe, so it is reported separately instead of aborting setup.
    Do not launch from the compressed-file preview and do not copy only selected
    files out of the archive.
 4. Open `cachyfreeze-setup.desktop` and choose **Execute** if KDE prompts.
-5. Run preflight, confirm either recovery readiness or disposable-device
-   acceptance, and select **Install CachyFreeze**.
+5. Follow the five vertical Setup steps: preflight, install, optional user,
+   GRUB maintenance password, then finish and enable FROZEN. The installation
+   confirmation reminds the operator to have recovery media and a backup ready.
 
 The launcher restores any helper execute permission lost during extraction,
 installs the graphical dependency through PolicyKit when necessary, and opens
@@ -35,20 +36,22 @@ file links, and launching directly from inside the ZIP are intentionally
 unsupported. `install.sh` remains a complete-repository fallback, but the ZIP
 and graphical Setup launcher are the documented end-user path.
 
-## Independent next steps
+## Setup workflow
 
-- Enable FROZEN immediately from Setup by choosing a strong GRUB maintenance
-  password. The GRUB maintenance username is always `cachyadmin`; it is shown
-  beside the password fields and is separate from Linux user accounts.
-- Or create users first from Users, then enable FROZEN.
-- Or enable FROZEN first and add users later during THAWED maintenance.
+The graphical Setup page is a vertical five-step workflow:
 
-User creation is never a prerequisite for installation or FROZEN activation.
-The Users page presents the intended order directly: first run **1. Install /
-repair applications**, then **2. Create ready user**. Account creation can enable
-automatic sign-in, but it never publishes Golden, schedules FROZEN, or reboots.
-Sign in to the prepared account, finish its desktop checks, and only then publish
-Golden / enable FROZEN from that session.
+1. Run preflight.
+2. Install CachyFreeze.
+3. Optionally create a user. Selecting it checks required applications and, with
+   one confirmation, prepares missing applications before opening the account form.
+4. Set a strong GRUB maintenance password. The fixed GRUB username is always `cachyadmin`;
+   it is separate from Linux user accounts.
+5. Finish and enable FROZEN. CachyFreeze requests a safe logout, then publishes
+   Golden and schedules FROZEN.
+
+User creation is never required for installation or FROZEN activation. Account
+creation can enable automatic sign-in, but it never publishes Golden, schedules
+FROZEN, or reboots.
 After an operation finishes, use the application's reboot confirmation. Never
 interrupt package, initramfs, GRUB, or Golden writes.
 

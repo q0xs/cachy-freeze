@@ -73,12 +73,14 @@ Installation leaves the next boot in safe THAWED maintenance mode.
 
 ## First workstation setup
 
-The intended order is shown directly in the Users page:
+The Setup page presents one vertical, five-step workflow:
 
-1. Select **1. Install / repair applications**.
-2. Select **2. Create ready user**.
-3. Sign in to the prepared standard account and finish its desktop checks.
-4. From that account, publish Golden and enable FROZEN.
+1. Run the system preflight.
+2. Install CachyFreeze.
+3. Optionally create a standard user. CachyFreeze prepares required applications
+   when needed, then asks for the account details.
+4. Set the GRUB maintenance password for the fixed `cachyadmin` username.
+5. Finish and enable FROZEN.
 
 User creation does not publish Golden, change boot mode, or reboot the machine.
 Automatic login uses a CachyFreeze-owned display-manager drop-in and leaves the

@@ -168,11 +168,11 @@ case ${1:-} in
     printf '%s\n' '{"ok":true,"result":{"phase":"installed"}}'
     exit 0
     ;;
-  setup-freeze)
+  setup-grub-password)
     (( $# == 1 )) || exit 2
     [[ -x $BACKEND ]] || die "Install CachyFreeze before enabling FROZEN mode."
     [[ ! -s /etc/cachy-freeze-grub-auth.conf ]] ||
-      die "FROZEN mode is already activated. Use the Overview page to publish changes."
+      die "The GRUB maintenance password is already configured."
     [[ -r $PROJECT_ROOT/installer/configure-grub-password.sh ]] ||
       die "Verified GRUB activation package was not found."
     read_grub_secret
@@ -180,6 +180,14 @@ case ${1:-} in
       CACHY_SETUP_NONINTERACTIVE=1 \
         bash "$PROJECT_ROOT/installer/configure-grub-password.sh" >&2
     unset SETUP_SECRET
+    printf '%s\n' '{"ok":true,"result":{"grub_protected":true}}'
+    exit 0
+    ;;
+  setup-freeze)
+    (( $# == 1 )) || exit 2
+    [[ -x $BACKEND ]] || die "Install CachyFreeze before enabling FROZEN mode."
+    [[ -s /etc/cachy-freeze-grub-auth.conf ]] ||
+      die "Set the GRUB maintenance password before enabling FROZEN mode."
     requester_identity
     exec "$BACKEND" finalize request "$REQUEST_USER" --uid "$REQUEST_UID"
     ;;
@@ -216,7 +224,7 @@ case ${1:-} in
     ;;
   reboot)
     require_argument_count 1 "$@"
-    exec /usr/bin/systemctl reboot
+    exec "$BACKEND" reboot
     ;;
   snapshot-list)
     require_argument_count 1 "$@"

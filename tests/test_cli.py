@@ -34,6 +34,7 @@ class CliParserTests(unittest.TestCase):
 
     def test_platform_management_contracts(self) -> None:
         self.assertEqual(parser().parse_args(["thaw-once"]).command, "thaw-once")
+        self.assertEqual(parser().parse_args(["reboot"]).command, "reboot")
         self.assertEqual(
             parser().parse_args(["applications", "status"]).operation,
             "status",
@@ -77,6 +78,7 @@ class CliParserTests(unittest.TestCase):
             ["freeze"],
             ["thaw"],
             ["thaw-once"],
+            ["reboot"],
             ["health"],
             ["diagnostics"],
             ["boot-success"],

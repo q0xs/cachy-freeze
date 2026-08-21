@@ -29,6 +29,7 @@ def parser() -> argparse.ArgumentParser:
     subcommands.add_parser("freeze")
     subcommands.add_parser("thaw")
     subcommands.add_parser("thaw-once")
+    subcommands.add_parser("reboot")
     subcommands.add_parser("health")
     subcommands.add_parser("diagnostics")
     subcommands.add_parser("boot-success")
@@ -144,6 +145,8 @@ def dispatch(engine: FreezeEngine, arguments: argparse.Namespace) -> Any:
     if arguments.command == "thaw-once":
         engine.set_boot_mode("thawed-once")
         return {"mode": "thawed-once"}
+    if arguments.command == "reboot":
+        return engine.request_reboot()
     if arguments.command == "health":
         return engine.health()
     if arguments.command == "diagnostics":
@@ -257,6 +260,7 @@ def _password_from_stdin() -> str:
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = parser().parse_args(argv)
+    engine: FreezeEngine | None = None
     try:
         config = Config.load(_config_path())
         engine = FreezeEngine(config)
@@ -276,9 +280,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         ):
             engine.write_status_cache(engine.status())
     except CachyFreezeError as error:
+        if engine is not None:
+            try:
+                engine.logger.write(
+                    "ERROR",
+                    "command.failed",
+                    "Privileged CachyFreeze command failed",
+                    command=arguments.command,
+                    error_type=type(error).__name__,
+                )
+            except OSError:
+                # Preserve the primary error even if the disk-backed audit log is unavailable.
+                pass
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
     except (OSError, ValueError) as error:
+        if engine is not None:
+            try:
+                engine.logger.write(
+                    "ERROR",
+                    "command.failed",
+                    "Unexpected privileged CachyFreeze command failure",
+                    command=arguments.command,
+                    error_type=type(error).__name__,
+                )
+            except OSError:
+                pass
         print(f"ERROR: Unexpected system error: {error}", file=sys.stderr)
         return 1
     _json({"ok": True, "result": value})

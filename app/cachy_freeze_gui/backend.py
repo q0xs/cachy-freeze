@@ -239,7 +239,8 @@ class BackendClient(QObject):
             "setup-status": "Setup status refreshed.",
             "setup-preflight": "CachyOS, UEFI, Btrfs, and GRUB preflight passed.",
             "setup-install": "CachyFreeze was installed in THAWED mode.",
-            "setup-freeze": "GRUB protection is ready; log out to publish Golden safely.",
+            "setup-grub-password": "GRUB maintenance password saved.",
+            "setup-freeze": "FROZEN finalization is queued; log out to continue safely.",
             "reboot": "System is rebooting.",
         }
         return messages.get(action, "Operation completed successfully.")

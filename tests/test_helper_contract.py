@@ -61,6 +61,21 @@ class HelperContractTests(unittest.TestCase):
     def test_optional_autologin_username_allows_only_zero_or_one_value(self) -> None:
         self.assertIn("(( $# == 1 || $# == 2 ))", self._case("user-autologin"))
 
+    def test_reboot_uses_the_json_backend_contract(self) -> None:
+        reboot = self._case("reboot")
+        self.assertIn('exec "$BACKEND" reboot', reboot)
+        self.assertNotIn("systemctl reboot", reboot)
+
+    def test_setup_splits_grub_password_from_frozen_finalization(self) -> None:
+        password = self._case("setup-grub-password")
+        freeze = self._case("setup-freeze")
+        self.assertIn("read_grub_secret", password)
+        self.assertIn("configure-grub-password.sh", password)
+        self.assertNotIn("finalize request", password)
+        self.assertIn("/etc/cachy-freeze-grub-auth.conf", freeze)
+        self.assertIn("finalize request", freeze)
+        self.assertNotIn("read_grub_secret", freeze)
+
 
 if __name__ == "__main__":
     unittest.main()

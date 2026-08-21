@@ -53,6 +53,11 @@ class MainWindow(QMainWindow):
         self.setup_preflight_ok = False
         self.pending_autologin_user: str | None = None
         self.pending_user_create_check = False
+        self.pending_user_create_after_install = False
+        self.running_mode = "unknown"
+        self.operation_is_busy = False
+        self.setup_installed = False
+        self.setup_grub_protected = False
         self.setWindowTitle("CachyFreeze Management Center")
         self.setMinimumSize(980, 640)
         self.resize(1180, 740)
@@ -266,18 +271,18 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 4, 0, 0)
 
-        workflow = QGroupBox("Ready-user workflow")
+        workflow = QGroupBox("Create a user")
         workflow_layout = QVBoxLayout(workflow)
         workflow_note = QLabel(
-            "First install and verify the managed applications, then create the account. "
-            "User creation never publishes Golden or schedules FROZEN. Sign in to the new "
-            "account, finish its checks, and enable FROZEN from that session when ready."
+            "Choose Create user. CachyFreeze checks the required applications first and, if "
+            "needed, offers to prepare them for you. Creating a user never changes your "
+            "boot mode or enables FROZEN."
         )
         workflow_note.setObjectName("muted")
         workflow_note.setWordWrap(True)
         workflow_buttons = QHBoxLayout()
-        self.user_app_install_button = QPushButton("1. Install / repair applications")
-        self.user_create_button = QPushButton("2. Create ready user")
+        self.user_app_install_button = QPushButton("Prepare applications")
+        self.user_create_button = QPushButton("Create user")
         self.user_create_button.setObjectName("primary")
         workflow_buttons.addWidget(self.user_app_install_button)
         workflow_buttons.addWidget(self.user_create_button)
@@ -470,34 +475,36 @@ class MainWindow(QMainWindow):
         state_layout.addWidget(self.setup_preflight_button)
         layout.addWidget(state_card)
 
-        stages = QGridLayout()
-        stages.setSpacing(14)
-
         provision_group = QGroupBox("2. Install CachyFreeze")
-        provision_form = QFormLayout(provision_group)
+        provision_layout = QVBoxLayout(provision_group)
         install_note = QLabel(
-            "Installs only the freeze engine and management app. User accounts are "
-            "optional and can be managed separately from the Users page."
+            "Installs and verifies the CachyFreeze engine. This keeps your current boot "
+            "mode unchanged."
         )
         install_note.setWordWrap(True)
-        self.setup_backup_check = QCheckBox("Recovery media and a restorable backup are ready")
-        self.setup_disposable_check = QCheckBox(
-            "Disposable test device: I accept the loss of all local data"
-        )
         self.setup_start_button = QPushButton("Install CachyFreeze")
         self.setup_start_button.setObjectName("primary")
-        provision_form.addRow(install_note)
-        provision_form.addRow("", self.setup_backup_check)
-        provision_form.addRow("", self.setup_disposable_check)
-        provision_form.addRow("", self.setup_start_button)
-        stages.addWidget(provision_group, 0, 0)
+        provision_layout.addWidget(install_note)
+        provision_layout.addWidget(self.setup_start_button)
+        layout.addWidget(provision_group)
 
-        finalize_group = QGroupBox("3. Enable FROZEN mode")
-        finalize_form = QFormLayout(finalize_group)
+        user_group = QGroupBox("3. Create a user (optional)")
+        user_layout = QVBoxLayout(user_group)
+        user_note = QLabel(
+            "Choose this only if you want a separate everyday account now. CachyFreeze "
+            "will prepare anything it needs and then ask for the user details."
+        )
+        user_note.setWordWrap(True)
+        self.setup_user_button = QPushButton("Create a user now")
+        user_layout.addWidget(user_note)
+        user_layout.addWidget(self.setup_user_button)
+        layout.addWidget(user_group)
+
+        grub_group = QGroupBox("4. Set GRUB maintenance password")
+        grub_form = QFormLayout(grub_group)
         freeze_note = QLabel(
-            "This step is independent from user creation. It protects maintenance mode, "
-            "publishes Golden, and schedules the next boot as FROZEN. Use the fixed "
-            "username cachyadmin with the password you set here to enter THAWED mode."
+            "This password protects maintenance mode. You will need it only when entering "
+            "THAWED maintenance from GRUB."
         )
         freeze_note.setWordWrap(True)
         self.setup_grub_username = QLabel("cachyadmin")
@@ -509,15 +516,27 @@ class MainWindow(QMainWindow):
         self.setup_grub_password.setEchoMode(QLineEdit.EchoMode.Password)
         self.setup_grub_confirm = QLineEdit()
         self.setup_grub_confirm.setEchoMode(QLineEdit.EchoMode.Password)
-        self.setup_finish_button = QPushButton("Publish Golden and enable FROZEN")
+        self.setup_grub_button = QPushButton("Save GRUB password")
+        self.setup_grub_button.setObjectName("primary")
+        grub_form.addRow(freeze_note)
+        grub_form.addRow("GRUB maintenance username", self.setup_grub_username)
+        grub_form.addRow("GRUB maintenance password", self.setup_grub_password)
+        grub_form.addRow("Confirm password", self.setup_grub_confirm)
+        grub_form.addRow("", self.setup_grub_button)
+        layout.addWidget(grub_group)
+
+        finish_group = QGroupBox("5. Finish and enable FROZEN")
+        finish_layout = QVBoxLayout(finish_group)
+        finish_note = QLabel(
+            "CachyFreeze will safely end this session, create the clean baseline, and "
+            "enable FROZEN for the next boot."
+        )
+        finish_note.setWordWrap(True)
+        self.setup_finish_button = QPushButton("Finish and enable FROZEN")
         self.setup_finish_button.setObjectName("primary")
-        finalize_form.addRow(freeze_note)
-        finalize_form.addRow("GRUB maintenance username", self.setup_grub_username)
-        finalize_form.addRow("GRUB maintenance password", self.setup_grub_password)
-        finalize_form.addRow("Confirm password", self.setup_grub_confirm)
-        finalize_form.addRow("", self.setup_finish_button)
-        stages.addWidget(finalize_group, 0, 1)
-        layout.addLayout(stages)
+        finish_layout.addWidget(finish_note)
+        finish_layout.addWidget(self.setup_finish_button)
+        layout.addWidget(finish_group)
 
         output_title = QLabel("Setup progress and error details")
         output_title.setObjectName("cardCaption")
@@ -592,6 +611,8 @@ class MainWindow(QMainWindow):
         self.boot_thawed_button.clicked.connect(self._confirm_thaw)
         self.setup_preflight_button.clicked.connect(lambda: self.backend.run("setup-preflight"))
         self.setup_start_button.clicked.connect(self._start_setup)
+        self.setup_user_button.clicked.connect(self._confirm_setup_user)
+        self.setup_grub_button.clicked.connect(self._save_setup_grub_password)
         self.setup_finish_button.clicked.connect(self._finish_setup)
         self.backend.busy_changed.connect(self._busy_changed)
         self.backend.status_changed.connect(self._status_changed)
@@ -623,6 +644,7 @@ class MainWindow(QMainWindow):
             self.backend.run("setup-status")
 
     def _busy_changed(self, busy: bool) -> None:
+        self.operation_is_busy = busy
         self.progress.setVisible(busy)
         for button in (
             self.refresh_button,
@@ -659,13 +681,41 @@ class MainWindow(QMainWindow):
             self.boot_thawed_button,
             self.setup_preflight_button,
             self.setup_start_button,
+            self.setup_user_button,
+            self.setup_grub_button,
             self.setup_finish_button,
         ):
             button.setDisabled(busy)
+        if not busy:
+            self._apply_mode_controls()
         self.statusBar().showMessage(tr("Operation in progress…" if busy else "Ready"))
+
+    def _apply_mode_controls(self) -> None:
+        """Keep writes out of a disposable FROZEN session before they can fail."""
+
+        maintenance_ready = self.running_mode == "thawed" and not self.operation_is_busy
+        for button in (
+            self.freeze_button,
+            self.boot_frozen_button,
+            self.create_button,
+            self.import_button,
+            self.rollback_button,
+            self.delete_button,
+            self.user_app_install_button,
+            self.user_create_button,
+            self.user_password_button,
+            self.user_lock_button,
+            self.user_autologin_button,
+            self.user_delete_button,
+            self.user_restore_button,
+            self.update_apply_button,
+            self.app_install_button,
+        ):
+            button.setEnabled(maintenance_ready)
 
     def _status_changed(self, status: dict[str, Any]) -> None:
         mode = str(status.get("running_mode", "unknown"))
+        self.running_mode = mode
         mode_labels = {
             "frozen": ("FROZEN", "#5865f2"),
             "thawed": ("THAWED — MAINTENANCE", "#b76e18"),
@@ -738,6 +788,10 @@ class MainWindow(QMainWindow):
         elif validation_status == "failed":
             error = str(validation.get("error", "Unknown validation error"))
             alerts.append(f"First FROZEN boot validation failed: {error}")
+        if mode != "thawed":
+            alerts.append(
+                "Maintenance operations are disabled in FROZEN mode. Switch to THAWED and reboot first."
+            )
         power_policy = status.get("power_policy", {})
         if isinstance(power_policy, dict):
             if power_policy.get("supported") is False:
@@ -752,6 +806,7 @@ class MainWindow(QMainWindow):
                     "Enabled: 1 hour idle → sleep; 1 more unattended hour → shutdown"
                 )
         self.alert_label.setText("  •  ".join(alerts) if alerts else "No warnings.")
+        self._apply_mode_controls()
 
     def _snapshots_changed(self, snapshots: list[dict[str, Any]]) -> None:
         self.snapshot_table.setRowCount(len(snapshots))
@@ -1099,32 +1154,11 @@ class MainWindow(QMainWindow):
                 "Run system preflight successfully before installation.",
             )
             return
-        backup_ready = self.setup_backup_check.isChecked()
-        disposable_accepted = self.setup_disposable_check.isChecked()
-        if backup_ready == disposable_accepted:
-            QMessageBox.warning(
-                self,
-                "Recovery choice required",
-                "Confirm recovery media and backup readiness, or accept all local data "
-                "loss on this disposable test device.",
-            )
-            return
-        if disposable_accepted:
-            disposable_answer = QMessageBox.warning(
-                self,
-                "Disposable test device — data loss risk",
-                "This device may fail to boot and require reformatting. Do you accept "
-                "permanent loss of all local data without recovery media or backup?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Cancel,
-            )
-            if disposable_answer != QMessageBox.StandardButton.Yes:
-                return
         answer = QMessageBox.warning(
             self,
             "Start installation",
-            "Packages will be installed and Btrfs, initramfs, and GRUB configured. "
-            "Do not interrupt power. Continue?",
+            "CachyFreeze will change Btrfs, initramfs, and GRUB. Make sure your recovery "
+            "media and backup are ready, then continue. Do not interrupt power.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
@@ -1133,7 +1167,33 @@ class MainWindow(QMainWindow):
         self.setup_output.clear()
         self.backend.run("setup-install")
 
-    def _finish_setup(self) -> None:
+    def _confirm_setup_user(self) -> None:
+        if not self.setup_installed:
+            QMessageBox.warning(
+                self,
+                "Install CachyFreeze first",
+                "Complete step 2 before creating a user.",
+            )
+            return
+        if (
+            QMessageBox.question(
+                self,
+                "Create a user now?",
+                "CachyFreeze will check what is needed and then ask for the new user's details. "
+                "Your boot mode will not change. Continue?",
+            )
+            == QMessageBox.StandardButton.Yes
+        ):
+            self._create_user()
+
+    def _save_setup_grub_password(self) -> None:
+        if not self.setup_installed:
+            QMessageBox.warning(
+                self,
+                "Install CachyFreeze first",
+                "Complete step 2 before setting the GRUB maintenance password.",
+            )
+            return
         password = self.setup_grub_password.text()
         if password != self.setup_grub_confirm.text():
             QMessageBox.warning(self, "Password error", "The GRUB passwords do not match.")
@@ -1146,20 +1206,29 @@ class MainWindow(QMainWindow):
                 "classes. The fixed GRUB username is cachyadmin.",
             )
             return
+        if self.backend.run("setup-grub-password", secret=password):
+            self.setup_grub_password.clear()
+            self.setup_grub_confirm.clear()
+
+    def _finish_setup(self) -> None:
+        if not self.setup_grub_protected:
+            QMessageBox.warning(
+                self,
+                "GRUB password required",
+                "Complete step 4 before enabling FROZEN.",
+            )
+            return
         answer = QMessageBox.warning(
             self,
-            "Publish Golden and enable FROZEN",
-            "CachyFreeze will request a normal logout, wait for managed sessions to stop, "
-            "then refresh templates, publish Golden and schedule FROZEN. Save your work "
-            "before continuing.",
+            "Finish and enable FROZEN",
+            "CachyFreeze will safely end this session, prepare the clean baseline, and enable "
+            "FROZEN for the next boot. Save your work before continuing.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        if self.backend.run("setup-freeze", secret=password):
-            self.setup_grub_password.clear()
-            self.setup_grub_confirm.clear()
+        self.backend.run("setup-freeze")
 
     def _operation_output(self, action: str, output: str) -> None:
         if action.startswith("setup-") and output.rstrip():
@@ -1273,6 +1342,9 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(tr(message), 8000)
         if action == "applications-status" and not success:
             self.pending_user_create_check = False
+            self.pending_user_create_after_install = False
+        if action == "applications-install" and not success:
+            self.pending_user_create_after_install = False
         if action == "user-create" and not success:
             self.pending_autologin_user = None
         if action == "user-autologin" and not success:
@@ -1282,6 +1354,9 @@ class MainWindow(QMainWindow):
         )
         if not success and not cancelled:
             QMessageBox.critical(self, "CachyFreeze Error", message)
+            if action != "logs":
+                # Failed privileged commands are durably audited by the backend; load them now.
+                self.backend.run("logs")
         elif success and action in {"setup-freeze", "freeze-prepare"}:
             QMessageBox.information(
                 self,
@@ -1307,21 +1382,31 @@ class MainWindow(QMainWindow):
             if answer == QMessageBox.StandardButton.Yes:
                 self.backend.run("reboot")
         if success and action == "setup-install":
+            self.setup_installed = True
             QMessageBox.information(
                 self,
                 "Installation complete",
-                "CachyFreeze is installed in THAWED mode. Before creating a ready user, "
-                "open Users and run step 1: Install / repair applications. Then create "
-                "the user in step 2. User creation will not enable FROZEN.",
+                "Step 2 is complete. Continue with step 3 if you want a separate user now, "
+                "or skip directly to the GRUB password in step 4.",
             )
             self.backend.run("setup-status")
-        if success and action == "applications-install":
+        if success and action == "setup-grub-password":
+            self.setup_grub_protected = True
             QMessageBox.information(
                 self,
-                "Applications ready",
-                "The managed applications were installed and verified. Continue with "
-                "step 2 on the Users page to create the account.",
+                "GRUB password saved",
+                "Step 4 is complete. Select Finish and enable FROZEN when you are ready.",
             )
+        if success and action == "applications-install":
+            if self.pending_user_create_after_install:
+                self.pending_user_create_after_install = False
+                self._show_create_user_dialog()
+            else:
+                QMessageBox.information(
+                    self,
+                    "Applications ready",
+                    "The required applications are ready. You can now create a user.",
+                )
         if success and action == "user-create":
             pending = self.pending_autologin_user
             self.pending_autologin_user = None
@@ -1350,9 +1435,11 @@ class MainWindow(QMainWindow):
                 f"Filesystem: {result.get('filesystem', '—')}"
             )
         elif action == "setup-status":
+            self.setup_installed = bool(result.get("manager_installed"))
+            self.setup_grub_protected = bool(result.get("grub_protected"))
             phase = str(result.get("phase", "unknown"))
             labels = {
-                "ready": "Ready to install. Run preflight, confirm recovery, and install.",
+                "ready": "Ready to install. Run preflight, then install CachyFreeze.",
                 "partial": (
                     "An interrupted installation was detected. Preserve the log and rerun "
                     "installation after preflight."
@@ -1455,13 +1542,17 @@ class MainWindow(QMainWindow):
                 if not result.get("all_installed") or missing:
                     if not missing:
                         missing.append("Application readiness could not be verified")
-                    QMessageBox.warning(
+                    answer = QMessageBox.question(
                         self,
-                        "Applications required",
-                        "Use step 1 on this Users page to install or repair the required "
-                        "applications before creating a ready user.\n\nMissing or unhealthy:\n• "
-                        + "\n• ".join(missing),
+                        "Prepare required applications",
+                        "CachyFreeze needs to prepare these applications before creating "
+                        "the user:\n\n• "
+                        + "\n• ".join(missing)
+                        + "\n\nPrepare them now?",
                     )
+                    if answer == QMessageBox.StandardButton.Yes:
+                        self.pending_user_create_after_install = True
+                        self.backend.run("applications-install")
                     return
                 self._show_create_user_dialog()
         elif action in {"settings-get", "settings-set"}:
@@ -1497,9 +1588,8 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "Ready user created",
-            "The account is ready. Golden was not published and FROZEN was not scheduled. "
-            "Sign in to the new account, complete its desktop checks, then open CachyFreeze "
-            "and publish Golden / enable FROZEN from that session.",
+            "The account is ready to use. Your boot mode was not changed. Sign in to the "
+            "new account and use it normally; enable FROZEN later from Setup when you want it.",
         )
 
     def _toggle_theme(self) -> None:

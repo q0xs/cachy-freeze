@@ -1457,6 +1457,18 @@ class FreezeEngine:
                 mode=mode,
             )
 
+    def request_reboot(self) -> dict[str, bool]:
+        """Queue a reboot and return before systemd tears down the desktop session."""
+
+        self.require_root()
+        self.logger.write(
+            "INFO",
+            "system.reboot",
+            "Reboot requested from CachyFreeze",
+        )
+        self.runner.run(["systemctl", "reboot", "--no-block"])
+        return {"reboot_queued": True}
+
     def recent_logs(self, limit: int = 100) -> list[dict[str, Any]]:
         if not 1 <= limit <= 1000:
             raise CachyFreezeError("Log line limit must be between 1 and 1000.")

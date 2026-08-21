@@ -53,12 +53,12 @@ class MetricCard(QFrame):
 class UserDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Create application-ready user")
+        self.setWindowTitle("Create user")
         self.setMinimumWidth(480)
         layout = QFormLayout(self)
         intro = QLabel(
-            "Creates a standard, non-administrator account and prepares its desktop, "
-            "KDE settings, application shortcuts, and verified MicroSIP profile."
+            "Creates a standard account with its desktop and required applications ready. "
+            "It never grants administrator access or changes the boot mode."
         )
         intro.setObjectName("muted")
         intro.setWordWrap(True)

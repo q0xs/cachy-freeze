@@ -4,6 +4,31 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-21 — GUI reboot, mode guard, audit failure visibility, and simplified setup — local extracted source
+
+- FIXED — the PolicyKit reboot helper now uses the JSON backend contract. The
+  backend queues `systemctl reboot --no-block`, writes a durable reboot audit
+  event, and returns a valid response before the desktop session is stopped.
+- FIXED — privileged command failures now create bounded, non-secret audit
+  events. The GUI reloads Audit Logs after a non-log operation fails.
+- FIXED — FROZEN and unknown modes disable THAWED-only writes in the GUI and
+  explain that the operator must schedule THAWED and reboot before user,
+  application, Golden-publication, or mutable snapshot work can continue.
+- CHANGED — Create user now performs the application readiness check itself.
+  When preparation is needed, one confirmation starts it and the verified
+  result returns directly to the normal user form; boot mode remains unchanged.
+- CHANGED — Setup is now one vertical five-step workflow: preflight, install,
+  optional user creation, GRUB maintenance password, then Finish and enable
+  FROZEN. The old recovery/disposable checkboxes were removed; installation
+  keeps one plain-language safety confirmation, while the GRUB password and
+  final FROZEN publication are separate operations.
+- PASS — 103/103 Python unit and GUI tests, repository static contracts, Qt
+  offscreen UI smoke, isolated GRUB generation/syntax checks, and Python
+  compilation completed successfully.
+- NOT RUN — Ruff and ShellCheck are unavailable on this workstation. No live
+  deployment, initramfs/GRUB write, user mutation, or reboot was performed by
+  this validation pass.
+
 ## 2026-08-20 — local v1 hardening and UEFI acceptance — working tree based on `dc8a675`
 
 - FIXED — Golden/FROZEN finalization now waits for normal managed-session logout,

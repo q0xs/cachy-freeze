@@ -44,6 +44,8 @@ grep -q '^STATE_SUBVOL=@cachy-state$' "$ROOT/etc/cachy-freeze.conf"
 grep -q '^SNAPSHOT_SUBVOL=@cachy-snapshots$' "$ROOT/etc/cachy-freeze.conf"
 grep -q 'ConditionKernelCommandLine=cachy.freeze=1' \
   "$ROOT/initcpio/cachy-freeze-reset.service"
+grep -q '^ConditionPathExists=/etc/initrd-release$' \
+  "$ROOT/initcpio/cachy-freeze-reset.service"
 grep -q '^BOOT_FAILURE_LIMIT=3$' "$ROOT/etc/cachy-freeze.conf"
 grep -q 'ConditionKernelCommandLine=cachy.freeze=1' \
   "$ROOT/../user/files/cachy-frozen-admin-restrict.service"
