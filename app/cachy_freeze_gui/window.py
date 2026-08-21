@@ -1547,9 +1547,7 @@ class MainWindow(QMainWindow):
                         self,
                         "Prepare required applications",
                         "CachyFreeze needs to prepare these applications before creating "
-                        "the user:\n\n• "
-                        + "\n• ".join(missing)
-                        + "\n\nPrepare them now?",
+                        "the user:\n\n• " + "\n• ".join(missing) + "\n\nPrepare them now?",
                     )
                     if answer == QMessageBox.StandardButton.Yes:
                         self.pending_user_create_after_install = True
