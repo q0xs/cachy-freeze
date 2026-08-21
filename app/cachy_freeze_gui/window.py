@@ -790,7 +790,8 @@ class MainWindow(QMainWindow):
             alerts.append(f"First FROZEN boot validation failed: {error}")
         if mode != "thawed":
             alerts.append(
-                "Maintenance operations are disabled in FROZEN mode. Switch to THAWED and reboot first."
+                "Maintenance operations are disabled in FROZEN mode. "
+                "Switch to THAWED and reboot first."
             )
         power_policy = status.get("power_policy", {})
         if isinstance(power_policy, dict):
