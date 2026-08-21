@@ -73,7 +73,7 @@ class UserDialog(QDialog):
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_confirm = QLineEdit()
         self.password_confirm.setEchoMode(QLineEdit.EchoMode.Password)
-        self.autologin = QCheckBox("Sign in automatically as this user")
+        self.autologin = QCheckBox("Select this user on the login screen (password required)")
         layout.addRow("Username", self.username)
         layout.addRow("Display name", self.display_name)
         layout.addRow("Password", self.password)

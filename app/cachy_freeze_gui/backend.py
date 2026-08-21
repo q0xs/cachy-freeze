@@ -229,7 +229,7 @@ class BackendClient(QObject):
             "user-password": "User password changed.",
             "user-lock": "User account locked.",
             "user-unlock": "User account unlocked.",
-            "user-autologin": "Automatic login updated.",
+            "user-autologin": "Login-screen selection updated; a password is still required.",
             "updates-check": "Update check completed.",
             "updates-apply": "Updates applied and a new Golden published.",
             "settings-get": "Settings loaded.",

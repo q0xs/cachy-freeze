@@ -72,7 +72,7 @@ class UserValidationTests(unittest.TestCase):
                 ):
                     manager.create(invalid, "Invalid User", "1234")
 
-    def test_plasma_login_manager_autologin_uses_owned_drop_in(self) -> None:
+    def test_plasma_login_selection_requires_password_and_preserves_main_config(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             manager_unit = root / "plasmalogin.service"
@@ -86,6 +86,12 @@ class UserValidationTests(unittest.TestCase):
             )
             original = main_config.read_text(encoding="utf-8")
             config = root / "plasmalogin.conf.d" / "90-cachy-freeze-autologin.conf"
+            login_state = root / "plasmalogin" / "plasma-login-greeterstaterc"
+            login_state.parent.mkdir()
+            login_state.write_text(
+                "[General]\nLastLoggedInSession=plasma.desktop\nLastLoggedInUser=localadm\n",
+                encoding="utf-8",
+            )
             manager = UserManager(
                 state_dir=root / "state",
                 lock_file=root / "operation.lock",
@@ -93,28 +99,30 @@ class UserValidationTests(unittest.TestCase):
                 display_manager_path=display_manager,
                 plasmalogin_path=config,
                 sddm_path=root / "sddm.conf",
+                login_state_path=login_state,
             )
 
             self.assertEqual(manager.autologin_kind, "plasmalogin-drop-in")
-            manager._write_autologin("person_01")
-            enabled = config.read_text(encoding="utf-8")
-            self.assertEqual(
-                enabled,
-                "[Autologin]\nUser=person_01\nSession=plasma\nRelogin=true\n",
-            )
-            self.assertEqual(main_config.read_text(encoding="utf-8"), original)
-            self.assertEqual(manager._autologin_user(), "person_01")
-
-            manager._write_autologin(None)
+            with (
+                patch.object(manager, "require_root"),
+                patch.object(manager, "_account", return_value=SimpleNamespace()),
+                patch.object(manager, "_is_administrator", return_value=False),
+            ):
+                result = manager.set_autologin("person_01")
             disabled = config.read_text(encoding="utf-8")
             self.assertEqual(
                 disabled,
                 "[Autologin]\nUser=\nSession=plasma\nRelogin=false\n",
             )
+            state = login_state.read_text(encoding="utf-8")
+            self.assertIn("LastLoggedInUser=person_01", state)
+            self.assertIn("LastLoggedInSession=plasma.desktop", state)
+            self.assertTrue(result["password_required"])
             self.assertEqual(main_config.read_text(encoding="utf-8"), original)
             self.assertIsNone(manager._autologin_user())
+            self.assertEqual(manager.preferred_login_user(), "person_01")
 
-    def test_sddm_autologin_uses_managed_drop_in(self) -> None:
+    def test_sddm_login_selection_removes_owned_autologin_drop_in(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             config = root / "cachy-autologin.conf"
@@ -125,13 +133,79 @@ class UserValidationTests(unittest.TestCase):
                 autologin_path=config,
             )
 
-            manager._write_autologin("person_01")
-            self.assertEqual(
-                config.read_text(encoding="utf-8"),
+            config.parent.mkdir(parents=True, exist_ok=True)
+            config.write_text(
                 "[Autologin]\nUser=person_01\nSession=plasma.desktop\nRelogin=true\n",
+                encoding="utf-8",
             )
-            manager._write_autologin(None)
+            with (
+                patch.object(manager, "require_root"),
+                patch.object(manager, "_account", return_value=SimpleNamespace()),
+                patch.object(manager, "_is_administrator", return_value=False),
+            ):
+                manager.set_autologin("person_01")
             self.assertFalse(config.exists())
+            state = manager.login_state_path.read_text(encoding="utf-8")
+            self.assertIn("[Last]", state)
+            self.assertIn("User=person_01", state)
+            self.assertIn("Session=plasma.desktop", state)
+
+    def test_finalization_adopts_and_disables_legacy_automatic_login(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / "cachy-autologin.conf"
+            config.write_text(
+                "[Autologin]\nUser=person_01\nSession=plasma.desktop\nRelogin=true\n",
+                encoding="utf-8",
+            )
+            manager = UserManager(
+                state_dir=root / "state",
+                lock_file=root / "operation.lock",
+                logger=AuditLogger(root / "audit.jsonl"),
+                autologin_path=config,
+            )
+            with (
+                patch.object(manager, "require_root"),
+                patch.object(manager, "_account", return_value=SimpleNamespace()),
+                patch.object(manager, "_is_administrator", return_value=False),
+            ):
+                preferred = manager.prepare_login_for_finalization()
+
+            self.assertEqual(preferred, "person_01")
+            self.assertFalse(config.exists())
+            self.assertEqual(manager.preferred_login_user(), "person_01")
+
+    def test_finalization_restores_managed_home_from_clean_template(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            template = root / "templates" / "person_01"
+            home = root / "home" / "person_01"
+            template.mkdir(parents=True)
+            home.mkdir(parents=True)
+            account = SimpleNamespace(pw_dir="/home/person_01", pw_uid=1001, pw_gid=1001)
+            manager = UserManager(
+                state_dir=root / "state",
+                lock_file=root / "operation.lock",
+                logger=AuditLogger(root / "audit.jsonl"),
+                template_root=root / "templates",
+            )
+            with (
+                patch.object(manager, "require_root"),
+                patch.object(manager, "_account", return_value=account),
+                patch("cachy_freeze.users.Path.is_dir", return_value=True),
+                patch.object(manager.runner, "run") as run,
+            ):
+                restored = manager.restore_managed_homes()
+
+            self.assertEqual(restored, ["person_01"])
+            self.assertEqual(
+                run.call_args_list[0].args[0],
+                ["rsync", "-aHAX", "--delete", f"{template}/", "/home/person_01/"],
+            )
+            self.assertEqual(
+                run.call_args_list[1].args[0],
+                ["chown", "-R", "1001:1001", "/home/person_01"],
+            )
 
     def test_encrypted_password_hash_uses_stdin_safe_payload(self) -> None:
         password_hash = "$y$j9T$example-salt$example-hash"

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import configparser
+import io
 import json
 import os
 import re
@@ -40,6 +42,7 @@ class UserManager:
         display_manager_path: Path = Path("/etc/systemd/system/display-manager.service"),
         plasmalogin_path: Path = Path("/etc/plasmalogin.conf.d/90-cachy-freeze-autologin.conf"),
         sddm_path: Path = Path("/etc/sddm.conf.d/cachy-autologin.conf"),
+        login_state_path: Path | None = None,
         template_root: Path = Path("/var/lib/cachy-user-template"),
         provisioner_path: Path = Path(
             "/usr/lib/cachy-freeze/deployment/installer/prepare-standard-user.sh"
@@ -55,6 +58,17 @@ class UserManager:
             plasmalogin_path=plasmalogin_path,
             sddm_path=sddm_path,
         )
+        if login_state_path is not None:
+            self.login_state_path = login_state_path
+        elif autologin_path is not None:
+            self.login_state_path = state_dir / "display-manager-state.conf"
+        elif self.autologin_kind == "plasmalogin-drop-in":
+            self.login_state_path = Path(
+                "/var/lib/plasmalogin/.local/state/plasma-login-greeterstaterc"
+            )
+        else:
+            self.login_state_path = Path("/var/lib/sddm/state.conf")
+        self.login_selection_path = state_dir / "login-selection.json"
         self.template_root = template_root
         self.provisioner_path = provisioner_path
 
@@ -126,6 +140,24 @@ class UserManager:
 
         return self._autologin_user()
 
+    def preferred_login_user(self) -> str | None:
+        """Return the password-required account selected on the login screen."""
+
+        try:
+            document = json.loads(self.login_selection_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return None
+        except (OSError, json.JSONDecodeError) as error:
+            raise CachyFreezeError(f"Login selection could not be read: {error}") from error
+        if document.get("schema") != 1 or document.get("password_required") is not True:
+            raise CachyFreezeError("Login selection has an invalid schema.")
+        username = document.get("username")
+        if username is None:
+            return None
+        if not isinstance(username, str) or not _USERNAME_RE.fullmatch(username):
+            raise CachyFreezeError("Login selection contains an invalid username.")
+        return username
+
     def _groups(self, username: str) -> list[str]:
         return self.runner.text(["id", "-nG", username], check=False).split()
 
@@ -137,7 +169,7 @@ class UserManager:
         self.require_root()
         if pwd is None:
             raise CachyFreezeError("User management is supported only on Linux.")
-        autologin = self._autologin_user()
+        login_default = self.preferred_login_user()
         result: list[dict[str, Any]] = []
         for account in pwd.getpwall():
             if account.pw_name != "localadm" and not 1000 <= account.pw_uid < 65534:
@@ -154,7 +186,8 @@ class UserManager:
                     "administrator": self._is_administrator(account.pw_name, groups),
                     "groups": groups,
                     "locked": len(status) > 1 and status[1] == "L",
-                    "autologin": account.pw_name == autologin,
+                    "autologin": False,
+                    "login_default": account.pw_name == login_default,
                 }
             )
         return sorted(result, key=lambda item: (not item["administrator"], item["username"]))
@@ -211,6 +244,43 @@ class UserManager:
             users=refreshed,
         )
         return refreshed
+
+    def restore_managed_homes(self, *, already_locked: bool = False) -> list[str]:
+        """Replace managed homes from their clean templates before Golden publication."""
+
+        self.require_root()
+        restored: list[str] = []
+        lock = nullcontext() if already_locked else ProcessLock(self.lock_file)
+        with lock:
+            preferred = self.preferred_login_user()
+            if not self.template_root.is_dir():
+                if preferred is not None:
+                    raise CachyFreezeError("The selected user's clean home template is missing.")
+                return restored
+            if preferred is not None and not (self.template_root / preferred).is_dir():
+                raise CachyFreezeError("The selected user's clean home template is missing.")
+            for template in self.template_root.iterdir():
+                username = template.name
+                if not template.is_dir() or not _USERNAME_RE.fullmatch(username):
+                    continue
+                account = self._account(username)
+                if account is None:
+                    continue
+                home = Path(account.pw_dir)
+                if home != Path("/home") / username or not home.is_dir():
+                    raise CachyFreezeError(
+                        "A managed account does not have the expected home directory."
+                    )
+                self.runner.run(["rsync", "-aHAX", "--delete", f"{template}/", f"{home}/"])
+                self.runner.run(["chown", "-R", f"{account.pw_uid}:{account.pw_gid}", str(home)])
+                restored.append(username)
+        self.logger.write(
+            "INFO",
+            "user.home-baseline",
+            "Managed user homes restored from clean templates",
+            users=restored,
+        )
+        return restored
 
     def create(self, username: str, display_name: str, password: str) -> dict[str, Any]:
         self.require_root()
@@ -333,8 +403,8 @@ class UserManager:
             if account.pw_dir != f"/home/{username}":
                 raise CachyFreezeError("Only standard users with a normal home can be deleted.")
             backup_id = self._backup_account(account)
-            if self._autologin_user() == username:
-                self._write_autologin(None)
+            if self.preferred_login_user() == username:
+                self._set_login_default_locked(None)
             self.runner.run(["userdel", "--remove", username])
             shutil.rmtree(self.template_root / username, ignore_errors=True)
             shutil.rmtree(self.template_root / f"{username}.previous", ignore_errors=True)
@@ -505,7 +575,83 @@ class UserManager:
             mode=0o644,
         )
 
+    def _write_login_manager_state(self, username: str | None) -> None:
+        parser = configparser.RawConfigParser(interpolation=None, strict=False)
+        parser.optionxform = str
+        try:
+            if self.login_state_path.is_file():
+                parser.read(self.login_state_path, encoding="utf-8")
+        except (OSError, configparser.Error) as error:
+            raise CachyFreezeError(f"Login manager state could not be read: {error}") from error
+
+        if self.autologin_kind == "plasmalogin-drop-in":
+            section = "General"
+            user_key = "LastLoggedInUser"
+            session_key = "LastLoggedInSession"
+        else:
+            section = "Last"
+            user_key = "User"
+            session_key = "Session"
+        if not parser.has_section(section):
+            parser.add_section(section)
+        if username is None:
+            parser.remove_option(section, user_key)
+        else:
+            parser.set(section, user_key, username)
+            parser.set(section, session_key, "plasma.desktop")
+
+        owner: tuple[int, int] | None = None
+        for candidate in (self.login_state_path, self.login_state_path.parent):
+            try:
+                metadata = candidate.stat()
+            except OSError:
+                continue
+            owner = (metadata.st_uid, metadata.st_gid)
+            break
+        output = io.StringIO()
+        parser.write(output, space_around_delimiters=False)
+        atomic_text_write(self.login_state_path, output.getvalue(), mode=0o644)
+        if owner is not None:
+            os.chown(self.login_state_path, *owner)
+
+    def _set_login_default_locked(self, username: str | None) -> None:
+        # CachyFreeze never bypasses PAM authentication.  The owned automatic-login
+        # configuration is explicitly disabled before the greeter selection changes.
+        self.autologin_path.parent.mkdir(parents=True, exist_ok=True)
+        self._write_autologin(None)
+        self._write_login_manager_state(username)
+        atomic_json_write(
+            self.login_selection_path,
+            {"schema": 1, "username": username, "password_required": True},
+            mode=0o600,
+        )
+
+    def prepare_login_for_finalization(self, *, already_locked: bool = False) -> str | None:
+        """Disable automatic login and restore the password-required greeter selection."""
+
+        self.require_root()
+        lock = nullcontext() if already_locked else ProcessLock(self.lock_file)
+        with lock:
+            preferred = self.preferred_login_user()
+            legacy_autologin = self._autologin_user()
+            if preferred is None and legacy_autologin is not None:
+                account = self._account(legacy_autologin)
+                if account is not None and not self._is_administrator(legacy_autologin):
+                    preferred = legacy_autologin
+            if preferred is not None and self._account(preferred) is None:
+                preferred = None
+            self._set_login_default_locked(preferred)
+        self.logger.write(
+            "INFO",
+            "user.login-selection",
+            "Password-required login selection prepared",
+            username=preferred,
+        )
+        return preferred
+
     def set_autologin(self, username: str | None) -> dict[str, Any]:
+        """Compatibility entry point for password-required login-screen selection."""
+
         self.require_root()
         if username is not None:
             username = self.validate_username(username)
@@ -516,14 +662,18 @@ class UserManager:
                     raise CachyFreezeError("User not found.")
                 if self._is_administrator(username):
                     raise CachyFreezeError(
-                        "Automatic login cannot be enabled for an administrator."
+                        "The default login selection cannot be set to an administrator."
                     )
-            self.autologin_path.parent.mkdir(parents=True, exist_ok=True)
-            self._write_autologin(username)
+            self._set_login_default_locked(username)
         self.logger.write(
-            "WARNING",
-            "user.autologin",
-            "Automatic login setting changed",
+            "INFO",
+            "user.login-selection",
+            "Password-required login selection changed",
             username=username,
         )
-        return {"username": username, "enabled": username is not None, "changed_at": time.time()}
+        return {
+            "username": username,
+            "enabled": username is not None,
+            "password_required": True,
+            "changed_at": time.time(),
+        }

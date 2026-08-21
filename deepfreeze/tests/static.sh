@@ -173,7 +173,7 @@ grep -q '90-cachy-freeze-autologin.conf' \
 grep -q 'cachy-freeze-idle-power.service' \
   "$PROJECT_ROOT/installer/install-freeze-engine.sh" \
   "$PROJECT_ROOT/installer/deploy-live-app.sh"
-grep -q '^1.0.0rc1$' "$PROJECT_ROOT/VERSION"
+grep -q '^1.0.0rc2$' "$PROJECT_ROOT/VERSION"
 grep -q 'class StateMigrationManager' \
   "$PROJECT_ROOT/src/cachy_freeze/versioning.py"
 grep -q 'class DiagnosticBundleBuilder' \

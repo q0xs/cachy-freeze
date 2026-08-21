@@ -4,7 +4,7 @@
 
 <h1 align="center">CachyFreeze</h1>
 
-[![Version](https://img.shields.io/badge/version-1.0.0rc1-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-1.0.0rc2-blue.svg)](VERSION)
 [![Quality checks](https://github.com/q0xs/cachy-freeze/actions/workflows/static-tests.yml/badge.svg?branch=main)](https://github.com/q0xs/cachy-freeze/actions/workflows/static-tests.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-CachyOS-5865F2.svg)](https://cachyos.org/)
@@ -25,7 +25,11 @@ verified Golden baseline, and a disposable FROZEN daily runtime.
 - THAWED maintenance boots the persistent `@` subvolume.
 - Golden publication waits for managed sessions to log out and fails closed if
   users or processes do not stop cleanly.
+- Finalization restores managed homes from their existing clean templates so
+  session artifacts are never promoted into Golden.
 - The first real FROZEN boot is validated before setup is marked complete.
+- The managed account can be preselected at the login screen while password
+  authentication remains mandatory; CachyFreeze disables automatic login.
 - GRUB protects THAWED maintenance with the fixed GRUB username `cachyadmin`;
   FROZEN is passwordless.
 - Users are provisioned only after the verified application set is installed.
@@ -83,8 +87,9 @@ The Setup page presents one vertical, five-step workflow:
 5. Finish and enable FROZEN.
 
 User creation does not publish Golden, change boot mode, or reboot the machine.
-Automatic login uses a CachyFreeze-owned display-manager drop-in and leaves the
-main Plasma Login Manager/SDDM configuration untouched.
+The optional login selection highlights the managed user at the login screen but
+never bypasses password authentication. CachyFreeze explicitly disables its old
+automatic-login drop-ins before Golden publication.
 
 ## Boot model
 

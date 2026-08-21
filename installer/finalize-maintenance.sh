@@ -28,4 +28,4 @@ request_user=$(getent passwd "$request_uid" | cut -d: -f1)
 
 printf '%s\n' \
   "Maintenance finalization is waiting for managed sessions to close." \
-  "Log out now. Reboot only after finalization status reports complete."
+  "Log out now. The computer will reboot automatically only after finalization succeeds."

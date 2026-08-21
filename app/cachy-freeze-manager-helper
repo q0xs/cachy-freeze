@@ -188,6 +188,15 @@ case ${1:-} in
     [[ -x $BACKEND ]] || die "Install CachyFreeze before enabling FROZEN mode."
     [[ -s /etc/cachy-freeze-grub-auth.conf ]] ||
       die "Set the GRUB maintenance password before enabling FROZEN mode."
+    "$BACKEND" health | /usr/bin/python -c '
+import json
+import sys
+
+document = json.load(sys.stdin)
+result = document.get("result", {}) if document.get("ok") is True else {}
+ready = result.get("freeze_ready", result.get("healthy", False))
+raise SystemExit(0 if ready else 1)
+' || die "FROZEN was not enabled because the final Btrfs or snapshot check failed."
     requester_identity
     exec "$BACKEND" finalize request "$REQUEST_USER" --uid "$REQUEST_UID"
     ;;

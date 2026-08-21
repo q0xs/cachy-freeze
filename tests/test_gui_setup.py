@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from cachy_freeze_gui.backend import BackendClient  # noqa: E402
+from cachy_freeze_gui.widgets import QMessageBox as LocalizedQMessageBox  # noqa: E402
 from cachy_freeze_gui.window import MainWindow, UserDialog  # noqa: E402
 from PyQt6.QtCore import Qt  # noqa: E402
 from PyQt6.QtWidgets import QApplication, QMessageBox  # noqa: E402
@@ -44,6 +45,21 @@ class SetupGuiTests(unittest.TestCase):
         self.assertTrue(self.window._password_is_strong("Correct-Horse-42"))
         self.assertFalse(self.window._password_is_strong("short"))
         self.assertFalse(self.window._password_is_strong("Colon:Password42"))
+
+    def test_question_dialog_defaults_to_safe_yes_no_buttons(self) -> None:
+        with patch.object(
+            LocalizedQMessageBox,
+            "_show",
+            return_value=QMessageBox.StandardButton.No,
+        ) as show:
+            result = LocalizedQMessageBox.question(self.window, "Continue?", "Proceed?")
+
+        self.assertEqual(result, QMessageBox.StandardButton.No)
+        buttons = show.call_args.args[4]
+        default_button = show.call_args.args[5]
+        self.assertTrue(buttons & QMessageBox.StandardButton.Yes)
+        self.assertTrue(buttons & QMessageBox.StandardButton.No)
+        self.assertEqual(default_button, QMessageBox.StandardButton.No)
 
     def test_helper_does_not_require_a_managed_user_to_freeze(self) -> None:
         helper = (Path(__file__).parents[1] / "app/cachy-freeze-manager-helper").read_text()
@@ -139,17 +155,65 @@ class SetupGuiTests(unittest.TestCase):
         ):
             self.window._finish_setup()
 
-        self.backend.run.assert_called_once_with("setup-freeze")
+        self.backend.run.assert_called_once_with("health")
+        self.assertTrue(self.window.pending_setup_finish_check)
+
+        with patch("cachy_freeze_gui.window.QMessageBox.information"):
+            self.window._result_ready("health", {"healthy": True, "freeze_ready": True})
+
+        self.assertEqual(
+            [call.args[0] for call in self.backend.run.call_args_list],
+            ["health", "setup-freeze"],
+        )
 
     def test_setup_user_step_is_optional_and_uses_the_simple_user_flow(self) -> None:
         self.window.setup_installed = True
-        with patch(
-            "cachy_freeze_gui.window.QMessageBox.question",
-            return_value=QMessageBox.StandardButton.Yes,
-        ):
-            self.window._confirm_setup_user()
+        self.window.running_mode = "thawed"
+        self.window._start_setup_user()
 
         self.backend.run.assert_called_once_with("applications-status")
+
+    def test_setup_controls_follow_the_five_step_order(self) -> None:
+        self.window._status_changed({"running_mode": "unknown", "current_subvolume": "@"})
+        self.window._apply_setup_controls()
+
+        self.assertEqual(self.window.running_mode, "thawed")
+        self.assertFalse(self.window.setup_start_button.isEnabled())
+        self.assertFalse(self.window.setup_user_button.isEnabled())
+        self.assertFalse(self.window.setup_grub_button.isEnabled())
+        self.assertFalse(self.window.setup_finish_button.isEnabled())
+
+        self.window._result_ready(
+            "setup-preflight",
+            {
+                "root_device": "/dev/sda2",
+                "current_subvolume": "@",
+                "firmware": "UEFI",
+                "filesystem": "btrfs",
+            },
+        )
+        self.assertTrue(self.window.setup_start_button.isEnabled())
+
+        self.window.setup_installed = True
+        self.window._apply_setup_controls()
+        self.assertFalse(self.window.setup_start_button.isEnabled())
+        self.assertTrue(self.window.setup_user_button.isEnabled())
+        self.assertTrue(self.window.setup_grub_button.isEnabled())
+        self.assertFalse(self.window.setup_finish_button.isEnabled())
+
+        self.window.setup_grub_protected = True
+        self.window._apply_setup_controls()
+        self.assertFalse(self.window.setup_grub_button.isEnabled())
+        self.assertTrue(self.window.setup_finish_button.isEnabled())
+
+    def test_failed_final_check_never_enables_frozen(self) -> None:
+        self.window.pending_setup_finish_check = True
+
+        with patch("cachy_freeze_gui.window.QMessageBox.warning") as warning:
+            self.window._result_ready("health", {"healthy": False, "freeze_ready": False})
+
+        warning.assert_called_once()
+        self.backend.run.assert_not_called()
 
     def test_successful_preflight_unlocks_setup_flow(self) -> None:
         self.window._result_ready(
@@ -281,7 +345,7 @@ class SetupGuiTests(unittest.TestCase):
         self.assertNotIn("freeze", [call.args[0] for call in self.backend.run.call_args_list])
         self.assertIn("boot mode was not changed", information.call_args.args[2])
 
-    def test_autologin_after_creation_never_chains_freeze(self) -> None:
+    def test_login_selection_after_creation_never_chains_freeze(self) -> None:
         self.window.pending_autologin_user = "person_01"
 
         self.window._operation_finished("user-create", True, "created")
@@ -294,7 +358,7 @@ class SetupGuiTests(unittest.TestCase):
         self.backend.run.assert_called_once_with("user-list")
         self.assertNotIn("freeze", [call.args[0] for call in self.backend.run.call_args_list])
 
-    def test_autologin_failure_clears_pending_user(self) -> None:
+    def test_login_selection_failure_clears_pending_user(self) -> None:
         self.window.pending_autologin_user = "person_01"
 
         with patch("cachy_freeze_gui.window.QMessageBox.critical"):
@@ -312,7 +376,7 @@ class SetupGuiTests(unittest.TestCase):
                     "administrator": True,
                     "groups": ["localadm", "wheel"],
                     "locked": False,
-                    "autologin": False,
+                    "login_default": False,
                     "home": "/home/localadm",
                 }
             ]

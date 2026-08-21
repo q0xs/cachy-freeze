@@ -55,4 +55,4 @@ request_user=$(getent passwd "$request_uid" | cut -d: -f1)
 printf '%s\n' \
   "FROZEN activation was queued safely." \
   "Save your work and log out; Golden will be published only after all managed sessions stop." \
-  "Do not reboot until finalization status reports complete."
+  "The computer will reboot automatically only after finalization completes successfully."

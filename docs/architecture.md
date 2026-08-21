@@ -29,12 +29,12 @@ defaults, creates the per-user MicroSIP Wine prefix, rejects unexpected
 administrator membership, and only then captures the FROZEN home template.
 Provisioning failure removes the partial account and candidate template.
 
-Automatic-login settings target the display manager that is actually enabled:
-Plasma Login Manager uses the CachyFreeze-owned
-`/etc/plasmalogin.conf.d/90-cachy-freeze-autologin.conf` drop-in without editing
-the administrator's main configuration, while compatible SDDM systems use the
-CachyFreeze-owned SDDM drop-in. User creation itself never publishes Golden or
-changes the scheduled boot mode.
+The optional login-screen selection targets the display manager that is actually
+enabled and only preselects the managed account; PAM password authentication is
+never bypassed. Before finalization, CachyFreeze disables its owned Plasma Login
+Manager/SDDM automatic-login drop-ins and reapplies the password-required greeter
+selection. User creation itself never publishes Golden or changes the scheduled
+boot mode.
 
 Golden/Active replacement uses staged subvolumes and a durable transaction
 journal. Early boot can roll forward interrupted publication. Boot-health resets
@@ -45,8 +45,10 @@ can restore the previous healthy Golden.
 
 Finalization is logout-aware. The GUI asks the desktop to end the normal session,
 while a persistent system service waits for managed sessions and processes to
-leave before it publishes Golden and schedules FROZEN as one locked operation.
-A timeout fails closed and leaves an auditable pending/error state.
+leave, restores every managed home from its existing clean template, then
+publishes Golden and schedules FROZEN as one locked operation. Session artifacts
+are never promoted into the baseline. A timeout fails closed and leaves an
+auditable pending/error state.
 
 The installed idle-power service reads the logind seat idle hint. After one hour
 without activity it uses an RTC-timed suspend for one further hour. A complete

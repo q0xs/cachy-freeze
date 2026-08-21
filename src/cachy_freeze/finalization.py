@@ -89,7 +89,37 @@ class FinalizationManager:
             raise CachyFreezeError("The finalization requester does not match its user id.")
         current = self.status()
         if current.get("status") in _ACTIVE_STATES:
-            raise CachyFreezeError("A logout finalization is already pending.")
+            service = self.runner.run(
+                [
+                    "systemctl",
+                    "show",
+                    "--property=ActiveState",
+                    "--value",
+                    "cachy-freeze-finalize.service",
+                ],
+                check=False,
+            )
+            active_state = (service.stdout or b"").decode("utf-8", errors="replace").strip()
+            if service.returncode == 0 and active_state in {
+                "active",
+                "activating",
+                "reloading",
+                "deactivating",
+            }:
+                raise CachyFreezeError("A logout finalization is already pending.")
+            current.update(
+                {
+                    "status": "failed",
+                    "error": "The earlier finalization was interrupted before completion.",
+                }
+            )
+            self._write(current)
+            self.logger.write(
+                "ERROR",
+                "finalization.interrupted",
+                "Interrupted logout finalization recovered for a safe retry",
+                request_id=current["request_id"],
+            )
         now = _now()
         document = {
             "schema": FINALIZATION_SCHEMA,

@@ -4,6 +4,59 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-21 — password-required login selection and reliable first FROZEN finalization — physical workstation
+
+- RELEASE — these fixes are prepared as `v1.0.0rc2`; release metadata is
+  synchronized across `VERSION`, `pyproject.toml`, the Python package, README,
+  and static contracts.
+- DIAGNOSED — local extracted source contained 14 functional changes beyond GitHub
+  `main` at `c6df9f1`; the relevant local finalization and mode-detection fixes were
+  preserved instead of replacing the tree with the older remote files.
+- FIXED — the former automatic-login option now only preselects the managed account
+  in Plasma Login Manager/SDDM state. The owned automatic-login drop-ins are disabled,
+  `Relogin` is false, and PAM password authentication remains mandatory.
+- FIXED — finalization disables legacy automatic login before logout, recovers an
+  interrupted durable request when its service is no longer active, and can be retried
+  safely instead of remaining permanently stuck in `waiting-for-logout`.
+- FIXED — logout finalization restores managed homes from their existing clean templates
+  before Golden publication. Files created by a normal or accidental user session are
+  deleted instead of being captured into the FROZEN baseline.
+- PASS — 113/113 Python unit and GUI tests, repository static/Bash contracts, Qt
+  offscreen smoke, isolated GRUB generation and syntax, Python compilation, live
+  rollback-capable application deployment, password-required greeter state, disabled
+  automatic-login configuration, enabled reset/restriction/boot-health services, both
+  installed initramfs reset payloads, and live Btrfs/snapshot health were verified.
+- NOT RUN — Ruff and ShellCheck are unavailable on this workstation. No Golden/Active
+  publication or reboot was performed; the next physical FROZEN boot and post-login
+  reset proof remain pending explicit reboot execution.
+
+## 2026-08-21 — fresh CachyOS guided setup and fail-closed automatic reboot — physical workstation
+
+- FIXED — the initial pre-GRUB boot now derives THAWED/FROZEN from the mounted
+  managed subvolume when kernel mode markers are not available; explicit kernel
+  markers still take precedence.
+- FIXED — localized question dialogs now use explicit Yes/No buttons with No as
+  the safe default. Setup user creation proceeds through application readiness
+  without a second silently-cancelled confirmation.
+- FIXED — Setup controls enforce the five-step order, and Finish runs a final
+  Btrfs/snapshot readiness check before requesting logout-aware publication.
+- CHANGED — successful logout finalization now records the reboot through the
+  backend and restarts automatically. A failed finalization never reaches the
+  `ExecStartPost` reboot and remains fail-closed at the login screen.
+- PASS — live preflight, installation, all 13 managed application checks,
+  standard non-administrator user creation, home ownership, user-template and
+  automatic-login configuration, GRUB authentication/hash/configuration, and
+  zero failed systemd units were verified without recording identities or
+  secrets.
+- PASS — 109/109 Python unit and GUI tests, repository static/systemd contracts,
+  Qt offscreen UI smoke, isolated GRUB generation and syntax checks, and the
+  rollback-capable live application deployment completed successfully.
+- INFO — the live deployment backup is managed under
+  `/var/backups/cachy-freeze/app/`; no reboot was initiated by deployment.
+- NOT RUN — the final physical FROZEN reboot, post-boot Golden reset proof, and
+  boot-validation completion remain pending. Ruff and ShellCheck are unavailable
+  on this workstation.
+
 ## 2026-08-21 — GUI reboot, mode guard, audit failure visibility, and simplified setup — local extracted source
 
 - FIXED — the PolicyKit reboot helper now uses the JSON backend contract. The

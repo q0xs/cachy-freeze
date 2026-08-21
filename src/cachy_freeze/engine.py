@@ -105,11 +105,19 @@ class FreezeEngine:
         try:
             arguments = Path("/proc/cmdline").read_text(encoding="utf-8").split()
         except OSError:
-            return "unknown"
+            arguments = []
         if "cachy.freeze=1" in arguments:
             return "frozen"
         if "cachy.freeze=0" in arguments:
             return "thawed"
+        try:
+            current_subvolume = self._root_subvolume()
+        except CachyFreezeError:
+            return "unknown"
+        if current_subvolume == self.config.MAINTENANCE_SUBVOL:
+            return "thawed"
+        if current_subvolume == self.config.ACTIVE_SUBVOL:
+            return "frozen"
         return "unknown"
 
     @contextmanager
@@ -1247,10 +1255,11 @@ class FreezeEngine:
             unhealthy = [
                 result["snapshot_id"] for result in snapshot_results if not result["healthy"]
             ]
+            freeze_ready = not unhealthy and not any(device_errors.values())
             result = {
+                "freeze_ready": freeze_ready,
                 "healthy": (
-                    not unhealthy
-                    and not any(device_errors.values())
+                    freeze_ready
                     and bool(power_policy["supported"])
                     and power_policy["status"] not in {"failed", "unsupported"}
                 ),
@@ -1267,7 +1276,9 @@ class FreezeEngine:
             )
             return result
 
-    def _publish_locked(self, description: str) -> SnapshotMetadata:
+    def _publish_locked(
+        self, description: str, *, restore_managed_homes: bool = False
+    ) -> SnapshotMetadata:
         from .users import UserManager
 
         self._recover_transaction_locked()
@@ -1277,7 +1288,11 @@ class FreezeEngine:
             logger=self.logger,
             runner=self.runner,
         )
-        user_manager.refresh_templates(already_locked=True)
+        expected_user = user_manager.prepare_login_for_finalization(already_locked=True)
+        if restore_managed_homes:
+            user_manager.restore_managed_homes(already_locked=True)
+        else:
+            user_manager.refresh_templates(already_locked=True)
         archived = self._create_snapshot_locked(
             self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
             description,
@@ -1293,7 +1308,7 @@ class FreezeEngine:
             Path(self.config.STATE_DIR),
             self.logger,
             runner=self.runner,
-        ).arm(archived.snapshot_id, user_manager.autologin_user())
+        ).arm(archived.snapshot_id, expected_user)
         self.logger.write(
             "INFO",
             "publish",
@@ -1316,7 +1331,7 @@ class FreezeEngine:
         if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
             raise CachyFreezeError("Golden can be published only in THAWED mode.")
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            archived = self._publish_locked(description)
+            archived = self._publish_locked(description, restore_managed_homes=True)
             self._set_boot_mode_locked("frozen")
             self.logger.write(
                 "INFO",
@@ -1330,6 +1345,14 @@ class FreezeEngine:
         self.require_root()
         if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
             raise CachyFreezeError("Finalization can be requested only in THAWED mode.")
+        from .users import UserManager
+
+        UserManager(
+            state_dir=Path(self.config.STATE_DIR),
+            lock_file=Path(self.config.LOCK_FILE),
+            logger=self.logger,
+            runner=self.runner,
+        ).prepare_login_for_finalization()
         return FinalizationManager(
             Path(self.config.STATE_DIR),
             self.logger,

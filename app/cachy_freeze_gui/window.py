@@ -54,6 +54,7 @@ class MainWindow(QMainWindow):
         self.pending_autologin_user: str | None = None
         self.pending_user_create_check = False
         self.pending_user_create_after_install = False
+        self.pending_setup_finish_check = False
         self.running_mode = "unknown"
         self.operation_is_busy = False
         self.setup_installed = False
@@ -298,7 +299,7 @@ class MainWindow(QMainWindow):
         buttons = QHBoxLayout()
         self.user_password_button = QPushButton("Reset password")
         self.user_lock_button = QPushButton("Lock / Unlock")
-        self.user_autologin_button = QPushButton("Automatic login")
+        self.user_autologin_button = QPushButton("Default login user")
         self.user_delete_button = QPushButton("Delete")
         self.user_delete_button.setObjectName("danger")
         self.user_restore_button = QPushButton("Restore backup")
@@ -330,7 +331,7 @@ class MainWindow(QMainWindow):
                 "Type",
                 "Groups",
                 "Status",
-                "Automatic login",
+                "Selected at login",
                 "Home",
             ]
         )
@@ -611,7 +612,7 @@ class MainWindow(QMainWindow):
         self.boot_thawed_button.clicked.connect(self._confirm_thaw)
         self.setup_preflight_button.clicked.connect(lambda: self.backend.run("setup-preflight"))
         self.setup_start_button.clicked.connect(self._start_setup)
-        self.setup_user_button.clicked.connect(self._confirm_setup_user)
+        self.setup_user_button.clicked.connect(self._start_setup_user)
         self.setup_grub_button.clicked.connect(self._save_setup_grub_password)
         self.setup_finish_button.clicked.connect(self._finish_setup)
         self.backend.busy_changed.connect(self._busy_changed)
@@ -712,9 +713,32 @@ class MainWindow(QMainWindow):
             self.app_install_button,
         ):
             button.setEnabled(maintenance_ready)
+        self._apply_setup_controls()
+
+    def _apply_setup_controls(self) -> None:
+        ready = not self.operation_is_busy
+        maintenance_ready = self.running_mode == "thawed" and ready
+        self.setup_preflight_button.setEnabled(ready)
+        self.setup_start_button.setEnabled(
+            ready and self.setup_preflight_ok and not self.setup_installed
+        )
+        self.setup_user_button.setEnabled(maintenance_ready and self.setup_installed)
+        grub_ready = maintenance_ready and self.setup_installed and not self.setup_grub_protected
+        self.setup_grub_password.setEnabled(grub_ready)
+        self.setup_grub_confirm.setEnabled(grub_ready)
+        self.setup_grub_button.setEnabled(grub_ready)
+        self.setup_finish_button.setEnabled(
+            maintenance_ready and self.setup_installed and self.setup_grub_protected
+        )
 
     def _status_changed(self, status: dict[str, Any]) -> None:
         mode = str(status.get("running_mode", "unknown"))
+        if mode == "unknown":
+            current_subvolume = str(status.get("current_subvolume", ""))
+            if current_subvolume == "@":
+                mode = "thawed"
+            elif current_subvolume == "@active":
+                mode = "frozen"
         self.running_mode = mode
         mode_labels = {
             "frozen": ("FROZEN", "#5865f2"),
@@ -851,7 +875,7 @@ class MainWindow(QMainWindow):
                 "Administrator" if user.get("administrator") else "Standard",
                 ", ".join(str(group) for group in user.get("groups", [])),
                 "Locked" if user.get("locked") else "Unlocked",
-                "Enabled" if user.get("autologin") else "Disabled",
+                "Selected" if user.get("login_default") else "—",
                 str(user.get("home", "")),
             )
             for column, value in enumerate(values):
@@ -965,10 +989,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "Protected administrator",
-                "Automatic login cannot be enabled for an administrator.",
+                "The default login selection cannot be set to an administrator.",
             )
             return
-        if user.get("autologin"):
+        if user.get("login_default"):
             self.backend.run("user-autologin")
         else:
             self.backend.run("user-autologin", str(user["username"]))
@@ -1168,7 +1192,7 @@ class MainWindow(QMainWindow):
         self.setup_output.clear()
         self.backend.run("setup-install")
 
-    def _confirm_setup_user(self) -> None:
+    def _start_setup_user(self) -> None:
         if not self.setup_installed:
             QMessageBox.warning(
                 self,
@@ -1176,16 +1200,14 @@ class MainWindow(QMainWindow):
                 "Complete step 2 before creating a user.",
             )
             return
-        if (
-            QMessageBox.question(
+        if self.running_mode != "thawed":
+            QMessageBox.warning(
                 self,
-                "Create a user now?",
-                "CachyFreeze will check what is needed and then ask for the new user's details. "
-                "Your boot mode will not change. Continue?",
+                "THAWED mode required",
+                "User preparation is available only in THAWED maintenance mode.",
             )
-            == QMessageBox.StandardButton.Yes
-        ):
-            self._create_user()
+            return
+        self._create_user()
 
     def _save_setup_grub_password(self) -> None:
         if not self.setup_installed:
@@ -1229,7 +1251,9 @@ class MainWindow(QMainWindow):
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        self.backend.run("setup-freeze")
+        self.pending_setup_finish_check = True
+        if not self.backend.run("health"):
+            self.pending_setup_finish_check = False
 
     def _operation_output(self, action: str, output: str) -> None:
         if action.startswith("setup-") and output.rstrip():
@@ -1309,8 +1333,9 @@ class MainWindow(QMainWindow):
                 "Finalize, log out and freeze",
                 "Save your work and close applications first. CachyFreeze will request "
                 "a normal logout, wait until every managed session and process has "
-                "stopped, then publish Golden and schedule FROZEN. If logout does not "
-                "finish safely, nothing will be frozen.",
+                "stopped, then publish Golden, schedule FROZEN and restart automatically. "
+                "If logout or finalization does not finish safely, nothing will be frozen "
+                "and the computer will not restart.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
@@ -1350,6 +1375,8 @@ class MainWindow(QMainWindow):
             self.pending_autologin_user = None
         if action == "user-autologin" and not success:
             self.pending_autologin_user = None
+        if action == "health" and not success:
+            self.pending_setup_finish_check = False
         cancelled = any(
             marker in message.lower() for marker in ("iptal edildi", "cancelled", "canceled")
         )
@@ -1363,9 +1390,11 @@ class MainWindow(QMainWindow):
                 self,
                 "Safe finalization queued",
                 f"{message}\n\nCachyFreeze will now open the normal Plasma logout flow. "
-                "After the session closes, a system service will capture the clean home "
-                "template, publish Golden and schedule FROZEN. Reboot only after the "
-                "operation reports completion.",
+                "After the session closes, a system service will restore managed homes from "
+                "their clean templates, publish Golden and schedule FROZEN. The computer "
+                "will restart "
+                "automatically only after finalization succeeds; on failure it will remain "
+                "at the login screen.",
             )
             self._start_safe_logout()
         elif success and action in {
@@ -1384,6 +1413,7 @@ class MainWindow(QMainWindow):
                 self.backend.run("reboot")
         if success and action == "setup-install":
             self.setup_installed = True
+            self._apply_setup_controls()
             QMessageBox.information(
                 self,
                 "Installation complete",
@@ -1393,6 +1423,7 @@ class MainWindow(QMainWindow):
             self.backend.run("setup-status")
         if success and action == "setup-grub-password":
             self.setup_grub_protected = True
+            self._apply_setup_controls()
             QMessageBox.information(
                 self,
                 "GRUB password saved",
@@ -1425,6 +1456,7 @@ class MainWindow(QMainWindow):
             return
         if action == "setup-preflight":
             self.setup_preflight_ok = True
+            self._apply_setup_controls()
             self.setup_state_label.setText(
                 "Preflight passed: the UEFI + Btrfs + GRUB layout is supported."
             )
@@ -1438,6 +1470,7 @@ class MainWindow(QMainWindow):
         elif action == "setup-status":
             self.setup_installed = bool(result.get("manager_installed"))
             self.setup_grub_protected = bool(result.get("grub_protected"))
+            self._apply_setup_controls()
             phase = str(result.get("phase", "unknown"))
             labels = {
                 "ready": "Ready to install. Run preflight, then install CachyFreeze.",
@@ -1483,17 +1516,35 @@ class MainWindow(QMainWindow):
             )
         elif action == "health":
             healthy = bool(result.get("healthy"))
+            freeze_ready = bool(result.get("freeze_ready", healthy))
             self.health_card.value.setText("Ready" if healthy else "Error")
             self.health_card.detail.setText(
                 "Btrfs, snapshots, and RTC power policy verified."
                 if healthy
                 else "A snapshot, Btrfs, or RTC power-policy error was found."
             )
-            QMessageBox.information(
-                self,
-                "System health scan",
-                "Healthy" if healthy else f"Attention required:\n{result}",
-            )
+            if self.pending_setup_finish_check:
+                self.pending_setup_finish_check = False
+                if freeze_ready:
+                    QMessageBox.information(
+                        self,
+                        "Final check passed",
+                        "Btrfs and snapshot checks passed. CachyFreeze will now request "
+                        "a safe logout and publish the final Golden baseline.",
+                    )
+                    self.backend.run("setup-freeze")
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "Final check failed",
+                        "FROZEN was not enabled because a Btrfs or snapshot check failed.",
+                    )
+            else:
+                QMessageBox.information(
+                    self,
+                    "System health scan",
+                    "Healthy" if healthy else f"Attention required:\n{result}",
+                )
         elif action == "diagnostics":
             QMessageBox.information(
                 self,

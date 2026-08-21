@@ -72,6 +72,9 @@ readonly -a managed_paths=(
   /etc/cachy-frozen-admin.conf
   /etc/plasmalogin.conf.d/90-cachy-freeze-autologin.conf
   /etc/sddm.conf.d/cachy-autologin.conf
+  /var/lib/plasmalogin/.local/state/plasma-login-greeterstaterc
+  /var/lib/sddm/state.conf
+  /var/lib/cachy-freeze/login-selection.json
   /var/lib/cachy-freeze/schema-version.json
 )
 
@@ -105,6 +108,9 @@ rollback_app_update() {
         /etc/cachy-frozen-admin.conf | \
         /etc/plasmalogin.conf.d/90-cachy-freeze-autologin.conf | \
         /etc/sddm.conf.d/cachy-autologin.conf | \
+        /var/lib/plasmalogin/.local/state/plasma-login-greeterstaterc | \
+        /var/lib/sddm/state.conf | \
+        /var/lib/cachy-freeze/login-selection.json | \
         /var/lib/cachy-freeze/schema-version.json) ;;
       *)
         printf 'ERROR: Refusing unsafe rollback target: %s\n' "$target" >&2

@@ -19,6 +19,30 @@ class RecordingRunner:
 
 
 class BootHealthTests(unittest.TestCase):
+    def test_mode_falls_back_to_the_mounted_managed_subvolume(self) -> None:
+        engine = FreezeEngine(Config())
+        cases = (("@", "thawed"), ("@active", "frozen"))
+
+        for subvolume, expected in cases:
+            with (
+                self.subTest(subvolume=subvolume),
+                patch("cachy_freeze.engine.Path.read_text", return_value="quiet splash\n"),
+                patch.object(engine, "_root_subvolume", return_value=subvolume),
+            ):
+                self.assertEqual(engine._current_mode(), expected)
+
+    def test_kernel_mode_marker_takes_precedence_over_subvolume_fallback(self) -> None:
+        engine = FreezeEngine(Config())
+
+        with (
+            patch(
+                "cachy_freeze.engine.Path.read_text",
+                return_value="quiet cachy.freeze=1\n",
+            ),
+            patch.object(engine, "_root_subvolume", return_value="@"),
+        ):
+            self.assertEqual(engine._current_mode(), "frozen")
+
     def test_success_resets_attempts_and_consumes_recovery_event(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

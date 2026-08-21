@@ -25,10 +25,33 @@ class FakeRunner:
             return subprocess.CompletedProcess(command, 0, output.encode(), b"")
         if command[0] == "pgrep":
             return subprocess.CompletedProcess(command, 1, b"", b"")
+        if command[:2] == ["systemctl", "show"]:
+            return subprocess.CompletedProcess(command, 0, b"activating\n", b"")
         return subprocess.CompletedProcess(command, 0, b"", b"")
 
 
 class FinalizationTests(unittest.TestCase):
+    def test_service_reboots_only_after_successful_finalization(self) -> None:
+        unit = (
+            Path(__file__).parents[1] / "deepfreeze/systemd/cachy-freeze-finalize.service"
+        ).read_text(encoding="utf-8")
+        start = unit.index("ExecStart=/usr/local/sbin/cachy-freeze finalize run --timeout 180")
+        reboot = unit.index("ExecStartPost=/usr/local/sbin/cachy-freeze reboot")
+
+        self.assertLess(start, reboot)
+        self.assertNotIn("ExecStopPost=/usr/local/sbin/cachy-freeze reboot", unit)
+
+    def test_frozen_publication_restores_clean_homes_instead_of_capturing_session_data(
+        self,
+    ) -> None:
+        engine = (Path(__file__).parents[1] / "src/cachy_freeze/engine.py").read_text(
+            encoding="utf-8"
+        )
+        publish_and_freeze = engine.split("def publish_and_freeze", 1)[1].split(
+            "def request_finalization", 1
+        )[0]
+        self.assertIn("restore_managed_homes=True", publish_and_freeze)
+
     def _manager(
         self,
         root: Path,
@@ -70,6 +93,26 @@ class FinalizationTests(unittest.TestCase):
                 manager.request("person_01", 1001)
                 with self.assertRaises(CachyFreezeError):
                     manager.request("person_01", 1001)
+
+    def test_interrupted_request_can_be_retried_when_service_is_inactive(self) -> None:
+        class InactiveServiceRunner(FakeRunner):
+            def run(self, command: list[str], *, check: bool = True, **kwargs: object):
+                if command[:2] == ["systemctl", "show"]:
+                    self.commands.append(command)
+                    return subprocess.CompletedProcess(command, 0, b"inactive\n", b"")
+                return super().run(command, check=check, **kwargs)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runner = InactiveServiceRunner()
+            manager = self._manager(root, runner=runner)
+            account = SimpleNamespace(pw_uid=1001)
+            with patch("cachy_freeze.finalization.pwd.getpwnam", return_value=account):
+                first = manager.request("person_01", 1001)
+                second = manager.request("person_01", 1001)
+
+            self.assertNotEqual(first["request_id"], second["request_id"])
+            self.assertEqual(second["status"], "pending")
 
     def test_run_waits_for_logout_then_publishes_and_freezes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

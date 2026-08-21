@@ -231,6 +231,11 @@ class QMessageBox(_QMessageBox):
 
     @staticmethod
     def question(parent: QWidget | None, title: str, text: str, *arguments: Any):
+        if not arguments:
+            arguments = (
+                _QMessageBox.StandardButton.Yes | _QMessageBox.StandardButton.No,
+                _QMessageBox.StandardButton.No,
+            )
         return QMessageBox._show(_QMessageBox.Icon.Question, parent, title, text, *arguments)
 
 

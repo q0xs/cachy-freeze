@@ -47,13 +47,15 @@ The graphical Setup page is a vertical five-step workflow:
 4. Set a strong GRUB maintenance password. The fixed GRUB username is always `cachyadmin`;
    it is separate from Linux user accounts.
 5. Finish and enable FROZEN. CachyFreeze requests a safe logout, then publishes
-   Golden and schedules FROZEN.
+   Golden, schedules FROZEN, and automatically reboots only after finalization
+   completes successfully. A failed finalization remains fail-closed at the login
+   screen and does not reboot.
 
 User creation is never required for installation or FROZEN activation. Account
-creation can enable automatic sign-in, but it never publishes Golden, schedules
-FROZEN, or reboots.
-After an operation finishes, use the application's reboot confirmation. Never
-interrupt package, initramfs, GRUB, or Golden writes.
+creation can preselect the new user on the login screen, but a password is always
+required; it never publishes Golden, schedules FROZEN, or reboots.
+For other mode-changing operations, use the application's reboot confirmation.
+Never interrupt package, initramfs, GRUB, or Golden writes.
 
 ## Automatic idle power policy
 

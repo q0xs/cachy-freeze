@@ -58,7 +58,7 @@ class HelperContractTests(unittest.TestCase):
             with self.subTest(action=action):
                 self.assertIn(f'require_argument_count {count} "$@"', self._case(action))
 
-    def test_optional_autologin_username_allows_only_zero_or_one_value(self) -> None:
+    def test_optional_login_selection_username_allows_only_zero_or_one_value(self) -> None:
         self.assertIn("(( $# == 1 || $# == 2 ))", self._case("user-autologin"))
 
     def test_reboot_uses_the_json_backend_contract(self) -> None:
@@ -73,6 +73,7 @@ class HelperContractTests(unittest.TestCase):
         self.assertIn("configure-grub-password.sh", password)
         self.assertNotIn("finalize request", password)
         self.assertIn("/etc/cachy-freeze-grub-auth.conf", freeze)
+        self.assertIn('"$BACKEND" health', freeze)
         self.assertIn("finalize request", freeze)
         self.assertNotIn("read_grub_secret", freeze)
 
