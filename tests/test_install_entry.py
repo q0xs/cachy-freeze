@@ -12,6 +12,7 @@ class InstallEntryTests(unittest.TestCase):
         cls.setup = (root / "app/cachy-freeze-setup").read_text()
         cls.gui_main = (root / "app/cachy_freeze_gui/main.py").read_text()
         cls.installer = (root / "installer/install-cachyfreeze.sh").read_text()
+        cls.engine_installer = (root / "installer/install-freeze-engine.sh").read_text()
 
     def test_single_file_builder_embeds_the_required_payload(self) -> None:
         self.assertIn("CachyFreeze-Installer-$version.run", self.builder)
@@ -40,6 +41,19 @@ class InstallEntryTests(unittest.TestCase):
         self.assertIn("cachy-freeze freeze", self.installer)
         self.assertNotIn("systemctl reboot", self.installer)
         self.assertIn("will not reboot automatically", self.installer)
+
+    def test_managed_grub_entry_is_the_direct_hidden_default(self) -> None:
+        self.assertIn(
+            "set_grub_setting GRUB_DEFAULT cachyos-current", self.engine_installer
+        )
+        self.assertIn("set_grub_setting GRUB_SAVEDEFAULT false", self.engine_installer)
+        self.assertIn("set_grub_setting GRUB_TIMEOUT_STYLE hidden", self.engine_installer)
+        self.assertIn("set_grub_setting GRUB_TIMEOUT 1", self.engine_installer)
+        self.assertNotIn("GRUB_DEFAULT=saved", self.engine_installer)
+        self.assertIn(
+            "The managed CachyFreeze GRUB entry is not the direct default.",
+            self.engine_installer,
+        )
 
 
 if __name__ == "__main__":

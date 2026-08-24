@@ -74,6 +74,11 @@ After reboot, open **CachyFreeze** from the KDE Application Launcher. No Git
 checkout, terminal workflow, `pip install`, manual Btrfs setup, or manual GRUB
 configuration is required.
 
+The stable CachyFreeze entry is the direct GRUB default. The normal boot hides
+the preserved recovery and firmware entries; press Esc during the one-second
+boot window to display them. The same default entry is named FROZEN or THAWED
+according to the mode scheduled by the application.
+
 Build the single-file installer from an unprivileged checkout:
 
 ```bash

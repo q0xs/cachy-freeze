@@ -1,6 +1,6 @@
 [project]
 name = "cachyfreeze"
-version = "1.0.0rc4"
+version = "1.0.0rc5"
 description = "Minimal Btrfs-based FROZEN and THAWED utility for CachyOS"
 readme = "README.md"
 requires-python = ">=3.11"

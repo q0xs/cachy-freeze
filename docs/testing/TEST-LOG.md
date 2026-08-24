@@ -4,6 +4,30 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-24 — direct managed GRUB default — physical diagnosis and rc5 tests
+
+- DIAGNOSED — after the rc4 installer scheduled FROZEN, the physical machine
+  rebooted through the first stock CachyOS entry and remained on persistent
+  THAWED `@`. The durable GRUB environment still requested FROZEN, while the
+  running kernel had no CachyFreeze mode marker. The managed entry, Golden
+  kernel, microcode, initramfs, embedded reset service/configuration, and
+  read-only Golden state all passed privileged read-only inspection.
+- ROOT CAUSE — the installer used `GRUB_DEFAULT=saved` and depended indirectly
+  on `saved_entry=cachyos-current`; that saved selection was not applied by the
+  physical boot. rc5 sets the stable managed entry ID directly as GRUB's
+  default. Unrelated recovery and firmware entries remain generated but the
+  normal one-second menu is hidden; Esc exposes the preserved menu.
+- PASS — all 45 Python tests, repository static/Bash contracts, isolated GRUB
+  generation, Qt offscreen smoke, privileged disposable-loop engine and
+  recursive-reset integrations, and `git diff --check` passed. ShellCheck and
+  Ruff were unavailable locally and were not represented as executed.
+- PASS — two `SOURCE_DATE_EPOCH=0 bash packaging/build-installer.sh` builds
+  produced an identical `CachyFreeze-Installer-1.0.0rc5.run`; its SHA-256
+  sidecar verified successfully.
+- NOT RUN — deployment of rc5 to the physical boot stack and the subsequent
+  FROZEN reboot/reset proof. No physical GRUB/initramfs write, Golden
+  publication, or reboot was performed by this verification pass.
+
 ## 2026-08-24 — NOCOW baseline-copy regression — physical diagnosis and disposable tests
 
 - DIAGNOSED — the physical rc3 installation stopped during the `preparing`

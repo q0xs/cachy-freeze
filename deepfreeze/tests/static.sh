@@ -71,6 +71,13 @@ grep -q 'will not reboot automatically' "$PROJECT_ROOT/installer/install-cachyfr
 ! grep -q 'systemctl reboot' "$PROJECT_ROOT/installer/install-cachyfreeze.sh"
 grep -q 'Preserve every unrelated generator and boot entry' \
   "$PROJECT_ROOT/installer/install-freeze-engine.sh"
+grep -q 'set_grub_setting GRUB_DEFAULT cachyos-current' \
+  "$PROJECT_ROOT/installer/install-freeze-engine.sh"
+grep -q 'set_grub_setting GRUB_TIMEOUT_STYLE hidden' \
+  "$PROJECT_ROOT/installer/install-freeze-engine.sh"
+grep -q 'set_grub_setting GRUB_TIMEOUT 1' \
+  "$PROJECT_ROOT/installer/install-freeze-engine.sh"
+! grep -q 'GRUB_DEFAULT=saved' "$PROJECT_ROOT/installer/install-freeze-engine.sh"
 grep -q 'readonly AUTH_USER=cachyadmin' \
   "$PROJECT_ROOT/installer/configure-grub-password.sh"
 

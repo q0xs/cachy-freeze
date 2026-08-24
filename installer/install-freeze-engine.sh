@@ -296,12 +296,33 @@ fi
 grep -Eq '^HOOKS=.*\bsystemd\b.*\bcachy-freeze\b.*\bfilesystems\b' \
   /etc/mkinitcpio.conf || die "mkinitcpio HOOKS could not be updated safely."
 
-sed -i -E 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT=saved/' /etc/default/grub
-if grep -q '^GRUB_SAVEDEFAULT=' /etc/default/grub; then
-  sed -i -E 's/^GRUB_SAVEDEFAULT=.*/GRUB_SAVEDEFAULT=false/' /etc/default/grub
-else
-  printf '%s\n' 'GRUB_SAVEDEFAULT=false' >>/etc/default/grub
-fi
+set_grub_setting() {
+  local key=$1 value=$2 count
+  count=$(grep -c "^${key}=" /etc/default/grub || true)
+  if (( count > 1 )); then
+    printf 'ERROR: The GRUB setting %s is duplicated.\n' "$key" >&2
+    return 1
+  fi
+  if (( count == 1 )); then
+    sed -i -E "s|^${key}=.*|${key}=${value}|" /etc/default/grub
+  else
+    printf '%s=%s\n' "$key" "$value" >>/etc/default/grub
+  fi
+  if [[ $(grep -c "^${key}=" /etc/default/grub) -ne 1 ]]; then
+    printf 'ERROR: The GRUB setting %s could not be written exactly once.\n' "$key" >&2
+    return 1
+  fi
+}
+
+# The managed entry has a stable ID and selects FROZEN or THAWED from grubenv.
+# Make that ID the direct default: relying on the saved-entry setting allowed the
+# first stock CachyOS entry to boot on systems where saved_entry was ignored.
+# Keep unrelated recovery entries in grub.cfg but hide the menu during a normal
+# boot; Esc still exposes it during the one-second timeout.
+set_grub_setting GRUB_DEFAULT cachyos-current
+set_grub_setting GRUB_SAVEDEFAULT false
+set_grub_setting GRUB_TIMEOUT_STYLE hidden
+set_grub_setting GRUB_TIMEOUT 1
 
 # Preserve every unrelated generator and boot entry. Only install/update the
 # two CachyFreeze-owned generators.
@@ -311,6 +332,8 @@ printf '%s\n' "$boot_secret" |
 unset boot_secret
 [[ $(grep -c -- "--id 'cachyos-current'" /boot/grub/grub.cfg) -eq 1 ]] ||
   die "Exactly one managed CachyFreeze GRUB entry is required."
+grep -Fq 'set default="cachyos-current"' /boot/grub/grub.cfg ||
+  die "The managed CachyFreeze GRUB entry is not the direct default."
 grub-editenv /boot/grub/grubenv set cachy_mode=thawed saved_entry=cachyos-current
 grub-editenv /boot/grub/grubenv list | grep -qx 'cachy_mode=thawed' ||
   die "The safe initial THAWED boot mode could not be verified."

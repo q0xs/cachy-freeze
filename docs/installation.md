@@ -42,6 +42,13 @@ environment files, logs, source, or fixtures.
 The installer never reboots automatically. After reboot, open **CachyFreeze**
 from the KDE Application Launcher.
 
+The installer makes the stable CachyFreeze entry ID the direct GRUB default
+instead of relying on GRUB's saved-entry fallback. Other operating-system,
+recovery, and firmware entries remain in `grub.cfg`, but the normal one-second
+boot window is hidden. Press Esc during that window to display the preserved
+menu. The managed default itself is named FROZEN or THAWED according to the
+mode selected in CachyFreeze.
+
 ## Repeat installation and migration
 
 Run the installer only while actually booted from persistent THAWED `@`.
