@@ -119,26 +119,47 @@ spawn qemu-system-x86_64 \
   -drive if=pflash,format=raw,readonly=on,file=$env(VM_OVMF_CODE) \
   -drive if=pflash,format=raw,file=$env(VM_CASE_ROOT)/OVMF_VARS.fd \
   -drive format=raw,file=fat:rw:$env(VM_CASE_ROOT)/esp
-expect "CACHY_GRUB_READY"
 if {$env(VM_PASSWORD) ne ""} {
-  expect "Enter username:"
+  expect {
+    "Enter username:" {}
+    timeout { exit 42 }
+    eof { exit 43 }
+  }
   send -- "$env(VM_USER)\r"
-  expect "Enter password:"
+  expect {
+    "Enter password:" {}
+    timeout { exit 44 }
+    eof { exit 45 }
+  }
   send -- "$env(VM_PASSWORD)\r"
 }
 if {$env(VM_EXPECTED) eq "allowed"} {
-  expect "CACHY_PROTECTED_LOAD_REACHED"
-  expect "CACHY_ENTRY_RETURNED"
+  expect {
+    "CACHY_PROTECTED_LOAD_REACHED" {}
+    timeout { exit 46 }
+    eof { exit 47 }
+  }
+  expect {
+    "CACHY_ENTRY_RETURNED" {}
+    timeout { exit 48 }
+    eof { exit 49 }
+  }
 } else {
   expect {
     "CACHY_PROTECTED_LOAD_REACHED" { exit 41 }
     "CACHY_ENTRY_RETURNED" {}
+    timeout { exit 50 }
+    eof { exit 51 }
   }
 }
 send -- "\001x"
-expect eof
+expect {
+  eof {}
+  timeout { exit 52 }
+}
 EOF
 
+  grep -q 'CACHY_GRUB_READY' "$transcript" || fail "$name did not start GRUB."
   if [[ $expected == denied ]]; then
     ! grep -q 'CACHY_PROTECTED_LOAD_REACHED' "$transcript" ||
       fail "$name reached the protected load marker."
