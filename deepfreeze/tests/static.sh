@@ -14,7 +14,9 @@ done < <(
       -path "$PROJECT_ROOT/deepfreeze/initcpio/cachy-freeze-reset" -o \
       -path "$PROJECT_ROOT/deepfreeze/initcpio/install-hook" -o \
       -path "$PROJECT_ROOT/deepfreeze/grub/01_cachy_auth" -o \
-      -path "$PROJECT_ROOT/deepfreeze/grub/40_cachy_freeze" -o \
+      -path "$PROJECT_ROOT/deepfreeze/grub/09_cachy_recovery_begin" -o \
+      -path "$PROJECT_ROOT/deepfreeze/grub/98_cachy_recovery_end" -o \
+      -path "$PROJECT_ROOT/deepfreeze/grub/99_cachy_freeze" -o \
       -path "$PROJECT_ROOT/app/cachy-freeze-manager-helper" -o \
       -path "$PROJECT_ROOT/app/cachy-freeze-setup" \) -print0
 )
@@ -31,7 +33,9 @@ if command -v shellcheck >/dev/null; then
     "$ROOT/initcpio/cachy-freeze-reset" \
     "$ROOT/initcpio/install-hook" \
     "$ROOT/grub/01_cachy_auth" \
-    "$ROOT/grub/40_cachy_freeze" \
+    "$ROOT/grub/09_cachy_recovery_begin" \
+    "$ROOT/grub/98_cachy_recovery_end" \
+    "$ROOT/grub/99_cachy_freeze" \
     "$PROJECT_ROOT/app/cachy-freeze-manager-helper" \
     "$PROJECT_ROOT/app/cachy-freeze-setup"
 else
@@ -47,11 +51,17 @@ grep -qx 'STATE_SUBVOL=@cachy-state' "$ROOT/etc/cachy-freeze.conf"
 ! grep -q 'RETENTION_COUNT' "$ROOT/etc/cachy-freeze.conf"
 grep -q 'ConditionKernelCommandLine=cachy.freeze=1' \
   "$ROOT/initcpio/cachy-freeze-reset.service"
+grep -q 'RemainAfterExit=yes' "$ROOT/initcpio/cachy-freeze-reset.service"
 grep -q 'no prior runtime was retained' "$ROOT/initcpio/cachy-freeze-reset"
+grep -q 'already reset for this boot' "$ROOT/initcpio/cachy-freeze-reset"
+grep -q 'Refusing to delete mounted subvolume' "$ROOT/initcpio/cachy-freeze-reset"
+grep -q 'MAINTENANCE_SUBVOL=@' "$PROJECT_ROOT/installer/install-freeze-engine.sh"
 grep -q 'subvolume delete --recursive --commit-after' \
   "$ROOT/initcpio/cachy-freeze-reset"
 ! grep -q '@active.previous' "$ROOT/initcpio/cachy-freeze-reset"
-grep -q 'cachy.freeze=1 fstab=no' "$ROOT/grub/40_cachy_freeze"
+grep -q 'cachy.freeze=1 fstab=no' "$ROOT/grub/99_cachy_freeze"
+grep -q 'CACHYFREEZE_RECOVERY_MENU_BEGIN' "$ROOT/grub/09_cachy_recovery_begin"
+grep -q 'CACHYFREEZE_RECOVERY_MENU_END' "$ROOT/grub/98_cachy_recovery_end"
 grep -q 'class OperationJournal' "$PROJECT_ROOT/src/cachy_freeze/catalog.py"
 grep -q 'def freeze' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'def thaw' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
@@ -69,13 +79,13 @@ grep -q 'CachyFreeze-Installer-\$version.run' \
 grep -q 'SOURCE_DATE_EPOCH' "$PROJECT_ROOT/packaging/build-installer.sh"
 grep -q 'will not reboot automatically' "$PROJECT_ROOT/installer/install-cachyfreeze.sh"
 ! grep -q 'systemctl reboot' "$PROJECT_ROOT/installer/install-cachyfreeze.sh"
-grep -q 'Preserve every unrelated generator and boot entry' \
+grep -q 'Preserve every unrelated generator and boot entry under the recovery gate' \
   "$PROJECT_ROOT/installer/install-freeze-engine.sh"
 grep -q 'set_grub_setting GRUB_DEFAULT cachyos-current' \
   "$PROJECT_ROOT/installer/install-freeze-engine.sh"
-grep -q 'set_grub_setting GRUB_TIMEOUT_STYLE hidden' \
+grep -q 'set_grub_setting GRUB_TIMEOUT_STYLE menu' \
   "$PROJECT_ROOT/installer/install-freeze-engine.sh"
-grep -q 'set_grub_setting GRUB_TIMEOUT 1' \
+grep -q 'set_grub_setting GRUB_TIMEOUT 5' \
   "$PROJECT_ROOT/installer/install-freeze-engine.sh"
 ! grep -q 'GRUB_DEFAULT=saved' "$PROJECT_ROOT/installer/install-freeze-engine.sh"
 grep -q 'readonly AUTH_USER=cachyadmin' \

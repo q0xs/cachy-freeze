@@ -68,7 +68,7 @@ EOF
   PATH="$fake_bin:$PATH" \
     CACHY_FREEZE_CONFIG="$ROOT/etc/cachy-freeze.conf" \
     CACHY_FREEZE_BOOT_DIR="$boot_dir" \
-    "$ROOT/grub/40_cachy_freeze" >"$generated"
+    "$ROOT/grub/99_cachy_freeze" >"$generated"
 
   cat >"$config" <<EOF
 serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
@@ -80,7 +80,7 @@ set pager=0
 set superusers="$TEST_USER"
 password_pbkdf2 $TEST_USER $password_hash
 set cachy_mode="$mode"
-set cachy_once=""
+set cachy_recovery="0"
 echo CACHY_GRUB_READY
 EOF
   sed \

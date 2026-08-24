@@ -38,12 +38,19 @@ mkfs.btrfs -q -f "$LOOP_DEVICE"
 mkdir -p "$TOP" "$STATE"
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 btrfs subvolume create "$TOP/@" >/dev/null
-mkdir -p "$TOP/@/boot/grub"
+mkdir -p "$TOP/@/boot/grub" "$TOP/@/etc" "$TOP/@/sbin" "$TOP/@/usr/lib/systemd"
 touch "$TOP/@/boot/vmlinuz-linux-cachyos" "$TOP/@/boot/initramfs-linux-cachyos.img"
+printf '%s\n' 'ID=cachyos' >"$TOP/@/etc/os-release"
+printf '%s\n' '#!/bin/sh' >"$TOP/@/usr/lib/systemd/systemd"
+chmod 0755 "$TOP/@/usr/lib/systemd/systemd"
+ln -s ../usr/lib/systemd/systemd "$TOP/@/sbin/init"
 printf "%s\n" "menuentry test --id 'cachyos-current' {" "}" \
   >"$TOP/@/boot/grub/grub.cfg"
 grub-editenv "$TOP/@/boot/grub/grubenv" create
-grub-editenv "$TOP/@/boot/grub/grubenv" set cachy_mode=thawed saved_entry=cachyos-current
+grub-editenv "$TOP/@/boot/grub/grubenv" set \
+  cachy_mode=thawed \
+  saved_entry=cachyos-current \
+  cachy_recovery=0
 printf '%s\n' maintained-a >"$TOP/@/approved"
 mkdir -p "$TOP/@/var/lib"
 btrfs subvolume create "$TOP/@/.snapshots" >/dev/null

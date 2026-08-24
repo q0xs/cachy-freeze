@@ -2,6 +2,8 @@
 
 build() {
   add_binary /usr/bin/btrfs
+  add_binary /usr/bin/findmnt
+  add_binary /usr/bin/grub-editenv
   add_binary /usr/bin/mount
   add_binary /usr/bin/mountpoint
   add_binary /usr/bin/umount

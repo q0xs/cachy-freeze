@@ -31,7 +31,9 @@ Every FROZEN boot deletes the prior disposable runtime and creates a fresh
 `@active` from read-only `@golden`. CachyFreeze does not keep a snapshot history,
 rollback timeline, old runtime, or historical Golden archive. Transaction
 staging exists only while a replacement is in progress and is removed after
-success or reconciled after interruption.
+success or reconciled after interruption. The early-boot reset is idempotent for
+one kernel boot, refuses to delete a mounted runtime, and must leave a current
+boot-id proof before the graphical boot is accepted as healthy.
 
 Deleting a Btrfs subvolume is logical non-retention, not forensic media erasure.
 CachyFreeze does not claim to overwrite old CoW extents, SSD flash cells, or
@@ -74,10 +76,12 @@ After reboot, open **CachyFreeze** from the KDE Application Launcher. No Git
 checkout, terminal workflow, `pip install`, manual Btrfs setup, or manual GRUB
 configuration is required.
 
-The stable CachyFreeze entry is the direct GRUB default. The normal boot hides
-the preserved recovery and firmware entries; press Esc during the one-second
-boot window to display them. The same default entry is named FROZEN or THAWED
-according to the mode scheduled by the application.
+The stable CachyFreeze entry is the direct GRUB default. A visible five-second
+menu shows exactly one normal entry, named FROZEN or THAWED according to the mode
+scheduled by the application. FROZEN boots without a GRUB password; THAWED asks
+for the fixed `cachyadmin` boot-maintenance user and its password. Vendor,
+firmware, snapshot, and custom entries remain generated behind an explicit
+administrator recovery gate instead of appearing in the normal appliance menu.
 
 Build the single-file installer from an unprivileged checkout:
 

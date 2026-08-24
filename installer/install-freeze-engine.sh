@@ -10,7 +10,7 @@ readonly DF_ROOT=$PROJECT_ROOT/deepfreeze
 
 die() {
   printf 'ERROR: %s\n' "$*" >&2
-  exit 1
+  return 1
 }
 
 (( EUID == 0 )) || die "Administrator authorization is required."
@@ -90,7 +90,12 @@ fi
 install -d -m 0700 /var/backups/cachy-freeze
 backup_dir=$(mktemp -d /var/backups/cachy-freeze/install.XXXXXXXX)
 readonly backup_dir
-cp -a /etc/mkinitcpio.conf /etc/default/grub /boot/grub/grub.cfg "$backup_dir/"
+cp -a \
+  /etc/mkinitcpio.conf \
+  /etc/default/grub \
+  /boot/grub/grub.cfg \
+  /boot/grub/grubenv \
+  "$backup_dir/"
 state_mount=/var/lib/cachy-freeze
 state_unit=$(systemd-escape --path --suffix=mount "$state_mount")
 readonly state_unit
@@ -100,7 +105,10 @@ readonly -a owned_files=(
   /etc/cachy-freeze-grub-auth.conf
   /etc/initcpio/install/cachy-freeze
   /etc/grub.d/01_cachy_auth
+  /etc/grub.d/09_cachy_recovery_begin
   /etc/grub.d/40_cachy_freeze
+  /etc/grub.d/98_cachy_recovery_end
+  /etc/grub.d/99_cachy_freeze
   "/etc/systemd/system/$state_unit"
   /usr/lib/systemd/system/cachy-freeze-reset.service
   /usr/lib/systemd/system/cachy-freeze-boot-health.service
@@ -132,6 +140,7 @@ rollback_boot_configuration() {
   cp -a "$backup_dir/mkinitcpio.conf" /etc/mkinitcpio.conf
   cp -a "$backup_dir/grub" /etc/default/grub
   cp -a "$backup_dir/grub.cfg" /boot/grub/grub.cfg
+  cp -a "$backup_dir/grubenv" /boot/grub/grubenv
   for target in "${owned_files[@]}"; do
     rm -f -- "$target"
     if [[ -e $backup_dir/owned$target || -L $backup_dir/owned$target ]]; then
@@ -236,8 +245,18 @@ install -m 0644 \
   "$DF_ROOT/systemd/cachy-freeze-boot-health.service" \
   /usr/lib/systemd/system/cachy-freeze-boot-health.service
 install -m 0644 "$DF_ROOT/initcpio/install-hook" /etc/initcpio/install/cachy-freeze
-install -m 0755 "$DF_ROOT/grub/40_cachy_freeze" /etc/grub.d/40_cachy_freeze
 install -m 0755 "$DF_ROOT/grub/01_cachy_auth" /etc/grub.d/01_cachy_auth
+install -m 0755 \
+  "$DF_ROOT/grub/09_cachy_recovery_begin" \
+  /etc/grub.d/09_cachy_recovery_begin
+install -m 0755 \
+  "$DF_ROOT/grub/98_cachy_recovery_end" \
+  /etc/grub.d/98_cachy_recovery_end
+install -m 0755 "$DF_ROOT/grub/99_cachy_freeze" /etc/grub.d/99_cachy_freeze
+# 40_cachy_freeze was owned by CachyFreeze through rc5. The managed entry now
+# runs last so every preserved vendor/recovery entry can stay inside the
+# explicit recovery gate while the normal menu exposes exactly one mode.
+rm -f /etc/grub.d/40_cachy_freeze
 
 sed "s/^ROOT_UUID=.*/ROOT_UUID=$root_uuid/" \
   "$DF_ROOT/etc/cachy-freeze.conf" >/etc/cachy-freeze.conf
@@ -272,6 +291,7 @@ chmod 0644 "/etc/systemd/system/$state_unit"
 
 cat >/etc/cachy-freeze-initrd.conf <<EOF
 ROOT_UUID=$root_uuid
+MAINTENANCE_SUBVOL=@
 GOLDEN_SUBVOL=@golden
 GOLDEN_NEXT_SUBVOL=@golden.next
 GOLDEN_PENDING_SUBVOL=@golden.pending
@@ -317,15 +337,16 @@ set_grub_setting() {
 # The managed entry has a stable ID and selects FROZEN or THAWED from grubenv.
 # Make that ID the direct default: relying on the saved-entry setting allowed the
 # first stock CachyOS entry to boot on systems where saved_entry was ignored.
-# Keep unrelated recovery entries in grub.cfg but hide the menu during a normal
-# boot; Esc still exposes it during the one-second timeout.
+# Keep the mode menu visible long enough to identify FROZEN or THAWED. Unrelated
+# entries remain generated inside the explicit cachy_recovery gate and do not
+# appear in the normal appliance menu.
 set_grub_setting GRUB_DEFAULT cachyos-current
 set_grub_setting GRUB_SAVEDEFAULT false
-set_grub_setting GRUB_TIMEOUT_STYLE hidden
-set_grub_setting GRUB_TIMEOUT 1
+set_grub_setting GRUB_TIMEOUT_STYLE menu
+set_grub_setting GRUB_TIMEOUT 5
 
-# Preserve every unrelated generator and boot entry. Only install/update the
-# two CachyFreeze-owned generators.
+# Preserve every unrelated generator and boot entry under the recovery gate.
+# Only CachyFreeze-owned generators are installed, replaced, or removed.
 mkinitcpio -P
 printf '%s\n' "$boot_secret" |
   CACHY_SETUP_NONINTERACTIVE=1 bash "$PROJECT_ROOT/installer/configure-grub-password.sh"
@@ -334,13 +355,26 @@ unset boot_secret
   die "Exactly one managed CachyFreeze GRUB entry is required."
 grep -Fq 'set default="cachyos-current"' /boot/grub/grub.cfg ||
   die "The managed CachyFreeze GRUB entry is not the direct default."
-grub-editenv /boot/grub/grubenv set cachy_mode=thawed saved_entry=cachyos-current
+grub-editenv /boot/grub/grubenv set \
+  cachy_mode=thawed \
+  saved_entry=cachyos-current \
+  cachy_recovery=0
 grub-editenv /boot/grub/grubenv list | grep -qx 'cachy_mode=thawed' ||
   die "The safe initial THAWED boot mode could not be verified."
+grub-editenv /boot/grub/grubenv list | grep -qx 'cachy_recovery=0' ||
+  die "The normal single-entry GRUB menu could not be verified."
 for image in /boot/initramfs-linux-cachyos.img /boot/initramfs-linux-cachyos-lts.img; do
   [[ -r $image ]] || continue
-  lsinitcpio "$image" | grep -qx 'usr/lib/cachy-freeze/cachy-freeze-reset' ||
-    die "The reset program is missing from initramfs: $image"
+  image_listing=$(lsinitcpio "$image")
+  for required in \
+    usr/bin/findmnt \
+    usr/bin/grub-editenv \
+    usr/lib/cachy-freeze/cachy-freeze-reset \
+    usr/lib/systemd/system/cachy-freeze-reset.service \
+    usr/lib/systemd/system/initrd-root-fs.target.requires/cachy-freeze-reset.service; do
+    grep -qx "$required" <<<"$image_listing" ||
+      die "Required FROZEN reset payload is missing from $image: $required"
+  done
 done
 
 [[ -x /usr/bin/cachy-freeze-manager ]] || die "The desktop application was not installed."

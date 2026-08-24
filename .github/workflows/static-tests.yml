@@ -19,7 +19,7 @@ jobs:
       - name: ShellCheck kur
         run: |
           sudo apt-get update
-          sudo apt-get install --yes desktop-file-utils grub-common libegl1 shellcheck
+          sudo apt-get install --yes btrfs-progs desktop-file-utils grub-common libegl1 shellcheck
           python -m pip install --disable-pip-version-check ruff==0.12.4 PyQt6==6.9.1
 
       - name: Çekirdek hedeflerini test ortamına yerleştir
@@ -46,6 +46,11 @@ jobs:
 
       - name: İzole GRUB üretim testi
         run: bash ./deepfreeze/tests/grub-generation.sh
+
+      - name: Tek kullanımlık Btrfs yaşam döngüsü testleri
+        run: |
+          sudo bash ./deepfreeze/tests/integration-engine.sh
+          sudo bash ./deepfreeze/tests/integration-btrfs.sh
 
   grub-uefi-vm:
     runs-on: ubuntu-latest

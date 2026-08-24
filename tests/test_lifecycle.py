@@ -20,6 +20,7 @@ class FakeBtrfsRunner:
         self.top = top
         self.commands: list[list[str]] = []
         self.mode = "thawed"
+        self.recovery = "0"
         self.fail_snapshot_destination: str | None = None
         self.mounted_sources: dict[str, str] = {}
         self.nested_sources: list[str] = []
@@ -88,6 +89,8 @@ class FakeBtrfsRunner:
             for assignment in command[3:]:
                 if assignment.startswith("cachy_mode="):
                     self.mode = assignment.split("=", 1)[1]
+                if assignment.startswith("cachy_recovery="):
+                    self.recovery = assignment.split("=", 1)[1]
             return self._completed(command)
         if command == ["systemctl", "reboot", "--no-block"] or command == ["sync"]:
             return self._completed(command)
@@ -137,7 +140,11 @@ class FakeBtrfsRunner:
         if command[:4] == ["findmnt", "-n", "-o", "UUID"]:
             return "11111111-2222-3333-4444-555555555555"
         if command and command[0] == "grub-editenv":
-            return f"cachy_mode={self.mode}\nsaved_entry=cachyos-current"
+            return (
+                f"cachy_mode={self.mode}\n"
+                "saved_entry=cachyos-current\n"
+                f"cachy_recovery={self.recovery}"
+            )
         completed = self.run(command, check=check)
         return (completed.stdout or b"").decode().strip()
 
@@ -177,6 +184,14 @@ class LifecycleTests(unittest.TestCase):
         (root / "boot/grub").mkdir()
         (root / "boot/grub/grub.cfg").write_text("menuentry test --id 'cachyos-current' {}\n")
         (root / "boot/grub/grubenv").write_text("")
+        (root / "etc").mkdir()
+        (root / "etc/os-release").write_text("ID=cachyos\n")
+        (root / "sbin").mkdir()
+        (root / "usr/lib/systemd").mkdir(parents=True)
+        systemd = root / "usr/lib/systemd/systemd"
+        systemd.write_text("#!/bin/sh\n")
+        systemd.chmod(0o755)
+        (root / "sbin/init").symlink_to("../usr/lib/systemd/systemd")
         (root / marker).write_text(marker)
         if readonly:
             (root / ".fake-read-only").touch()
@@ -288,6 +303,50 @@ class LifecycleTests(unittest.TestCase):
         self.assertFalse((self.state / "transaction.json").exists())
         self.assertFalse((self.top / "@golden.next").exists())
 
+    def test_freeze_rejects_baseline_without_usable_init(self) -> None:
+        (self.top / "@/sbin/init").unlink()
+
+        with self.assertRaisesRegex(IntegrityError, "required root file"):
+            self.engine.freeze()
+
+        self.assertTrue((self.top / "@golden/old").exists())
+        self.assertTrue((self.top / "@active/runtime").exists())
+        self.assertTrue((self.state / "transaction.json").exists())
+
+    def test_frozen_boot_success_requires_current_reset_proof(self) -> None:
+        boot_id = "11111111-2222-3333-4444-555555555555"
+        (self.state / "active-reset-boot-id").write_text(f"{boot_id}\n")
+        os.environ["CACHY_FREEZE_ROOT_SUBVOLUME"] = "@active"
+        self.runner.mode = "frozen"
+
+        with patch.object(self.engine, "_current_boot_id", return_value=boot_id):
+            result = self.engine.mark_boot_successful()
+
+        self.assertEqual(result["mode"], "frozen")
+
+    def test_frozen_boot_success_rejects_stale_reset_proof(self) -> None:
+        (self.state / "active-reset-boot-id").write_text("11111111-2222-3333-4444-555555555555\n")
+        os.environ["CACHY_FREEZE_ROOT_SUBVOLUME"] = "@active"
+        self.runner.mode = "frozen"
+
+        with (
+            patch.object(
+                self.engine,
+                "_current_boot_id",
+                return_value="22222222-3333-4444-5555-666666666666",
+            ),
+            self.assertRaisesRegex(IntegrityError, "not reset during the current boot"),
+        ):
+            self.engine.mark_boot_successful()
+
+    def test_thawed_boot_removes_stale_reset_proof(self) -> None:
+        marker = self.state / "active-reset-boot-id"
+        marker.write_text("11111111-2222-3333-4444-555555555555\n")
+
+        self.engine.mark_boot_successful()
+
+        self.assertFalse(marker.exists())
+
     def test_interrupted_auxiliary_capture_is_removed_during_recovery(self) -> None:
         (self.top / "@/home").mkdir()
         (self.top / "@home").mkdir()
@@ -372,6 +431,11 @@ class LifecycleTests(unittest.TestCase):
     def test_status_rejects_invalid_scheduled_boot_state(self) -> None:
         self.runner.mode = "invalid"
         with self.assertRaisesRegex(IntegrityError, "scheduled GRUB mode"):
+            self.engine.status()
+
+    def test_status_rejects_exposed_recovery_menu(self) -> None:
+        self.runner.recovery = "1"
+        with self.assertRaisesRegex(IntegrityError, "single-entry GRUB menu"):
             self.engine.status()
 
 

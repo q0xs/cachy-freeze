@@ -13,6 +13,7 @@ class InstallEntryTests(unittest.TestCase):
         cls.gui_main = (root / "app/cachy_freeze_gui/main.py").read_text()
         cls.installer = (root / "installer/install-cachyfreeze.sh").read_text()
         cls.engine_installer = (root / "installer/install-freeze-engine.sh").read_text()
+        cls.grub_installer = (root / "installer/configure-grub-password.sh").read_text()
 
     def test_single_file_builder_embeds_the_required_payload(self) -> None:
         self.assertIn("CachyFreeze-Installer-$version.run", self.builder)
@@ -42,16 +43,26 @@ class InstallEntryTests(unittest.TestCase):
         self.assertNotIn("systemctl reboot", self.installer)
         self.assertIn("will not reboot automatically", self.installer)
 
-    def test_managed_grub_entry_is_the_direct_hidden_default(self) -> None:
+    def test_managed_grub_entry_is_the_direct_visible_single_mode_default(self) -> None:
         self.assertIn("set_grub_setting GRUB_DEFAULT cachyos-current", self.engine_installer)
         self.assertIn("set_grub_setting GRUB_SAVEDEFAULT false", self.engine_installer)
-        self.assertIn("set_grub_setting GRUB_TIMEOUT_STYLE hidden", self.engine_installer)
-        self.assertIn("set_grub_setting GRUB_TIMEOUT 1", self.engine_installer)
+        self.assertIn("set_grub_setting GRUB_TIMEOUT_STYLE menu", self.engine_installer)
+        self.assertIn("set_grub_setting GRUB_TIMEOUT 5", self.engine_installer)
+        self.assertIn("cachy_recovery=0", self.engine_installer)
+        self.assertIn("09_cachy_recovery_begin", self.engine_installer)
+        self.assertIn("98_cachy_recovery_end", self.engine_installer)
+        self.assertIn("99_cachy_freeze", self.engine_installer)
         self.assertNotIn("GRUB_DEFAULT=saved", self.engine_installer)
         self.assertIn(
             "The managed CachyFreeze GRUB entry is not the direct default.",
             self.engine_installer,
         )
+
+    def test_post_mutation_failures_reach_rollback_traps(self) -> None:
+        for script in (self.engine_installer, self.grub_installer):
+            die_body = script.split("die() {", 1)[1].split("}", 1)[0]
+            self.assertIn("return 1", die_body)
+            self.assertNotIn("exit 1", die_body)
 
 
 if __name__ == "__main__":

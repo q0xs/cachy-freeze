@@ -49,17 +49,37 @@ subvolumes are not mounted; their approved content already exists inside the
 flattened Golden/Active root. The initramfs hook then verifies the Btrfs device and
 Golden, rolls back an interrupted pre-boot transaction when pending names prove
 the old roots, recursively deletes all disposable runtime objects, creates a
-fresh writable runtime from Golden, validates it, and exposes it as `@active`.
+fresh writable runtime from Golden, validates its boot files and usable init,
+and exposes it as `@active`.
 
-No previous runtime is renamed into history. Failure enters initramfs emergency
-handling rather than booting an unverified root.
+The reset oneshot remains active for the rest of the initramfs transaction and
+also records the current boot ID. A duplicate start in the same boot is a
+verified no-op. A reset with a new boot ID refuses to delete `@active` while any
+mount references it. The next candidate is created, synced, and fully validated
+before the prior runtime is recursively deleted. No previous runtime is renamed
+into history.
+
+A failed reset schedules the next boot as password-protected THAWED when the
+canonical GRUB environment is still writable; it never continues into an
+unverified FROZEN root. The real-root boot-health check accepts FROZEN only when
+the reset proof matches that same kernel boot.
 
 ### THAW
 
 While verified FROZEN, the engine verifies persistent `@`, writes and verifies
 the managed GRUB environment, and schedules THAWED. It never snapshots or copies
 `@active`. Once a THAWED graphical boot is verified, the boot-verification
-service deletes stale CachyFreeze runtime objects.
+service recursively deletes stale CachyFreeze runtime objects and removes the
+old reset proof.
+
+## GRUB boundary
+
+The normal five-second GRUB menu contains one dynamic managed entry. Its title
+is FROZEN or THAWED, never both. FROZEN is unrestricted for passwordless boot;
+THAWED gates every kernel and initramfs load behind successful `cachyadmin`
+authentication. Vendor, firmware, snapshot, and custom generators are preserved
+inside a `cachy_recovery=1` conditional and therefore remain absent from the
+normal menu.
 
 ## Existing installations
 
@@ -79,4 +99,6 @@ Btrfs submounts are rejected rather than silently left persistent.
 
 CachyFreeze keeps no logically accessible historical FROZEN runtime or Golden
 archive. This is not physical secure erase; Btrfs CoW, TRIM, SSD wear leveling,
-and storage-controller behavior remain outside this guarantee.
+and storage-controller behavior remain outside this guarantee. External drives,
+network storage, manually mounted filesystems, and unsupported layouts are also
+outside the reset boundary.

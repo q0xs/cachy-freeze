@@ -34,15 +34,39 @@ printf '%s\n' '11111111-2222-3333-4444-555555555555'
 EOF
 chmod 0755 "$FAKE_BIN/findmnt"
 
+"$ROOT/grub/09_cachy_recovery_begin" >"$OUTPUT"
+printf "%s\n" "menuentry 'VENDOR RECOVERY' { true }" >>"$OUTPUT"
+"$ROOT/grub/98_cachy_recovery_end" >>"$OUTPUT"
 PATH="$FAKE_BIN:$PATH" \
   CACHY_FREEZE_CONFIG="$ROOT/etc/cachy-freeze.conf" \
   CACHY_FREEZE_BOOT_DIR="$BOOT_DIR" \
-  "$ROOT/grub/40_cachy_freeze" >"$OUTPUT"
+  "$ROOT/grub/99_cachy_freeze" >>"$OUTPUT"
 
 grep -q -- "--id 'cachyos-current'" "$OUTPUT" ||
   fail "The managed GRUB entry is missing."
-[[ $(grep -c '^menuentry ' "$OUTPUT") -eq 1 ]] ||
+[[ $(grep -c -- "--id 'cachyos-current'" "$OUTPUT") -eq 1 ]] ||
   fail "Exactly one managed GRUB entry was not generated."
+grep -q '^# CACHYFREEZE_RECOVERY_MENU_BEGIN$' "$OUTPUT" ||
+  fail "The preserved recovery-menu gate does not begin."
+grep -q '^# CACHYFREEZE_RECOVERY_MENU_END$' "$OUTPUT" ||
+  fail "The preserved recovery-menu gate does not end."
+python - "$OUTPUT" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+configuration = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
+begin = configuration.index("# CACHYFREEZE_RECOVERY_MENU_BEGIN")
+end = configuration.index("# CACHYFREEZE_RECOVERY_MENU_END")
+managed = next(index for index, line in enumerate(configuration) if "--id 'cachyos-current'" in line)
+entries = [
+    index
+    for index, line in enumerate(configuration)
+    if re.match(r"^[ \t]*(?:menuentry|submenu)[ \t]", line)
+]
+assert begin < end < managed
+assert all(index == managed or begin < index < end for index in entries)
+PY
 grep -q 'set cachy_title="FROZEN"' "$OUTPUT" ||
   fail "The FROZEN title is missing."
 grep -q 'set cachy_title="THAWED"' "$OUTPUT" ||

@@ -12,7 +12,7 @@ readonly AUTH_USER=cachyadmin
 
 die() {
   printf 'ERROR: %s\n' "$*" >&2
-  exit 1
+  return 1
 }
 
 (( EUID == 0 )) || die "Run as root: sudo $0"
@@ -91,6 +91,36 @@ grep -q 'if \[ "\${cachy_boot_authorized}" = "true" \]; then' /boot/grub/grub.cf
   die "GRUB boot commands are not protected by the authorization result."
 [[ $(grep -c -- "--id 'cachyos-current'" /boot/grub/grub.cfg) -eq 1 ]] ||
   die "Exactly one managed CachyFreeze entry is required."
+python - /boot/grub/grub.cfg <<'PY'
+import re
+import sys
+from pathlib import Path
+
+configuration = Path(sys.argv[1]).read_text(encoding="utf-8", errors="strict").splitlines()
+begin = [
+    index
+    for index, line in enumerate(configuration)
+    if line == "# CACHYFREEZE_RECOVERY_MENU_BEGIN"
+]
+end = [
+    index
+    for index, line in enumerate(configuration)
+    if line == "# CACHYFREEZE_RECOVERY_MENU_END"
+]
+managed = [
+    index for index, line in enumerate(configuration) if "--id 'cachyos-current'" in line
+]
+if len(begin) != 1 or len(end) != 1 or len(managed) != 1 or not begin[0] < end[0] < managed[0]:
+    raise SystemExit("ERROR: The GRUB single-entry recovery boundary is malformed.")
+entries = [
+    index
+    for index, line in enumerate(configuration)
+    if re.match(r"^[ \t]*(?:menuentry|submenu)[ \t]", line)
+]
+outside = [index for index in entries if index != managed[0] and not begin[0] < index < end[0]]
+if outside:
+    raise SystemExit("ERROR: An unmanaged GRUB entry escaped the explicit recovery gate.")
+PY
 
 trap - ERR
 rm -rf --one-file-system "$backup_dir"

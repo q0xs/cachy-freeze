@@ -4,6 +4,56 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-24 — rc6 idempotent FROZEN reset and single-mode GRUB menu
+
+- DIAGNOSED — privileged read-only inspection after the rc5 FROZEN failure
+  found a valid read-only Golden with a usable init and matching installed and
+  embedded reset payloads. The failed boot had recorded a completed Active
+  reset, but `@active` was absent afterward. The reset oneshot was also observed
+  being requested twice during an ordinary THAWED initramfs sequence.
+- ROOT CAUSE — the reset service was `Type=oneshot` without
+  `RemainAfterExit=yes`. After its first successful run it returned to the dead
+  state and could be started again in the same initramfs boot. A repeated start
+  could recursively delete the already-mounted switch-root target, producing
+  `switch root target contains no usable init` even though Golden itself was
+  complete.
+- FIXED — rc6 keeps the successful oneshot active, makes the reset program
+  idempotent by kernel boot ID, rejects deletion of any mounted Active, stages
+  and validates the replacement before deleting the old runtime, validates a
+  usable init in Golden and Active, and requires matching reset proof during
+  real-root boot health. A failed reset schedules the next boot as protected
+  THAWED when the canonical GRUB environment remains writable.
+- CHANGED — the normal GRUB menu is visible for five seconds and contains only
+  the scheduled FROZEN or THAWED entry. FROZEN remains passwordless and THAWED
+  keeps the fail-closed `cachyadmin` authentication boundary. Unrelated vendor,
+  firmware, snapshot, and custom entries remain generated inside an explicit
+  administrator recovery gate.
+- PASS — all 51 Python tests, Ruff 0.12.4 check/format, ShellCheck 0.11.0
+  error-level validation, repository static/Bash contracts, Qt offscreen smoke,
+  and isolated GRUB generation passed.
+- PASS — privileged disposable-loop tests proved that a duplicate same-boot
+  reset is a no-op, a mounted Active is never deleted, a changed boot ID
+  recursively discards runtime data and nested subvolumes, failed reset selects
+  protected THAWED recovery, repeated lifecycle operations retain no Active or
+  Golden history, and NOCOW baseline content remains supported.
+- PASS — a temporary mount namespace generated and syntax-checked the complete
+  physical CachyOS GRUB configuration without installing it; every unrelated
+  entry remained inside the recovery gate and the managed entry was the only
+  normal entry. A separately generated temporary initramfs contained the rc6
+  reset program, single-run service, required tools, configuration, and target
+  dependency. Neither test wrote the physical boot configuration.
+- PASS — two `SOURCE_DATE_EPOCH=0 bash packaging/build-installer.sh` builds
+  produced an identical `CachyFreeze-Installer-1.0.0rc6.run`; its checksum,
+  embedded manifest, version, executable GRUB generators, and removal of the
+  obsolete rc5 generator path were verified.
+- NOT RUN locally — the disposable QEMU/OVMF authentication test because QEMU
+  and Expect are unavailable on this workstation. GitHub Actions verification
+  is pending the rc6 push.
+- NOT RUN — rc6 installation, GRUB/initramfs deployment, reboot, and complete
+  FROZEN/THAWED lifecycle on the physical machine. This pass changed no physical
+  subvolume or boot configuration; the user plans a clean-format acceptance
+  test with the released installer.
+
 ## 2026-08-24 — direct managed GRUB default — physical diagnosis and rc5 tests
 
 - DIAGNOSED — after the rc4 installer scheduled FROZEN, the physical machine

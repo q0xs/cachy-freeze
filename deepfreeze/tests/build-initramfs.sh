@@ -63,9 +63,13 @@ for kernel in /usr/lib/modules/*; do
   printf 'Testing kernel initramfs: %s\n' "$version"
   mkinitcpio -n -k "$version" -g "$image" -A cachy-freeze
 
-  listing="$TEST_DIR/initramfs-$version.list"
-  lsinitcpio "$image" >"$listing"
-  grep -qx 'usr/lib/cachy-freeze/cachy-freeze-reset' "$listing" ||
+    listing="$TEST_DIR/initramfs-$version.list"
+    lsinitcpio "$image" >"$listing"
+    grep -qx 'usr/bin/findmnt' "$listing" ||
+      fail "$version does not contain the mounted-subvolume guard."
+    grep -qx 'usr/bin/grub-editenv' "$listing" ||
+      fail "$version does not contain the protected THAWED fallback tool."
+    grep -qx 'usr/lib/cachy-freeze/cachy-freeze-reset' "$listing" ||
     fail "$version does not contain the reset program."
   grep -qx 'etc/cachy-freeze-initrd.conf' "$listing" ||
     fail "$version does not contain the configuration."

@@ -3,6 +3,7 @@ set -eu
 
 CONFIG=${CACHY_FREEZE_INITRD_CONFIG:-/etc/cachy-freeze-initrd.conf}
 TOP=${CACHY_FREEZE_TOP:-/run/cachy-freeze/btrfs}
+BOOT_ID_FILE=${CACHY_FREEZE_BOOT_ID_FILE:-/proc/sys/kernel/random/boot_id}
 
 log() {
   printf 'cachy-freeze: %s\n' "$*" >/dev/kmsg
@@ -10,7 +11,23 @@ log() {
 
 fail() {
   log "ERROR: $*"
+  schedule_protected_thawed ||
+    log "WARNING: The protected THAWED recovery boot could not be scheduled"
   exit 1
+}
+
+schedule_protected_thawed() {
+  [ "${MAINTENANCE_SUBVOL:-}" = "@" ] || return 1
+  mountpoint -q "$TOP" || return 1
+  grub_environment="$TOP/$MAINTENANCE_SUBVOL/boot/grub/grubenv"
+  [ -f "$grub_environment" ] || return 1
+  command -v grub-editenv >/dev/null 2>&1 || return 1
+  grub-editenv "$grub_environment" set \
+    cachy_mode=thawed \
+    saved_entry=cachyos-current \
+    cachy_recovery=0 || return 1
+  sync
+  log "FROZEN reset failed; the next boot is protected THAWED"
 }
 
 cleanup() {
@@ -23,14 +40,51 @@ subvol_exists() {
   btrfs subvolume show "$TOP/$1" >/dev/null 2>&1
 }
 
+subvol_is_mounted() {
+  target="/$1"
+  mounted_roots=$(findmnt -rn -S "$device" -o FSROOT 2>/dev/null || true)
+  for mounted_root in $mounted_roots; do
+    [ "$mounted_root" = "$target" ] && return 0
+  done
+  return 1
+}
+
 delete_subvol() {
   subvol_exists "$1" || return 0
+  ! subvol_is_mounted "$1" || fail "Refusing to delete mounted subvolume $1"
   btrfs subvolume delete --commit-after "$TOP/$1"
 }
 
 delete_disposable_subvol() {
   subvol_exists "$1" || return 0
+  ! subvol_is_mounted "$1" || fail "Refusing to delete mounted subvolume $1"
   btrfs subvolume delete --recursive --commit-after "$TOP/$1"
+}
+
+bootable_root() {
+  root=$TOP/$1
+  [ -x "$root/sbin/init" ] &&
+    [ -x "$root/usr/lib/systemd/systemd" ] &&
+    [ -r "$root/etc/os-release" ] &&
+    [ -f "$root/boot/vmlinuz-linux-cachyos" ] &&
+    [ -f "$root/boot/initramfs-linux-cachyos.img" ]
+}
+
+validate_golden() {
+  subvol_exists "$GOLDEN_SUBVOL" || fail "The Golden baseline is missing"
+  [ "$(btrfs property get -ts "$TOP/$GOLDEN_SUBVOL" ro)" = "ro=true" ] ||
+    fail "The Golden baseline is not read-only"
+  bootable_root "$GOLDEN_SUBVOL" ||
+    fail "The Golden baseline has no usable init or required boot files"
+}
+
+validate_active() {
+  name=$1
+  subvol_exists "$name" || fail "The disposable runtime is missing: $name"
+  [ "$(btrfs property get -ts "$TOP/$name" ro)" = "ro=false" ] ||
+    fail "The disposable runtime is read-only: $name"
+  bootable_root "$name" ||
+    fail "The disposable runtime has no usable init or required boot files: $name"
 }
 
 # A baseline transaction keeps only transaction-scoped pending objects. If a
@@ -62,6 +116,7 @@ main() {
   # shellcheck disable=SC1090
   . "$CONFIG"
 
+  [ "${MAINTENANCE_SUBVOL:-}" = "@" ] || fail "Invalid maintenance subvolume contract"
   [ "${GOLDEN_SUBVOL:-}" = "@golden" ] || fail "Invalid Golden subvolume contract"
   [ "${GOLDEN_NEXT_SUBVOL:-}" = "@golden.next" ] || fail "Invalid Golden candidate contract"
   [ "${GOLDEN_PENDING_SUBVOL:-}" = "@golden.pending" ] || fail "Invalid Golden pending contract"
@@ -103,35 +158,50 @@ main() {
   mount -t btrfs -o rw,subvolid=5 "$device" "$TOP"
   subvol_exists "$STATE_SUBVOL" || fail "The CachyFreeze state subvolume is missing"
 
-  recover_baseline_transaction
-  subvol_exists "$GOLDEN_SUBVOL" || fail "The Golden baseline is missing"
-  [ "$(btrfs property get -ts "$TOP/$GOLDEN_SUBVOL" ro)" = "ro=true" ] ||
-    fail "The Golden baseline is not read-only"
-  [ -f "$TOP/$GOLDEN_SUBVOL/boot/vmlinuz-linux-cachyos" ] ||
-    fail "The Golden baseline is missing its kernel"
-  [ -f "$TOP/$GOLDEN_SUBVOL/boot/initramfs-linux-cachyos.img" ] ||
-    fail "The Golden baseline is missing its initramfs"
-
-  # @active is disposable by contract. Delete every prior runtime and create
-  # exactly one fresh runtime from Golden; no previous runtime is retained.
-  delete_disposable_subvol "$CAPTURE_SUBVOL"
-  delete_disposable_subvol "$ACTIVE_NEXT_SUBVOL"
-  delete_disposable_subvol "$ACTIVE_PENDING_SUBVOL"
-  delete_disposable_subvol "$ACTIVE_SUBVOL"
-  log "Creating a fresh disposable runtime from $GOLDEN_SUBVOL"
-  btrfs subvolume snapshot "$TOP/$GOLDEN_SUBVOL" "$TOP/$ACTIVE_NEXT_SUBVOL"
-  subvol_exists "$ACTIVE_NEXT_SUBVOL" || fail "The new disposable runtime is invalid"
-  [ "$(btrfs property get -ts "$TOP/$ACTIVE_NEXT_SUBVOL" ro)" = "ro=false" ] ||
-    fail "The new disposable runtime is read-only"
-  mv "$TOP/$ACTIVE_NEXT_SUBVOL" "$TOP/$ACTIVE_SUBVOL"
-  sync
-
-  boot_id=$(cat /proc/sys/kernel/random/boot_id)
+  [ -r "$BOOT_ID_FILE" ] || fail "The current boot id is unavailable"
+  IFS= read -r boot_id <"$BOOT_ID_FILE" || fail "The current boot id could not be read"
   case $boot_id in
     ????????-????-????-????-????????????) ;;
     *) fail "The current boot id is invalid" ;;
   esac
   marker="$TOP/$STATE_SUBVOL/active-reset-boot-id"
+
+  # initrd-root-fs.target can be requested more than once. A successful reset
+  # is immutable for the rest of this boot: rerunning it after /sysroot has
+  # mounted @active would delete the live switch-root target.
+  if [ -r "$marker" ]; then
+    IFS= read -r completed_boot_id <"$marker" || completed_boot_id=
+    if [ "$completed_boot_id" = "$boot_id" ]; then
+      validate_golden
+      validate_active "$ACTIVE_SUBVOL"
+      log "$ACTIVE_SUBVOL was already reset for this boot; leaving it unchanged"
+      return 0
+    fi
+  fi
+  ! mountpoint -q /sysroot ||
+    fail "The switch-root target is already mounted; refusing a destructive reset"
+  ! subvol_is_mounted "$ACTIVE_SUBVOL" ||
+    fail "The disposable runtime is already mounted; refusing a destructive reset"
+
+  recover_baseline_transaction
+  validate_golden
+
+  # @active is disposable by contract. Delete every prior runtime and create
+  # exactly one fresh runtime from Golden; no previous runtime is retained.
+  # Prepare and validate the replacement before deleting the old runtime so a
+  # snapshot failure cannot strand the machine without a bootable @active.
+  delete_disposable_subvol "$CAPTURE_SUBVOL"
+  delete_disposable_subvol "$ACTIVE_NEXT_SUBVOL"
+  delete_disposable_subvol "$ACTIVE_PENDING_SUBVOL"
+  log "Creating a fresh disposable runtime from $GOLDEN_SUBVOL"
+  btrfs subvolume snapshot "$TOP/$GOLDEN_SUBVOL" "$TOP/$ACTIVE_NEXT_SUBVOL"
+  validate_active "$ACTIVE_NEXT_SUBVOL"
+  sync
+  delete_disposable_subvol "$ACTIVE_SUBVOL"
+  mv "$TOP/$ACTIVE_NEXT_SUBVOL" "$TOP/$ACTIVE_SUBVOL"
+  validate_active "$ACTIVE_SUBVOL"
+  sync
+
   temporary="$TOP/$STATE_SUBVOL/.active-reset-boot-id.$$"
   printf '%s\n' "$boot_id" >"$temporary"
   mv "$temporary" "$marker"

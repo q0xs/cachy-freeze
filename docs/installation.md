@@ -43,11 +43,19 @@ The installer never reboots automatically. After reboot, open **CachyFreeze**
 from the KDE Application Launcher.
 
 The installer makes the stable CachyFreeze entry ID the direct GRUB default
-instead of relying on GRUB's saved-entry fallback. Other operating-system,
-recovery, and firmware entries remain in `grub.cfg`, but the normal one-second
-boot window is hidden. Press Esc during that window to display the preserved
-menu. The managed default itself is named FROZEN or THAWED according to the
-mode selected in CachyFreeze.
+instead of relying on GRUB's saved-entry fallback. The normal five-second menu
+is visible and contains exactly one managed entry, named FROZEN or THAWED
+according to the mode selected in CachyFreeze. FROZEN is passwordless. THAWED
+requires the fixed `cachyadmin` boot-maintenance user and its password before
+any kernel or initramfs load. Other operating-system, recovery, firmware,
+snapshot, and custom entries remain generated in `grub.cfg` behind the explicit
+administrator recovery gate and do not appear in the normal menu.
+
+The initramfs prepares and validates a fresh Active before deleting the prior
+one, runs at most once per kernel boot, refuses to delete a mounted Active, and
+records a boot-specific reset proof. If FROZEN preparation fails after the
+canonical GRUB environment becomes available, the next boot is scheduled as
+password-protected THAWED rather than repeatedly selecting a broken FROZEN root.
 
 ## Repeat installation and migration
 

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# Keep vendor, firmware, snapshot, and custom entries in grub.cfg for explicit
+# recovery without exposing them in the normal two-mode appliance menu.
+cat <<'EOF'
+# CACHYFREEZE_RECOVERY_MENU_BEGIN
+if [ "${cachy_recovery}" = "1" ]; then
+EOF

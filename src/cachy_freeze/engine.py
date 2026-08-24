@@ -25,6 +25,10 @@ _FILESYSTEM_UUID = re.compile(
     r"^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
     r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
 )
+_BOOT_ID = re.compile(
+    r"^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
+    r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
+)
 _LEGACY_TRANSIENTS = (
     "@golden.previous",
     "@golden.previous.pending",
@@ -481,15 +485,54 @@ class FreezeEngine:
             raise IntegrityError(f"Golden candidate is not read-only: {name}")
         if self._nested_subvolume_listing(path):
             raise IntegrityError(f"Golden candidate contains nested subvolumes: {name}")
-        for relative in ("boot/vmlinuz-linux-cachyos", "boot/initramfs-linux-cachyos.img"):
+        for relative in (
+            "boot/vmlinuz-linux-cachyos",
+            "boot/initramfs-linux-cachyos.img",
+            "etc/os-release",
+            "sbin/init",
+            "usr/lib/systemd/systemd",
+        ):
             if not (path / relative).is_file():
-                raise IntegrityError(f"Golden candidate is missing required boot file: {relative}")
+                raise IntegrityError(f"Golden candidate is missing required root file: {relative}")
+        for relative in ("sbin/init", "usr/lib/systemd/systemd"):
+            if not os.access(path / relative, os.X_OK):
+                raise IntegrityError(f"Golden candidate has unusable init file: {relative}")
 
     def _validate_active(self, name: str) -> None:
+        path = self._managed_path(name)
         if not self._subvolume_exists(name):
             raise IntegrityError(f"Disposable runtime is missing: {name}")
         if self._is_read_only(name):
             raise IntegrityError(f"Disposable runtime is unexpectedly read-only: {name}")
+        for relative in ("etc/os-release", "sbin/init", "usr/lib/systemd/systemd"):
+            if not (path / relative).is_file():
+                raise IntegrityError(
+                    f"Disposable runtime is missing required root file: {relative}"
+                )
+        for relative in ("sbin/init", "usr/lib/systemd/systemd"):
+            if not os.access(path / relative, os.X_OK):
+                raise IntegrityError(f"Disposable runtime has unusable init file: {relative}")
+
+    @staticmethod
+    def _current_boot_id() -> str:
+        try:
+            boot_id = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="ascii").strip()
+        except OSError as error:
+            raise IntegrityError("The current boot id could not be read") from error
+        if not _BOOT_ID.fullmatch(boot_id):
+            raise IntegrityError("The current boot id is malformed")
+        return boot_id
+
+    def _verify_active_reset_for_current_boot(self) -> None:
+        marker = Path(self.config.STATE_DIR) / "active-reset-boot-id"
+        try:
+            completed_boot_id = marker.read_text(encoding="ascii").strip()
+        except OSError as error:
+            raise IntegrityError("The FROZEN runtime reset proof is missing") from error
+        if not _BOOT_ID.fullmatch(completed_boot_id):
+            raise IntegrityError("The FROZEN runtime reset proof is malformed")
+        if completed_boot_id != self._current_boot_id():
+            raise IntegrityError("The FROZEN runtime was not reset during the current boot")
 
     def _replace_with_candidate(self, current: str, candidate: str, pending: str) -> None:
         if not self._subvolume_exists(candidate):
@@ -589,11 +632,17 @@ class FreezeEngine:
         if "--id 'cachyos-current'" not in grub_cfg.read_text(encoding="utf-8", errors="replace"):
             raise IntegrityError("The managed CachyFreeze GRUB entry was not found")
         grub_env, _environment = self._grub_environment()
-        assignments = [f"cachy_mode={mode}", "saved_entry=cachyos-current"]
+        assignments = [
+            f"cachy_mode={mode}",
+            "saved_entry=cachyos-current",
+            "cachy_recovery=0",
+        ]
         self.runner.run(["grub-editenv", str(grub_env), "set", *assignments])
         _path, environment = self._grub_environment()
-        if environment.get("cachy_mode") != mode or environment.get("saved_entry") != (
-            "cachyos-current"
+        if (
+            environment.get("cachy_mode") != mode
+            or environment.get("saved_entry") != "cachyos-current"
+            or environment.get("cachy_recovery") != "0"
         ):
             raise IntegrityError("GRUB boot mode could not be verified after writing")
 
@@ -651,6 +700,8 @@ class FreezeEngine:
                 raise IntegrityError("The scheduled GRUB mode is missing or invalid")
             if environment.get("saved_entry") != "cachyos-current":
                 raise IntegrityError("The managed CachyFreeze GRUB entry is not scheduled")
+            if environment.get("cachy_recovery") != "0":
+                raise IntegrityError("The normal single-entry GRUB menu is not scheduled")
             running_mode = self._current_mode()
             if running_mode not in {"frozen", "thawed"}:
                 raise IntegrityError("The running boot mode cannot be verified")
@@ -762,10 +813,12 @@ class FreezeEngine:
             if mode == "frozen":
                 self._validate_golden(self.config.GOLDEN_SUBVOL)
                 self._validate_active(self.config.ACTIVE_SUBVOL)
+                self._verify_active_reset_for_current_boot()
             elif mode == "thawed":
                 self._delete_subvolume(self.config.ACTIVE_SUBVOL)
                 self._delete_subvolume(self.config.ACTIVE_NEXT_SUBVOL)
                 self._delete_subvolume(self.config.ACTIVE_PENDING_SUBVOL)
+                (Path(self.config.STATE_DIR) / "active-reset-boot-id").unlink(missing_ok=True)
             else:
                 raise IntegrityError("The running boot mode cannot be verified")
         result = {"mode": mode, "verified_at": datetime.now(UTC).isoformat()}
