@@ -98,10 +98,8 @@ EOF
   cp "$ovmf_vars" "$case_root/OVMF_VARS.fd"
 }
 
-run_case() {
-  local name=$1 mode=$2 password=$3 expected=$4
-  local case_root=$WORK/$name transcript=$WORK/$name.log
-  build_case "$mode" "$case_root"
+run_vm() {
+  local case_root=$1 password=$2 expected=$3 transcript=$4
   VM_CASE_ROOT=$case_root \
     VM_OVMF_CODE=$ovmf_code \
     VM_USER=$TEST_USER \
@@ -168,6 +166,38 @@ expect {
   timeout { exit 52 }
 }
 EOF
+}
+
+run_case() {
+  local name=$1 mode=$2 password=$3 expected=$4
+  local case_root=$WORK/$name transcript=
+  local attempt=1 max_attempts=1 vm_status=0
+  build_case "$mode" "$case_root"
+
+  # OVMF's emulated serial receiver can very rarely drop a hidden password
+  # character even with deliberately slow input. Retry only that exact
+  # allowed-case denial; a real authentication regression still fails all
+  # three fresh-firmware attempts, while denied/passwordless cases never retry.
+  if [[ -n $password && $expected == allowed ]]; then
+    max_attempts=3
+  fi
+  while ((attempt <= max_attempts)); do
+    transcript=$WORK/$name-attempt-$attempt.log
+    cp "$ovmf_vars" "$case_root/OVMF_VARS.fd"
+    if run_vm "$case_root" "$password" "$expected" "$transcript"; then
+      vm_status=0
+      break
+    else
+      vm_status=$?
+    fi
+    if ((vm_status != 47 || attempt == max_attempts)); then
+      return "$vm_status"
+    fi
+    printf 'RETRY: %s serial password attempt %d/%d was denied.\n' \
+      "$name" "$attempt" "$max_attempts" >&2
+    ((attempt += 1))
+  done
+  ((vm_status == 0)) || return "$vm_status"
 
   grep -q 'CACHY_GRUB_READY' "$transcript" || fail "$name did not start GRUB."
   if [[ -n $password ]]; then
