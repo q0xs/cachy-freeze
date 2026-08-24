@@ -59,6 +59,19 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
   ShellCheck, Ruff, all 53 Python/Qt/static checks, isolated GRUB generation,
   both privileged disposable Btrfs lifecycle tests on Ubuntu, and QEMU/OVMF
   authentication acceptance for passwordless FROZEN plus protected THAWED.
+- PARTIAL — the later documentation-only run `32738514227` again passed the
+  complete static/Btrfs job, but its otherwise identical QEMU job denied the
+  correct-password case after emulated serial input. Run `32738897079` again
+  passed static/Btrfs and made the transport fault visible by echoing the
+  truncated username `cachyadmi`; the harness correctly rejected that result.
+- FIXED/PASS — the QEMU harness now sends serial characters more slowly and
+  retries only an incompletely echoed username or an allowed-case denial, using
+  fresh OVMF variables each time. A real authentication failure must still fail
+  all three attempts, and the passwordless case never retries. GitHub Actions
+  run `32739279334` for commit `5cdceeb` passed both jobs. Its first wrong-
+  password attempt detected incomplete input; the clean retry supplied the full
+  username and was denied, while the correct password was accepted and FROZEN
+  remained passwordless.
 - NOT RUN locally — the disposable QEMU/OVMF authentication test because QEMU
   and Expect are unavailable on this workstation; the same repository test
   passed in GitHub Actions as recorded above.
