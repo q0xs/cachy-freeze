@@ -460,16 +460,52 @@ class FreezeEngine:
     def _delete_subvolume(self, name: str) -> None:
         path = self._managed_path(name)
         if self._subvolume_exists(name):
-            command = ["btrfs", "subvolume", "delete"]
             if name in {
                 self.config.ACTIVE_SUBVOL,
                 self.config.ACTIVE_NEXT_SUBVOL,
                 self.config.ACTIVE_PENDING_SUBVOL,
                 self.config.CAPTURE_SUBVOL,
             }:
-                command.append("--recursive")
-            command.extend(["--commit-after", str(path)])
-            self.runner.run(command)
+                root_id_text = self.runner.text(["btrfs", "inspect-internal", "rootid", str(path)])
+                if not root_id_text.isdecimal():
+                    raise IntegrityError("Btrfs returned an invalid disposable-subvolume id")
+                root_id = int(root_id_text)
+                records: dict[int, int] = {}
+                for line in self.runner.text(
+                    ["btrfs", "subvolume", "list", str(self.top)]
+                ).splitlines():
+                    match = re.match(
+                        r"^ID ([0-9]+) gen [0-9]+ top level ([0-9]+) path(?: .*)?$",
+                        line,
+                    )
+                    if match is None:
+                        raise IntegrityError("Btrfs returned a malformed nested-subvolume record")
+                    subvolume_id = int(match.group(1))
+                    if subvolume_id in records:
+                        raise IntegrityError("Btrfs returned a duplicate subvolume id")
+                    records[subvolume_id] = int(match.group(2))
+
+                known_ids = {root_id}
+                deletion_ids: list[int] = []
+                while descendants := [
+                    subvolume_id
+                    for subvolume_id, parent_id in records.items()
+                    if subvolume_id not in known_ids and parent_id in known_ids
+                ]:
+                    known_ids.update(descendants)
+                    deletion_ids.extend(descendants)
+                for subvolume_id in reversed(deletion_ids):
+                    self.runner.run(
+                        [
+                            "btrfs",
+                            "subvolume",
+                            "delete",
+                            "-i",
+                            str(subvolume_id),
+                            str(self.top),
+                        ]
+                    )
+            self.runner.run(["btrfs", "subvolume", "delete", "--commit-after", str(path)])
 
     def _is_read_only(self, name: str) -> bool:
         output = self.runner.text(

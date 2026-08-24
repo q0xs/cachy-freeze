@@ -77,8 +77,9 @@ run_reset
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 [[ -f $TOP/@active/approved ]] || fail "The first FROZEN runtime is incomplete."
 printf '%s\n' runtime-only >"$TOP/@active/unique-marker"
-btrfs subvolume create "$TOP/@active/runtime-nested" >/dev/null
-printf '%s\n' nested-runtime-only >"$TOP/@active/runtime-nested/unique-marker"
+btrfs subvolume create "$TOP/@active/runtime nested" >/dev/null
+btrfs subvolume create "$TOP/@active/runtime nested/child" >/dev/null
+printf '%s\n' nested-runtime-only >"$TOP/@active/runtime nested/child/unique-marker"
 umount "$TOP"
 
 # A duplicate service start in the same boot must be a no-op. This is the rc5
@@ -87,7 +88,7 @@ run_reset
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 [[ -f $TOP/@active/unique-marker ]] ||
   fail "A duplicate reset in the same boot replaced the live runtime."
-[[ -d $TOP/@active/runtime-nested ]] ||
+[[ -d "$TOP/@active/runtime nested/child" ]] ||
   fail "A duplicate reset in the same boot deleted nested runtime state."
 umount "$TOP"
 
@@ -109,7 +110,7 @@ umount "$TOP"
 run_reset
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 [[ ! -e $TOP/@active/unique-marker ]] || fail "FROZEN runtime data survived reset."
-[[ ! -e $TOP/@active/runtime-nested ]] || fail "Nested FROZEN runtime data survived reset."
+[[ ! -e "$TOP/@active/runtime nested" ]] || fail "Nested FROZEN runtime data survived reset."
 [[ -f $TOP/@active/approved ]] || fail "Golden content was not restored."
 for forbidden in \
   @active.next @active.pending @golden.next @golden.pending @cachy-capture; do

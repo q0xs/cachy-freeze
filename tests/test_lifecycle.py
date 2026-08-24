@@ -24,6 +24,8 @@ class FakeBtrfsRunner:
         self.fail_snapshot_destination: str | None = None
         self.mounted_sources: dict[str, str] = {}
         self.nested_sources: list[str] = []
+        self.disposable_root_id = 300
+        self.subvolume_records: list[str] = []
 
     @staticmethod
     def _completed(command: list[str], returncode: int = 0, output: str = ""):
@@ -69,6 +71,8 @@ class FakeBtrfsRunner:
                     nested_destination.mkdir(parents=True)
             return self._completed(command)
         if command[:3] == ["btrfs", "subvolume", "delete"]:
+            if "-i" in command:
+                return self._completed(command)
             shutil.rmtree(command[-1])
             return self._completed(command)
         if command and command[0] == "find":
@@ -98,6 +102,8 @@ class FakeBtrfsRunner:
 
     def text(self, command: list[str], *, check: bool = True) -> str:
         command = [str(part) for part in command]
+        if command[:3] == ["btrfs", "inspect-internal", "rootid"]:
+            return str(self.disposable_root_id)
         if command[:2] == ["findmnt", "--json"]:
             children = [
                 {
@@ -130,6 +136,8 @@ class FakeBtrfsRunner:
                     for index, path in enumerate(self.nested_sources)
                 )
             return ""
+        if command[:3] == ["btrfs", "subvolume", "list"]:
+            return "\n".join(self.subvolume_records)
         if command[:4] == ["findmnt", "-n", "-o", "FSTYPE"]:
             return "btrfs"
         if command[:4] == ["findmnt", "-n", "-o", "FSROOT"]:
@@ -278,6 +286,37 @@ class LifecycleTests(unittest.TestCase):
             sorted(path.name for path in self.top.iterdir()),
             ["@", "@active", "@golden"],
         )
+
+    def test_disposable_cleanup_deletes_nested_subvolumes_deepest_first(self) -> None:
+        self.runner.subvolume_records = [
+            "ID 302 gen 1 top level 301 path @active/runtime nested/child",
+            "ID 301 gen 1 top level 300 path @active/runtime nested",
+            "ID 400 gen 1 top level 5 path @unrelated",
+        ]
+
+        self.engine._delete_subvolume("@active")
+
+        id_deletions = [
+            command
+            for command in self.runner.commands
+            if command[:4] == ["btrfs", "subvolume", "delete", "-i"]
+        ]
+        self.assertEqual(
+            id_deletions,
+            [
+                ["btrfs", "subvolume", "delete", "-i", "302", str(self.top)],
+                ["btrfs", "subvolume", "delete", "-i", "301", str(self.top)],
+            ],
+        )
+        self.assertFalse((self.top / "@active").exists())
+
+    def test_disposable_cleanup_rejects_malformed_subvolume_records(self) -> None:
+        self.runner.subvolume_records = ["malformed"]
+
+        with self.assertRaisesRegex(IntegrityError, "malformed nested-subvolume record"):
+            self.engine._delete_subvolume("@active")
+
+        self.assertTrue((self.top / "@active").exists())
 
     def test_thaw_never_promotes_runtime_and_discards_it_after_boot(self) -> None:
         (self.top / "@active/unique-frozen-marker").write_text("secret")

@@ -108,6 +108,9 @@ for forbidden in \
 done
 
 printf '%s\n' runtime-only >"$TOP/@active/unique-marker"
+btrfs subvolume create "$TOP/@active/runtime nested" >/dev/null
+btrfs subvolume create "$TOP/@active/runtime nested/child" >/dev/null
+printf '%s\n' nested-runtime-only >"$TOP/@active/runtime nested/child/unique-marker"
 TEST_RUNNING_SUBVOL=@active run_backend thaw >"$TEST_ROOT/thaw.json"
 [[ ! -e $TOP/@/unique-marker && ! -e $TOP/@golden/unique-marker ]] ||
   fail "THAW promoted disposable runtime data."

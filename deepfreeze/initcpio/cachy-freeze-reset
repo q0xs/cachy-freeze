@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+set -f
 
 CONFIG=${CACHY_FREEZE_INITRD_CONFIG:-/etc/cachy-freeze-initrd.conf}
 TOP=${CACHY_FREEZE_TOP:-/run/cachy-freeze/btrfs}
@@ -56,9 +57,59 @@ delete_subvol() {
 }
 
 delete_disposable_subvol() {
-  subvol_exists "$1" || return 0
-  ! subvol_is_mounted "$1" || fail "Refusing to delete mounted subvolume $1"
-  btrfs subvolume delete --recursive --commit-after "$TOP/$1"
+  disposable=$1
+  subvol_exists "$disposable" || return 0
+  ! subvol_is_mounted "$disposable" ||
+    fail "Refusing to delete mounted subvolume $disposable"
+  disposable_id=$(btrfs inspect-internal rootid "$TOP/$disposable")
+  case $disposable_id in
+    '' | *[!0-9]*) fail "Btrfs returned an invalid disposable-subvolume id" ;;
+  esac
+
+  # `subvolume list -o` reports only direct children on some btrfs-progs
+  # releases. Build the complete descendant set from numeric top-level IDs so
+  # paths containing whitespace cannot affect either scope or deletion order.
+  subvolume_records=$(btrfs subvolume list "$TOP")
+  known_ids=" $disposable_id "
+  deletion_ids=
+  while :; do
+    found_descendant=0
+    while IFS= read -r record; do
+      [ -n "$record" ] || continue
+      # Globbing is disabled and only the fixed metadata prefix is consumed.
+      # shellcheck disable=SC2086
+      set -- $record
+      [ "${1:-}" = "ID" ] && [ "${3:-}" = "gen" ] &&
+        [ "${5:-}" = "top" ] && [ "${6:-}" = "level" ] ||
+        fail "Btrfs returned a malformed subvolume record"
+      nested_id=${2:-}
+      parent_id=${7:-}
+      case $nested_id in
+        '' | *[!0-9]*) fail "Btrfs returned an invalid nested-subvolume id" ;;
+      esac
+      case $parent_id in
+        '' | *[!0-9]*) fail "Btrfs returned an invalid parent-subvolume id" ;;
+      esac
+      case $known_ids in
+        *" $nested_id "*) continue ;;
+      esac
+      case $known_ids in
+        *" $parent_id "*)
+          known_ids="$known_ids$nested_id "
+          deletion_ids="$nested_id $deletion_ids"
+          found_descendant=1
+          ;;
+      esac
+    done <<EOF
+$subvolume_records
+EOF
+    [ "$found_descendant" -eq 1 ] || break
+  done
+
+  for nested_id in $deletion_ids; do
+    btrfs subvolume delete -i "$nested_id" "$TOP" >/dev/null
+  done
+  btrfs subvolume delete --commit-after "$TOP/$disposable"
 }
 
 bootable_root() {
