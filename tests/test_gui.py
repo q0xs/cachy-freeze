@@ -7,10 +7,9 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
-    from PyQt6.QtWidgets import QApplication, QMessageBox
-
     from cachy_freeze_gui.backend import BackendClient
     from cachy_freeze_gui.window import MainWindow
+    from PyQt6.QtWidgets import QApplication, QMessageBox
 
     HAS_QT = True
 except ModuleNotFoundError:

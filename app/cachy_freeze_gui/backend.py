@@ -110,9 +110,7 @@ class BackendClient(QObject):
         if len(self.stderr_buffer) > MAX_ERROR_OUTPUT_BYTES:
             del self.stderr_buffer[:-MAX_ERROR_OUTPUT_BYTES]
         if chunk:
-            self.operation_output.emit(
-                self.pending_action, chunk.decode("utf-8", errors="replace")
-            )
+            self.operation_output.emit(self.pending_action, chunk.decode("utf-8", errors="replace"))
 
     def _finished(self, exit_code: int, _status: QProcess.ExitStatus) -> None:
         if self.process is None:

@@ -20,7 +20,7 @@ class HelperContractTests(unittest.TestCase):
 
     def test_secret_uses_stdin_not_arguments_or_environment(self) -> None:
         self.assertIn("IFS= read -r BOOT_SECRET", self.source)
-        self.assertIn('printf \'%s\\n\' "$BOOT_SECRET" |', self.source)
+        self.assertIn("printf '%s\\n' \"$BOOT_SECRET\" |", self.source)
         self.assertNotIn("export BOOT_SECRET", self.source)
         self.assertIn("self.process.write", self.backend)
 

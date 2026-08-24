@@ -117,21 +117,13 @@ class FreezeEngine:
         if self.top.is_symlink():
             raise IntegrityError("The top-level Btrfs mount path must not be a symlink")
         self.top.mkdir(parents=True, exist_ok=True)
-        mounted = self.runner.run(
-            ["mountpoint", "-q", str(self.top)], check=False
-        ).returncode == 0
+        mounted = self.runner.run(["mountpoint", "-q", str(self.top)], check=False).returncode == 0
         mounted_here = False
         if mounted:
             filesystem = self.runner.text(["findmnt", "-n", "-o", "FSTYPE", str(self.top)])
             mounted_uuid = self.runner.text(["findmnt", "-n", "-o", "UUID", str(self.top)])
-            filesystem_root = self.runner.text(
-                ["findmnt", "-n", "-o", "FSROOT", str(self.top)]
-            )
-            if (
-                filesystem != "btrfs"
-                or mounted_uuid != self._root_uuid()
-                or filesystem_root != "/"
-            ):
+            filesystem_root = self.runner.text(["findmnt", "-n", "-o", "FSROOT", str(self.top)])
+            if filesystem != "btrfs" or mounted_uuid != self._root_uuid() or filesystem_root != "/":
                 raise CachyFreezeError(f"An unexpected filesystem is mounted at {self.top}.")
         else:
             self.runner.run(
@@ -149,14 +141,8 @@ class FreezeEngine:
         try:
             filesystem = self.runner.text(["findmnt", "-n", "-o", "FSTYPE", str(self.top)])
             mounted_uuid = self.runner.text(["findmnt", "-n", "-o", "UUID", str(self.top)])
-            filesystem_root = self.runner.text(
-                ["findmnt", "-n", "-o", "FSROOT", str(self.top)]
-            )
-            if (
-                filesystem != "btrfs"
-                or mounted_uuid != self._root_uuid()
-                or filesystem_root != "/"
-            ):
+            filesystem_root = self.runner.text(["findmnt", "-n", "-o", "FSROOT", str(self.top)])
+            if filesystem != "btrfs" or mounted_uuid != self._root_uuid() or filesystem_root != "/":
                 raise CachyFreezeError(f"An unexpected filesystem is mounted at {self.top}.")
             yield
         finally:
@@ -173,9 +159,9 @@ class FreezeEngine:
 
     def _subvolume_exists(self, name: str) -> bool:
         path = self._managed_path(name)
-        return self.runner.run(
-            ["btrfs", "subvolume", "show", str(path)], check=False
-        ).returncode == 0
+        return (
+            self.runner.run(["btrfs", "subvolume", "show", str(path)], check=False).returncode == 0
+        )
 
     def _delete_subvolume(self, name: str) -> None:
         path = self._managed_path(name)
@@ -244,8 +230,7 @@ class FreezeEngine:
             ]
             if unexpected:
                 raise IntegrityError(
-                    "Unowned transaction subvolumes require manual review: "
-                    + ", ".join(unexpected)
+                    "Unowned transaction subvolumes require manual review: " + ", ".join(unexpected)
                 )
             return
 
@@ -297,9 +282,7 @@ class FreezeEngine:
         grub_cfg = maintenance / "boot/grub/grub.cfg"
         if not grub_cfg.is_file():
             raise CachyFreezeError("Canonical maintenance GRUB configuration was not found.")
-        if "--id 'cachyos-current'" not in grub_cfg.read_text(
-            encoding="utf-8", errors="replace"
-        ):
+        if "--id 'cachyos-current'" not in grub_cfg.read_text(encoding="utf-8", errors="replace"):
             raise IntegrityError("The managed CachyFreeze GRUB entry was not found")
         grub_env, _environment = self._grub_environment()
         assignments = [f"cachy_mode={mode}", "saved_entry=cachyos-current"]
@@ -327,11 +310,12 @@ class FreezeEngine:
             raise CachyFreezeError("The supported GRUB and /boot/efi layout was not found.")
         if self.runner.text(["findmnt", "-n", "-o", "TARGET", "--target", "/boot"]) != "/":
             raise CachyFreezeError("A separate /boot filesystem is not supported.")
-        if self.runner.text(
-            ["findmnt", "-n", "-o", "TARGET", "--target", "/boot/efi"]
-        ) != "/boot/efi" or self.runner.text(
-            ["findmnt", "-n", "-o", "FSTYPE", "--target", "/boot/efi"]
-        ) != "vfat":
+        if (
+            self.runner.text(["findmnt", "-n", "-o", "TARGET", "--target", "/boot/efi"])
+            != "/boot/efi"
+            or self.runner.text(["findmnt", "-n", "-o", "FSTYPE", "--target", "/boot/efi"])
+            != "vfat"
+        ):
             raise CachyFreezeError("The EFI System Partition is not mounted as vfat at /boot/efi.")
         current = self._root_subvolume()
         if current not in {self.config.MAINTENANCE_SUBVOL, self.config.ACTIVE_SUBVOL}:
@@ -580,9 +564,10 @@ class FreezeEngine:
             child = parent / snapshot_id
             if child.parent != parent or child.is_symlink():
                 raise IntegrityError("Legacy snapshot path failed validation")
-            if self.runner.run(
-                ["btrfs", "subvolume", "show", str(child)], check=False
-            ).returncode != 0:
+            if (
+                self.runner.run(["btrfs", "subvolume", "show", str(child)], check=False).returncode
+                != 0
+            ):
                 raise IntegrityError("Legacy catalog entry is not a Btrfs subvolume")
             self.runner.run(["btrfs", "subvolume", "delete", "--commit-after", str(child)])
             remaining.remove(snapshot_id)
@@ -614,9 +599,12 @@ class FreezeEngine:
                     path = self.top / name
                     if path.parent != self.top or path.is_symlink():
                         raise IntegrityError("Legacy transaction target failed validation")
-                    if self.runner.run(
-                        ["btrfs", "subvolume", "show", str(path)], check=False
-                    ).returncode == 0:
+                    if (
+                        self.runner.run(
+                            ["btrfs", "subvolume", "show", str(path)], check=False
+                        ).returncode
+                        == 0
+                    ):
                         self.runner.run(
                             ["btrfs", "subvolume", "delete", "--commit-after", str(path)]
                         )

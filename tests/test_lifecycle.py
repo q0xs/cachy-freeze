@@ -110,9 +110,7 @@ class LifecycleTests(unittest.TestCase):
         (root / "boot/vmlinuz-linux-cachyos").write_text("kernel")
         (root / "boot/initramfs-linux-cachyos.img").write_text("initramfs")
         (root / "boot/grub").mkdir()
-        (root / "boot/grub/grub.cfg").write_text(
-            "menuentry test --id 'cachyos-current' {}\n"
-        )
+        (root / "boot/grub/grub.cfg").write_text("menuentry test --id 'cachyos-current' {}\n")
         (root / "boot/grub/grubenv").write_text("")
         (root / marker).write_text(marker)
         if readonly:
@@ -211,9 +209,7 @@ class LifecycleTests(unittest.TestCase):
             {"snapshot_id": item, "subvolume": f"@cachy-snapshots/{item}"}
             for item in (deleted, remaining)
         ]
-        (self.state / "snapshots.json").write_text(
-            json.dumps({"schema": 1, "snapshots": items})
-        )
+        (self.state / "snapshots.json").write_text(json.dumps({"schema": 1, "snapshots": items}))
         (self.state / "history-migration.json").write_text(
             json.dumps(
                 {
