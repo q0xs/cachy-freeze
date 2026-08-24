@@ -38,7 +38,8 @@ CachyFreeze does not claim to overwrite old CoW extents, SSD flash cells, or
 controller-managed storage.
 
 The standard CachyOS data subvolumes (`@home`, `@root`, `@srv`, `@cache`,
-`@tmp`, and `@log`) are captured into Golden with same-filesystem CoW clones.
+`@tmp`, and `@log`) are captured into Golden with same-filesystem CoW clones
+where supported and a normal copy for Btrfs NOCOW files such as system journals.
 FROZEN boots disable `/etc/fstab` mounts, so those persistent THAWED subvolumes
 are not modified by a FROZEN session. Existing third-party Snapper history is
 not copied into Golden and is never deleted by CachyFreeze.

@@ -26,7 +26,7 @@ verified running @ (THAWED)
 → lock and validate filesystem/boot state
 → discover and verify standard CachyOS data mounts and supported nested state
 → sync, snapshot @ to @golden.next, and capture auxiliary sources read-only
-→ reflink captured content into the candidate mountpoint directories
+→ reflink captured content where supported and copy NOCOW files normally
 → exclude third-party Snapper history and make the candidate read-only
 → validate candidate boot files and read-only state
 → create and validate @active.next

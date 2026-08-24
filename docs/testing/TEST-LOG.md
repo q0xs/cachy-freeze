@@ -4,6 +4,34 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-24 — NOCOW baseline-copy regression — physical diagnosis and disposable tests
+
+- DIAGNOSED — the physical rc3 installation stopped during the `preparing`
+  phase while copying the read-only `@log` capture. Standard data before that
+  point copied completely, but two systemd journal files were absent from the
+  candidate. The incomplete Golden was never activated, GRUB remained THAWED,
+  and the transaction metadata and staging subvolumes were retained for
+  controlled recovery.
+- ROOT CAUSE — systemd journal files carry the Btrfs NOCOW attribute. The rc3
+  engine forced `cp --reflink=always`, and Btrfs rejected a forced clone of
+  those files. An isolated disposable loopback reproduced the failure and
+  verified that a normal-copy fallback preserves the file contents.
+- FIXED — rc4 uses same-filesystem reflinks where supported and falls back to a
+  normal copy for NOCOW data. Candidate Btrfs stubs are replaced with a normal
+  directory before copying. The engine integration test now creates NOCOW data,
+  and the test invokes the checked-out source explicitly so a partial host
+  installation cannot substitute an older installed engine.
+- PASS — all 44 Python tests, Ruff check/format, repository static/Bash checks,
+  Qt offscreen smoke, isolated GRUB generation, the NOCOW engine loopback test,
+  and the recursive FROZEN-reset loopback test passed. ShellCheck remains
+  unavailable locally and was not represented as executed.
+- PASS — two `SOURCE_DATE_EPOCH=0 bash packaging/build-installer.sh` builds
+  produced an identical `CachyFreeze-Installer-1.0.0rc4.run`; its SHA-256
+  sidecar verified successfully.
+- NOT RUN — physical rc4 transaction recovery, baseline publication, reboot,
+  and FROZEN reset. The physical system remains THAWED pending the corrected
+  installer retry.
+
 ## 2026-08-24 — stock CachyOS Btrfs layout support — local rc3 working tree
 
 - PASS — `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:app python -m unittest

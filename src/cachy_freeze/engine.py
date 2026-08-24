@@ -361,14 +361,15 @@ class FreezeEngine:
                 capture_child = capture / baseline_source.key
                 destination = self._safe_candidate_directory(candidate, baseline_source.target)
                 self._remove_candidate_directory(destination)
+                destination.mkdir(mode=0o700)
                 self.runner.run(
                     [
                         "cp",
                         "-a",
                         "-x",
-                        "--reflink=always",
+                        "--reflink=auto",
                         "--",
-                        str(capture_child),
+                        f"{capture_child}/.",
                         str(destination),
                     ]
                 )

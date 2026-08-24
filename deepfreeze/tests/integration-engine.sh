@@ -9,7 +9,6 @@ readonly STATE=$TEST_ROOT/state
 readonly CONFIG=$TEST_ROOT/cachy-freeze.conf
 PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 readonly PROJECT_ROOT
-readonly BACKEND=$PROJECT_ROOT/deepfreeze/bin/cachy-freeze
 LOOP_DEVICE=
 
 cleanup() {
@@ -19,13 +18,16 @@ cleanup() {
 }
 fail() { printf 'TEST ERROR: %s\n' "$*" >&2; exit 1; }
 run_backend() {
+  PYTHONPATH=$PROJECT_ROOT/src \
+    PYTHONNOUSERSITE=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
   CACHY_FREEZE_CONFIG=$CONFIG \
     CACHY_FREEZE_ROOT_SUBVOLUME=${TEST_RUNNING_SUBVOL:-@} \
-    "$BACKEND" "$@"
+    /usr/bin/python -s -m cachy_freeze.cli "$@"
 }
 
 (( EUID == 0 )) || fail "The disposable loopback test requires root."
-for command in btrfs blkid grub-editenv losetup mkfs.btrfs python; do
+for command in btrfs blkid chattr grub-editenv losetup mkfs.btrfs python; do
   command -v "$command" >/dev/null || fail "Missing test command: $command"
 done
 trap cleanup EXIT
@@ -48,6 +50,8 @@ btrfs subvolume create "$TOP/@/.snapshots" >/dev/null
 btrfs subvolume create "$TOP/@/var/lib/machines" >/dev/null
 btrfs subvolume create "$TOP/@/var/lib/portables" >/dev/null
 printf '%s\n' historical-third-party-data >"$TOP/@/.snapshots/old-marker"
+touch "$TOP/@/var/lib/machines/approved-marker"
+chattr +C "$TOP/@/var/lib/machines/approved-marker"
 printf '%s\n' approved-machine-data >"$TOP/@/var/lib/machines/approved-marker"
 
 cat >"$CONFIG" <<EOF

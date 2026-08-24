@@ -15,10 +15,12 @@
 Compatibility checks run inside the graphical installer before CachyFreeze
 changes Btrfs or GRUB. A failed critical check stops installation.
 
-During FREEZE, mounted CachyOS data subvolumes are captured read-only and
-reflinked into the staged Golden root. FROZEN boots use `fstab=no`; persistent
-THAWED mounts such as `@home` remain unmounted and all session changes land in
-disposable `@active`. THAWED boots use the original `/etc/fstab` unchanged.
+During FREEZE, mounted CachyOS data subvolumes are captured read-only and copied
+into the staged Golden root. Same-filesystem reflinks are used where Btrfs
+supports them; NOCOW files use a normal byte copy. FROZEN boots use `fstab=no`;
+persistent THAWED mounts such as `@home` remain unmounted and all session
+changes land in disposable `@active`. THAWED boots use the original
+`/etc/fstab` unchanged.
 
 ## Graphical single-file install
 

@@ -212,6 +212,10 @@ class LifecycleTests(unittest.TestCase):
         self.assertTrue((self.top / "@golden/home/approved-home-marker").exists())
         self.assertTrue((self.top / "@active/home/approved-home-marker").exists())
         self.assertFalse((self.top / "@cachy-capture").exists())
+        copy_commands = [command for command in self.runner.commands if command[0] == "cp"]
+        self.assertTrue(copy_commands)
+        self.assertTrue(all("--reflink=auto" in command for command in copy_commands))
+        self.assertTrue(all("--reflink=always" not in command for command in copy_commands))
         (self.top / "@active/home/runtime-only-marker").write_text("discard")
         self.assertFalse((home / "runtime-only-marker").exists())
 
