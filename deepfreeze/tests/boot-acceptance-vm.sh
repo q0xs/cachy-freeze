@@ -110,6 +110,7 @@ run_case() {
     VM_TRANSCRIPT=$transcript \
     timeout 90 expect <<'EOF'
 set timeout 60
+set send_slow {1 0.03}
 log_file -noappend $env(VM_TRANSCRIPT)
 spawn qemu-system-x86_64 \
   -machine q35,accel=tcg \
@@ -125,13 +126,15 @@ if {$env(VM_PASSWORD) ne ""} {
     timeout { exit 42 }
     eof { exit 43 }
   }
-  send -- "$env(VM_USER)\r"
+  after 250
+  send -s -- "$env(VM_USER)\r"
   expect {
     "Enter password:" {}
     timeout { exit 44 }
     eof { exit 45 }
   }
-  send -- "$env(VM_PASSWORD)\r"
+  after 250
+  send -s -- "$env(VM_PASSWORD)\r"
 }
 if {$env(VM_EXPECTED) eq "allowed"} {
   expect {
