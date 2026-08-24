@@ -22,20 +22,24 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
   and validates the replacement before deleting the old runtime, validates a
   usable init in Golden and Active, and requires matching reset proof during
   real-root boot health. A failed reset schedules the next boot as protected
-  THAWED when the canonical GRUB environment remains writable.
+  THAWED when the canonical GRUB environment remains writable. Recursive
+  runtime cleanup uses portable nested subvolume-ID deletion rather than the
+  newer `btrfs subvolume delete --recursive` option.
 - CHANGED — the normal GRUB menu is visible for five seconds and contains only
   the scheduled FROZEN or THAWED entry. FROZEN remains passwordless and THAWED
   keeps the fail-closed `cachyadmin` authentication boundary. Unrelated vendor,
   firmware, snapshot, and custom entries remain generated inside an explicit
   administrator recovery gate.
-- PASS — all 51 Python tests, Ruff 0.12.4 check/format, ShellCheck 0.11.0
+- PASS — all 53 Python tests, Ruff 0.12.4 check/format, ShellCheck 0.11.0
   error-level validation, repository static/Bash contracts, Qt offscreen smoke,
   and isolated GRUB generation passed.
 - PASS — privileged disposable-loop tests proved that a duplicate same-boot
   reset is a no-op, a mounted Active is never deleted, a changed boot ID
-  recursively discards runtime data and nested subvolumes, failed reset selects
-  protected THAWED recovery, repeated lifecycle operations retain no Active or
-  Golden history, and NOCOW baseline content remains supported.
+  recursively discards runtime data and multi-level nested subvolumes (including
+  whitespace in their paths), THAWED cleanup removes the same nested layout,
+  failed reset selects protected THAWED recovery, repeated lifecycle operations
+  retain no Active or Golden history, and NOCOW baseline content remains
+  supported.
 - PASS — a temporary mount namespace generated and syntax-checked the complete
   physical CachyOS GRUB configuration without installing it; every unrelated
   entry remained inside the recovery gate and the managed entry was the only
@@ -46,9 +50,18 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
   produced an identical `CachyFreeze-Installer-1.0.0rc6.run`; its checksum,
   embedded manifest, version, executable GRUB generators, and removal of the
   obsolete rc5 generator path were verified.
+- PARTIAL — GitHub Actions run `32736656987` for commit `3f14f8f` passed the
+  complete QEMU/OVMF GRUB authentication job. Its static job reached the new
+  loopback test and failed because Ubuntu's btrfs-progs lacks the newer
+  `subvolume delete --recursive` option; no product test assertion failed before
+  that portability error.
+- PASS — GitHub Actions run `32738331172` for commit `a4c9fc9` passed both jobs:
+  ShellCheck, Ruff, all 53 Python/Qt/static checks, isolated GRUB generation,
+  both privileged disposable Btrfs lifecycle tests on Ubuntu, and QEMU/OVMF
+  authentication acceptance for passwordless FROZEN plus protected THAWED.
 - NOT RUN locally — the disposable QEMU/OVMF authentication test because QEMU
-  and Expect are unavailable on this workstation. GitHub Actions verification
-  is pending the rc6 push.
+  and Expect are unavailable on this workstation; the same repository test
+  passed in GitHub Actions as recorded above.
 - NOT RUN — rc6 installation, GRUB/initramfs deployment, reboot, and complete
   FROZEN/THAWED lifecycle on the physical machine. This pass changed no physical
   subvolume or boot configuration; the user plans a clean-format acceptance
