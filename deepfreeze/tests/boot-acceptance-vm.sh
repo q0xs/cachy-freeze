@@ -127,14 +127,18 @@ if {$env(VM_PASSWORD) ne ""} {
     eof { exit 43 }
   }
   after 250
-  send -s -- "$env(VM_USER)\r"
+  send -s -- "$env(VM_USER)"
+  after 250
+  send -- "\r"
   expect {
     "Enter password:" {}
     timeout { exit 44 }
     eof { exit 45 }
   }
   after 250
-  send -s -- "$env(VM_PASSWORD)\r"
+  send -s -- "$env(VM_PASSWORD)"
+  after 250
+  send -- "\r"
 }
 if {$env(VM_EXPECTED) eq "allowed"} {
   expect {
