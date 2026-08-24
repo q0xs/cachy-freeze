@@ -22,16 +22,12 @@ jobs:
           sudo apt-get install --yes desktop-file-utils grub-common libegl1 shellcheck
           python -m pip install --disable-pip-version-check ruff==0.12.4 PyQt6==6.9.1
 
-      - name: Servis hedeflerini test ortamına yerleştir
+      - name: Çekirdek hedeflerini test ortamına yerleştir
         run: |
           sudo install -Dm755 deepfreeze/initcpio/cachy-freeze-reset \
             /usr/lib/cachy-freeze/cachy-freeze-reset
           sudo install -Dm755 deepfreeze/bin/cachy-freeze \
             /usr/local/sbin/cachy-freeze
-          sudo install -Dm755 user/files/cachy-employee-reset \
-            /usr/local/sbin/cachy-employee-reset
-          sudo install -Dm755 user/files/cachy-frozen-admin-restrict \
-            /usr/local/sbin/cachy-frozen-admin-restrict
 
       - name: Statik testleri çalıştır
         env:
@@ -64,5 +60,5 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes expect grub-common grub-efi-amd64-bin ovmf qemu-system-x86
 
-      - name: Yanlış/doğru parola ve FROZEN kabul testi
+      - name: FROZEN ve korumalı THAWED UEFI kabul testi
         run: bash ./deepfreeze/tests/boot-acceptance-vm.sh
