@@ -53,8 +53,8 @@ grep -Eq '^(ID|ID_LIKE)=.*\b(arch|cachyos)\b' /etc/os-release || {
   show_error "CachyFreeze requires the persistent Btrfs @ root in THAWED mode."
   exit 1
 }
-[[ $(findmnt -n -o TARGET --target /boot) == / && -d /boot/grub && -d /boot/efi/EFI ]] || {
-  show_error "The supported GRUB, /boot, and /boot/efi layout was not found."
+[[ $(findmnt -n -o TARGET --target /boot) == / && -d /boot/grub ]] || {
+  show_error "The supported GRUB and /boot layout was not found."
   exit 1
 }
 [[ $(findmnt -n -o TARGET --target /boot/efi) == /boot/efi &&

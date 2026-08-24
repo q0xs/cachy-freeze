@@ -30,6 +30,12 @@ class InstallEntryTests(unittest.TestCase):
         self.assertIn(".cachyfreeze-root-staged", self.setup)
         self.assertIn("installer staging directory is not root-owned and verified", self.gui_main)
 
+    def test_unprivileged_bootstrap_does_not_traverse_root_only_esp(self) -> None:
+        self.assertNotIn("-d /boot/efi/EFI", self.setup)
+        self.assertIn("-d /boot/efi/EFI", self.installer)
+        self.assertIn("findmnt -n -o TARGET --target /boot/efi", self.setup)
+        self.assertIn("findmnt -n -o FSTYPE --target /boot/efi", self.setup)
+
     def test_installer_prepares_frozen_without_automatic_reboot(self) -> None:
         self.assertIn("cachy-freeze freeze", self.installer)
         self.assertNotIn("systemctl reboot", self.installer)
