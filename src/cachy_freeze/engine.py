@@ -9,8 +9,9 @@ import shutil
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .catalog import AuditLogger, OperationJournal, atomic_json_write
@@ -31,6 +32,33 @@ _LEGACY_TRANSIENTS = (
     "@active.previous",
     "@active.previous.pending",
 )
+
+_STANDARD_CACHYOS_MOUNTS = (
+    ("home", "/home", "@home"),
+    ("root", "/root", "@root"),
+    ("srv", "/srv", "@srv"),
+    ("cache", "/var/cache", "@cache"),
+    ("tmp", "/var/tmp", "@tmp"),
+    ("log", "/var/log", "@log"),
+)
+_STANDARD_CACHYOS_NESTED = (
+    ("machines", "var/lib/machines"),
+    ("portables", "var/lib/portables"),
+)
+_EXCLUDED_THIRD_PARTY_NESTED = frozenset({".snapshots"})
+
+
+@dataclass(frozen=True, slots=True)
+class _BaselineSource:
+    key: str
+    subvolume: str
+    target: PurePosixPath
+
+
+@dataclass(frozen=True, slots=True)
+class _BaselineLayout:
+    sources: tuple[_BaselineSource, ...]
+    excluded_nested: tuple[PurePosixPath, ...]
 
 
 class FreezeEngine:
@@ -92,6 +120,267 @@ class FreezeEngine:
         if "[" not in source or not source.endswith("]"):
             raise CachyFreezeError(f"Root Btrfs subvolume was not found: {source}")
         return source.rsplit("[", 1)[1][:-1].lstrip("/")
+
+    @staticmethod
+    def _findmnt_nodes(document: dict[str, Any]) -> Iterator[dict[str, Any]]:
+        pending = list(document.get("filesystems", []))
+        while pending:
+            node = pending.pop(0)
+            if not isinstance(node, dict):
+                raise IntegrityError("findmnt returned a malformed mount record")
+            yield node
+            children = node.get("children", [])
+            if children is None:
+                continue
+            if not isinstance(children, list):
+                raise IntegrityError("findmnt returned malformed child mounts")
+            pending[0:0] = children
+
+    def _mounted_baseline_sources(self) -> tuple[_BaselineSource, ...]:
+        if os.environ.get("CACHY_FREEZE_ROOT_SUBVOLUME") and self.config.ROOT_DEVICE:
+            return ()
+        try:
+            document = json.loads(
+                self.runner.text(
+                    [
+                        "findmnt",
+                        "--json",
+                        "--submounts",
+                        "/",
+                        "--output",
+                        "TARGET,SOURCE,FSTYPE,FSROOT,UUID",
+                    ]
+                )
+            )
+        except (TypeError, json.JSONDecodeError) as error:
+            raise IntegrityError(
+                f"The mounted filesystem layout cannot be parsed: {error}"
+            ) from error
+        if not isinstance(document, dict):
+            raise IntegrityError("findmnt returned an invalid filesystem layout")
+
+        root_uuid = self._root_uuid().lower()
+        standard = {target: (key, subvolume) for key, target, subvolume in _STANDARD_CACHYOS_MOUNTS}
+        sources: list[_BaselineSource] = []
+        seen_targets: set[str] = set()
+        for node in self._findmnt_nodes(document):
+            if node.get("fstype") != "btrfs":
+                continue
+            target = node.get("target")
+            filesystem_root = node.get("fsroot")
+            mounted_uuid = node.get("uuid")
+            if not isinstance(target, str) or target in seen_targets:
+                raise IntegrityError(
+                    "The Btrfs mount layout contains an invalid or duplicate target"
+                )
+            seen_targets.add(target)
+            if not isinstance(filesystem_root, str) or not isinstance(mounted_uuid, str):
+                raise IntegrityError(f"The Btrfs identity for {target} is incomplete")
+            if mounted_uuid.lower() != root_uuid:
+                raise IntegrityError(f"The Btrfs mount at {target} is not on the root filesystem")
+            if target == "/":
+                if filesystem_root != f"/{self.config.MAINTENANCE_SUBVOL}":
+                    raise IntegrityError("The THAWED root mount identity changed during validation")
+                continue
+            if target == str(self.top):
+                if filesystem_root != "/":
+                    raise IntegrityError("The CachyFreeze top-level mount is not subvolid=5")
+                continue
+            if target == self.config.STATE_DIR:
+                if filesystem_root != f"/{self.config.STATE_SUBVOL}":
+                    raise IntegrityError("The CachyFreeze state mount identity is invalid")
+                continue
+            specification = standard.get(target)
+            if specification is None:
+                raise CachyFreezeError(
+                    f"Unsupported Btrfs submount inside the system root: {target}"
+                )
+            key, expected_subvolume = specification
+            if filesystem_root != f"/{expected_subvolume}":
+                raise IntegrityError(
+                    f"The standard CachyOS mount {target} uses unexpected {filesystem_root}"
+                )
+            sources.append(
+                _BaselineSource(
+                    key=key,
+                    subvolume=expected_subvolume,
+                    target=PurePosixPath(target.lstrip("/")),
+                )
+            )
+
+        mounted_subvolumes = {source.subvolume for source in sources}
+        for _key, target, expected_subvolume in _STANDARD_CACHYOS_MOUNTS:
+            path = self.top / expected_subvolume
+            exists = (
+                self.runner.run(["btrfs", "subvolume", "show", str(path)], check=False).returncode
+                == 0
+            )
+            if exists and expected_subvolume not in mounted_subvolumes:
+                raise CachyFreezeError(
+                    f"Standard CachyOS subvolume {expected_subvolume} is not mounted at {target}"
+                )
+        return tuple(sorted(sources, key=lambda item: item.target.as_posix()))
+
+    def _nested_subvolume_listing(self, path: Path) -> str:
+        return self.runner.text(["btrfs", "subvolume", "list", "-o", str(path)])
+
+    def _baseline_source_path(self, source: _BaselineSource) -> Path:
+        allowed = {subvolume for _key, _target, subvolume in _STANDARD_CACHYOS_MOUNTS}
+        allowed.update(
+            f"{self.config.MAINTENANCE_SUBVOL}/{relative}"
+            for _key, relative in _STANDARD_CACHYOS_NESTED
+        )
+        if source.subvolume not in allowed:
+            raise IntegrityError(f"Unsupported baseline source: {source.subvolume}")
+        relative = PurePosixPath(source.subvolume)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise IntegrityError("A baseline source contains an unsafe path")
+        current = self.top
+        for part in relative.parts:
+            current /= part
+            if current.is_symlink():
+                raise IntegrityError(f"Baseline source traverses a symlink: {source.subvolume}")
+        if (
+            self.runner.run(["btrfs", "subvolume", "show", str(current)], check=False).returncode
+            != 0
+        ):
+            raise IntegrityError(f"Baseline source is not a Btrfs subvolume: {source.subvolume}")
+        if self._nested_subvolume_listing(current):
+            raise CachyFreezeError(
+                f"Baseline source contains unsupported nested subvolumes: {source.target}"
+            )
+        return current
+
+    def _baseline_layout(self) -> _BaselineLayout:
+        sources = list(self._mounted_baseline_sources())
+        maintenance = self._managed_path(self.config.MAINTENANCE_SUBVOL)
+        nested_output = self._nested_subvolume_listing(maintenance)
+        nested: set[str] = set()
+        for line in nested_output.splitlines():
+            _prefix, separator, raw_path = line.rpartition(" path ")
+            if not separator:
+                raise IntegrityError("Btrfs returned a malformed nested-subvolume record")
+            path = PurePosixPath(raw_path.lstrip("/"))
+            expected_parent = PurePosixPath(self.config.MAINTENANCE_SUBVOL)
+            if path.is_absolute() or ".." in path.parts or path.parent == path:
+                raise IntegrityError("Btrfs returned an unsafe nested-subvolume path")
+            try:
+                relative = path.relative_to(expected_parent).as_posix()
+            except ValueError as error:
+                raise IntegrityError(
+                    f"Nested subvolume is outside {self.config.MAINTENANCE_SUBVOL}: {path}"
+                ) from error
+            nested.add(relative)
+
+        standard_nested = {
+            relative: _BaselineSource(
+                key=key,
+                subvolume=f"{self.config.MAINTENANCE_SUBVOL}/{relative}",
+                target=PurePosixPath(relative),
+            )
+            for key, relative in _STANDARD_CACHYOS_NESTED
+        }
+        unexpected = sorted(nested - set(standard_nested) - _EXCLUDED_THIRD_PARTY_NESTED)
+        if unexpected:
+            raise CachyFreezeError(
+                "Unsupported nested subvolumes inside @: " + ", ".join(unexpected)
+            )
+        for relative in sorted(nested & set(standard_nested)):
+            sources.append(standard_nested[relative])
+        excluded = tuple(
+            PurePosixPath(path) for path in sorted(nested & _EXCLUDED_THIRD_PARTY_NESTED)
+        )
+        ordered_sources = tuple(sorted(sources, key=lambda item: item.target.as_posix()))
+        if len({source.target for source in ordered_sources}) != len(ordered_sources):
+            raise IntegrityError("The baseline layout maps more than one source to a target")
+        for source in ordered_sources:
+            self._baseline_source_path(source)
+        return _BaselineLayout(sources=ordered_sources, excluded_nested=excluded)
+
+    @staticmethod
+    def _safe_candidate_directory(root: Path, relative: PurePosixPath) -> Path:
+        if relative.is_absolute() or not relative.parts or ".." in relative.parts:
+            raise IntegrityError("A candidate target contains an unsafe path")
+        current = root
+        for part in relative.parts:
+            current /= part
+            if current.is_symlink() or not current.is_dir():
+                raise IntegrityError(f"Candidate target is not a safe directory: {relative}")
+        return current
+
+    def _clear_candidate_directory(self, directory: Path) -> None:
+        self.runner.run(["find", str(directory), "-mindepth", "1", "-delete"])
+        if any(directory.iterdir()):
+            raise IntegrityError(f"Candidate target could not be emptied: {directory}")
+
+    def _remove_candidate_directory(self, directory: Path) -> None:
+        self._clear_candidate_directory(directory)
+        try:
+            directory.rmdir()
+        except OSError as error:
+            raise IntegrityError(
+                f"Candidate target could not be replaced safely: {directory}"
+            ) from error
+
+    def _create_empty_candidate_directory(self, candidate: Path, relative: PurePosixPath) -> None:
+        destination = self._safe_candidate_directory(candidate, relative)
+        source = self._managed_path(self.config.MAINTENANCE_SUBVOL).joinpath(*relative.parts)
+        if source.is_symlink() or not source.is_dir():
+            raise IntegrityError(f"Excluded source is not a safe directory: {relative}")
+        source_stat = source.lstat()
+        self._remove_candidate_directory(destination)
+        destination.mkdir(mode=source_stat.st_mode & 0o7777)
+        os.chown(destination, source_stat.st_uid, source_stat.st_gid, follow_symlinks=False)
+        shutil.copystat(source, destination, follow_symlinks=False)
+
+    def _prepare_golden_candidate(self, layout: _BaselineLayout) -> None:
+        source = self._managed_path(self.config.MAINTENANCE_SUBVOL)
+        candidate = self._managed_path(self.config.GOLDEN_NEXT_SUBVOL)
+        self.runner.run(["btrfs", "subvolume", "snapshot", str(source), str(candidate)])
+        if self._nested_subvolume_listing(candidate):
+            raise IntegrityError("The Golden candidate unexpectedly contains nested subvolumes")
+
+        if layout.sources:
+            capture = self._managed_path(self.config.CAPTURE_SUBVOL)
+            self.runner.run(["btrfs", "subvolume", "create", str(capture)])
+            for baseline_source in layout.sources:
+                capture_child = capture / baseline_source.key
+                if capture_child.parent != capture or capture_child.exists():
+                    raise IntegrityError("A capture target is unsafe or already exists")
+                self.runner.run(
+                    [
+                        "btrfs",
+                        "subvolume",
+                        "snapshot",
+                        "-r",
+                        str(self._baseline_source_path(baseline_source)),
+                        str(capture_child),
+                    ]
+                )
+            for baseline_source in layout.sources:
+                capture_child = capture / baseline_source.key
+                destination = self._safe_candidate_directory(candidate, baseline_source.target)
+                self._remove_candidate_directory(destination)
+                self.runner.run(
+                    [
+                        "cp",
+                        "-a",
+                        "-x",
+                        "--reflink=always",
+                        "--",
+                        str(capture_child),
+                        str(destination),
+                    ]
+                )
+                if destination.is_symlink() or not destination.is_dir():
+                    raise IntegrityError(
+                        f"Captured baseline was not copied safely: {baseline_source.target}"
+                    )
+            self._delete_subvolume(self.config.CAPTURE_SUBVOL)
+
+        for excluded in layout.excluded_nested:
+            self._create_empty_candidate_directory(candidate, excluded)
+        self.runner.run(["btrfs", "property", "set", "-ts", str(candidate), "ro", "true"])
 
     def _current_mode(self) -> str:
         try:
@@ -166,7 +455,16 @@ class FreezeEngine:
     def _delete_subvolume(self, name: str) -> None:
         path = self._managed_path(name)
         if self._subvolume_exists(name):
-            self.runner.run(["btrfs", "subvolume", "delete", "--commit-after", str(path)])
+            command = ["btrfs", "subvolume", "delete"]
+            if name in {
+                self.config.ACTIVE_SUBVOL,
+                self.config.ACTIVE_NEXT_SUBVOL,
+                self.config.ACTIVE_PENDING_SUBVOL,
+                self.config.CAPTURE_SUBVOL,
+            }:
+                command.append("--recursive")
+            command.extend(["--commit-after", str(path)])
+            self.runner.run(command)
 
     def _is_read_only(self, name: str) -> bool:
         output = self.runner.text(
@@ -180,6 +478,8 @@ class FreezeEngine:
             raise IntegrityError(f"Golden candidate is missing: {name}")
         if not self._is_read_only(name):
             raise IntegrityError(f"Golden candidate is not read-only: {name}")
+        if self._nested_subvolume_listing(path):
+            raise IntegrityError(f"Golden candidate contains nested subvolumes: {name}")
         for relative in ("boot/vmlinuz-linux-cachyos", "boot/initramfs-linux-cachyos.img"):
             if not (path / relative).is_file():
                 raise IntegrityError(f"Golden candidate is missing required boot file: {relative}")
@@ -212,6 +512,7 @@ class FreezeEngine:
             self.config.ACTIVE_NEXT_SUBVOL,
             self.config.GOLDEN_PENDING_SUBVOL,
             self.config.ACTIVE_PENDING_SUBVOL,
+            self.config.CAPTURE_SUBVOL,
         ):
             self._delete_subvolume(name)
 
@@ -225,6 +526,7 @@ class FreezeEngine:
                     self.config.GOLDEN_PENDING_SUBVOL,
                     self.config.ACTIVE_NEXT_SUBVOL,
                     self.config.ACTIVE_PENDING_SUBVOL,
+                    self.config.CAPTURE_SUBVOL,
                 )
                 if self._subvolume_exists(name)
             ]
@@ -257,6 +559,7 @@ class FreezeEngine:
                 self.config.ACTIVE_NEXT_SUBVOL,
                 self.config.ACTIVE_PENDING_SUBVOL,
             )
+            self._delete_subvolume(self.config.CAPTURE_SUBVOL)
             # A crash can occur after grub-editenv succeeds but before the
             # durable commit phase is recorded. A rolled-back publication must
             # remain THAWED rather than booting the predecessor unexpectedly.
@@ -303,7 +606,7 @@ class FreezeEngine:
         os_release = Path("/etc/os-release").read_text(encoding="utf-8", errors="replace")
         if not re.search(r"^(ID|ID_LIKE)=.*\b(arch|cachyos)\b", os_release, re.MULTILINE):
             raise CachyFreezeError("Only CachyOS/Arch Linux is supported.")
-        for command in ("btrfs", "grub-editenv", "grub-mkconfig", "mkinitcpio"):
+        for command in ("btrfs", "cp", "find", "grub-editenv", "grub-mkconfig", "mkinitcpio"):
             if shutil.which(command) is None:
                 raise CachyFreezeError(f"Required command was not found: {command}")
         if not Path("/boot/grub").is_dir() or not Path("/boot/efi/EFI").is_dir():
@@ -326,25 +629,13 @@ class FreezeEngine:
         with self.mounted_top():
             if not self._subvolume_exists(self.config.MAINTENANCE_SUBVOL):
                 raise CachyFreezeError("The persistent maintenance subvolume was not found.")
-            nested = self.runner.text(
-                [
-                    "btrfs",
-                    "subvolume",
-                    "list",
-                    "-o",
-                    str(self._managed_path(self.config.MAINTENANCE_SUBVOL)),
-                ]
-            )
-            nested_count = len([line for line in nested.splitlines() if line.strip()])
-            if nested_count:
-                raise CachyFreezeError(
-                    "Nested subvolumes inside @ are unsupported because their data would not reset."
-                )
+            layout = self._baseline_layout()
         result = {
             "current_subvolume": current,
             "firmware": "UEFI",
             "filesystem": filesystem,
-            "nested_subvolume_count": 0,
+            "frozen_mounts": [f"/{source.target}" for source in layout.sources],
+            "excluded_third_party": [f"/{path}" for path in layout.excluded_nested],
         }
         self.logger.write("INFO", "preflight", "Compatibility validation passed", **result)
         return result
@@ -394,27 +685,18 @@ class FreezeEngine:
         baseline_id = uuid.uuid4().hex
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
             self._recover_transaction_locked()
-            source = self._managed_path(self.config.MAINTENANCE_SUBVOL)
             if not self._subvolume_exists(self.config.MAINTENANCE_SUBVOL):
                 raise IntegrityError("The THAWED source subvolume is missing")
             if self._is_read_only(self.config.MAINTENANCE_SUBVOL):
                 raise IntegrityError("The THAWED source subvolume is read-only")
+            layout = self._baseline_layout()
             self.journal.begin(
                 baseline_id=baseline_id,
                 source_subvolume=self.config.MAINTENANCE_SUBVOL,
             )
             try:
                 self.runner.run(["sync"])
-                self.runner.run(
-                    [
-                        "btrfs",
-                        "subvolume",
-                        "snapshot",
-                        "-r",
-                        str(source),
-                        str(self._managed_path(self.config.GOLDEN_NEXT_SUBVOL)),
-                    ]
-                )
+                self._prepare_golden_candidate(layout)
                 self._validate_golden(self.config.GOLDEN_NEXT_SUBVOL)
                 self.runner.run(
                     [

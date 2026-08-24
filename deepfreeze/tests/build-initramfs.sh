@@ -50,6 +50,7 @@ GOLDEN_PENDING_SUBVOL=@golden.pending
 ACTIVE_SUBVOL=@active
 ACTIVE_NEXT_SUBVOL=@active.next
 ACTIVE_PENDING_SUBVOL=@active.pending
+CAPTURE_SUBVOL=@cachy-capture
 STATE_SUBVOL=@cachy-state
 EOF
 chmod 0600 "$INSTALLED_CONFIG"

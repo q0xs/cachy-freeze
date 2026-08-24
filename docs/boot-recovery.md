@@ -7,9 +7,10 @@ delete or rename subvolumes manually. Boot the persistent THAWED entry with the
 GRUB maintenance password when that entry remains available, or use recovery
 media to inspect the filesystem read-only.
 
-Transaction-scoped `.next` and `.pending` names are part of the recovery
-protocol. Their presence without a valid journal or an expected initramfs
-transition is an integrity error, not permission to guess which copy is valid.
+Transaction-scoped `.next` and `.pending` names and `@cachy-capture` are part
+of the recovery protocol. Their presence without a valid journal or an
+expected initramfs transition is an integrity error, not permission to guess
+which copy is valid.
 
 Do not run `btrfs check --repair`. Do not delete `@`, `@golden`, `@active`,
 `@cachy-state`, or similarly named objects based only on their names. Confirm

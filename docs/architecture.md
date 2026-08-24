@@ -11,10 +11,11 @@ GRUB state.
 | `@golden` | Read-only approved FROZEN baseline |
 | `@active` | Writable disposable FROZEN root, recreated at every FROZEN boot |
 | `@cachy-state` | Minimal version, transaction, boot proof, and status metadata |
+| `@cachy-capture` | Transaction-only parent for read-only CachyOS data captures |
 
-`@golden.next`, `@golden.pending`, `@active.next`, and `@active.pending` are
-transaction-scoped names. They are not recovery history and must not remain
-after a successful operation.
+`@golden.next`, `@golden.pending`, `@active.next`, `@active.pending`, and
+`@cachy-capture` are transaction-scoped names. They are not recovery history
+and must not remain after a successful operation.
 
 ## State transitions
 
@@ -23,7 +24,10 @@ after a successful operation.
 ```text
 verified running @ (THAWED)
 → lock and validate filesystem/boot state
-→ sync and snapshot @ read-only to @golden.next
+→ discover and verify standard CachyOS data mounts and supported nested state
+→ sync, snapshot @ to @golden.next, and capture auxiliary sources read-only
+→ reflink captured content into the candidate mountpoint directories
+→ exclude third-party Snapper history and make the candidate read-only
 → validate candidate boot files and read-only state
 → create and validate @active.next
 → move current roots to transaction-scoped pending names
@@ -40,10 +44,12 @@ objects. An invalid candidate is never activated deliberately.
 
 GRUB loads the FROZEN kernel, microcode, and initramfs from read-only `@golden`,
 never from the previous writable `@active`; the selected root remains
-`@active`. The initramfs hook then verifies the configured Btrfs device and
+`@active`. The FROZEN kernel receives `fstab=no`, so persistent THAWED data
+subvolumes are not mounted; their approved content already exists inside the
+flattened Golden/Active root. The initramfs hook then verifies the Btrfs device and
 Golden, rolls back an interrupted pre-boot transaction when pending names prove
-the old roots, deletes all disposable runtime objects, creates a fresh writable
-runtime from Golden, validates it, and exposes it as `@active`.
+the old roots, recursively deletes all disposable runtime objects, creates a
+fresh writable runtime from Golden, validates it, and exposes it as `@active`.
 
 No previous runtime is renamed into history. Failure enters initramfs emergency
 handling rather than booting an unverified root.
@@ -64,6 +70,10 @@ Timeshift, Btrfs, and GRUB resources are never migration targets.
 
 The installer disables and removes only known CachyFreeze legacy services and
 binaries. It preserves unrelated GRUB generators and entries.
+
+Existing Snapper `.snapshots` data remains attached only to persistent `@` and
+is neither copied into Golden nor deleted. Unknown nested subvolumes and custom
+Btrfs submounts are rejected rather than silently left persistent.
 
 ## Data guarantee
 

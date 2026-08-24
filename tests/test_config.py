@@ -24,6 +24,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.MAINTENANCE_SUBVOL, "@")
         self.assertEqual(config.STATE_SUBVOL, "@cachy-state")
         self.assertEqual(config.GOLDEN_PENDING_SUBVOL, "@golden.pending")
+        self.assertEqual(config.CAPTURE_SUBVOL, "@cachy-capture")
         active_contract = config.managed_subvolumes - {config.LEGACY_SNAPSHOT_SUBVOL}
         self.assertNotIn("@cachy-snapshots", active_contract)
 

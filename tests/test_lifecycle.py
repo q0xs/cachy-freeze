@@ -12,7 +12,7 @@ from unittest.mock import patch
 from cachy_freeze.catalog import AuditLogger, OperationJournal
 from cachy_freeze.config import Config
 from cachy_freeze.engine import FreezeEngine
-from cachy_freeze.errors import IntegrityError
+from cachy_freeze.errors import CachyFreezeError, IntegrityError
 
 
 class FakeBtrfsRunner:
@@ -21,6 +21,8 @@ class FakeBtrfsRunner:
         self.commands: list[list[str]] = []
         self.mode = "thawed"
         self.fail_snapshot_destination: str | None = None
+        self.mounted_sources: dict[str, str] = {}
+        self.nested_sources: list[str] = []
 
     @staticmethod
     def _completed(command: list[str], returncode: int = 0, output: str = ""):
@@ -36,6 +38,16 @@ class FakeBtrfsRunner:
         if command[:3] == ["btrfs", "property", "get"]:
             readonly = (Path(command[-2]) / ".fake-read-only").exists()
             return self._completed(command, output=f"ro={'true' if readonly else 'false'}\n")
+        if command[:3] == ["btrfs", "property", "set"]:
+            marker = Path(command[-3]) / ".fake-read-only"
+            if command[-1] == "true":
+                marker.touch()
+            else:
+                marker.unlink(missing_ok=True)
+            return self._completed(command)
+        if command[:3] == ["btrfs", "subvolume", "create"]:
+            Path(command[-1]).mkdir()
+            return self._completed(command)
         if command[:3] == ["btrfs", "subvolume", "snapshot"]:
             source = Path(command[-2])
             destination = Path(command[-1])
@@ -47,9 +59,30 @@ class FakeBtrfsRunner:
                 marker.touch()
             else:
                 marker.unlink(missing_ok=True)
+            if source == self.top / "@":
+                for nested in self.nested_sources:
+                    relative = Path(nested).relative_to("@")
+                    nested_destination = destination / relative
+                    if nested_destination.exists():
+                        shutil.rmtree(nested_destination)
+                    nested_destination.mkdir(parents=True)
             return self._completed(command)
         if command[:3] == ["btrfs", "subvolume", "delete"]:
             shutil.rmtree(command[-1])
+            return self._completed(command)
+        if command and command[0] == "find":
+            directory = Path(command[1])
+            for child in directory.iterdir():
+                if child.is_dir() and not child.is_symlink():
+                    shutil.rmtree(child)
+                else:
+                    child.unlink()
+            return self._completed(command)
+        if command and command[0] == "cp":
+            source = Path(command[-2])
+            destination = Path(command[-1])
+            shutil.copytree(source, destination, dirs_exist_ok=True)
+            (destination / ".fake-read-only").unlink(missing_ok=True)
             return self._completed(command)
         if command and command[0] == "grub-editenv" and "set" in command:
             for assignment in command[3:]:
@@ -62,6 +95,38 @@ class FakeBtrfsRunner:
 
     def text(self, command: list[str], *, check: bool = True) -> str:
         command = [str(part) for part in command]
+        if command[:2] == ["findmnt", "--json"]:
+            children = [
+                {
+                    "target": target,
+                    "source": f"/dev/loop0[/{subvolume}]",
+                    "fstype": "btrfs",
+                    "fsroot": f"/{subvolume}",
+                    "uuid": "11111111-2222-3333-4444-555555555555",
+                }
+                for target, subvolume in sorted(self.mounted_sources.items())
+            ]
+            return json.dumps(
+                {
+                    "filesystems": [
+                        {
+                            "target": "/",
+                            "source": "/dev/loop0[/@]",
+                            "fstype": "btrfs",
+                            "fsroot": "/@",
+                            "uuid": "11111111-2222-3333-4444-555555555555",
+                            "children": children,
+                        }
+                    ]
+                }
+            )
+        if command[:4] == ["btrfs", "subvolume", "list", "-o"]:
+            if Path(command[-1]) == self.top / "@":
+                return "\n".join(
+                    f"ID {300 + index} gen 1 top level 256 path {path}"
+                    for index, path in enumerate(self.nested_sources)
+                )
+            return ""
         if command[:4] == ["findmnt", "-n", "-o", "FSTYPE"]:
             return "btrfs"
         if command[:4] == ["findmnt", "-n", "-o", "FSROOT"]:
@@ -129,10 +194,61 @@ class LifecycleTests(unittest.TestCase):
             "@golden.pending",
             "@active.next",
             "@active.pending",
+            "@cachy-capture",
             "@cachy-snapshots",
         ):
             self.assertFalse((self.top / forbidden).exists())
         self.assertFalse((self.state / "transaction.json").exists())
+
+    def test_freeze_flattens_standard_cachyos_mounts_into_disposable_root(self) -> None:
+        (self.top / "@/home").mkdir()
+        home = self.top / "@home"
+        home.mkdir()
+        (home / "approved-home-marker").write_text("baseline")
+        self.runner.mounted_sources["/home"] = "@home"
+
+        self.engine.freeze()
+
+        self.assertTrue((self.top / "@golden/home/approved-home-marker").exists())
+        self.assertTrue((self.top / "@active/home/approved-home-marker").exists())
+        self.assertFalse((self.top / "@cachy-capture").exists())
+        (self.top / "@active/home/runtime-only-marker").write_text("discard")
+        self.assertFalse((home / "runtime-only-marker").exists())
+
+    def test_freeze_rejects_an_unmounted_standard_data_subvolume(self) -> None:
+        (self.top / "@/home").mkdir()
+        (self.top / "@home").mkdir()
+
+        with self.assertRaisesRegex(
+            CachyFreezeError, "Standard CachyOS subvolume @home is not mounted at /home"
+        ):
+            self.engine.freeze()
+
+        self.assertTrue((self.top / "@golden/old").exists())
+        self.assertTrue((self.top / "@active/runtime").exists())
+        self.assertFalse((self.top / "@golden.next").exists())
+
+    def test_freeze_excludes_snapper_history_and_flattens_systemd_subvolumes(self) -> None:
+        snapshots = self.top / "@/.snapshots"
+        machines = self.top / "@/var/lib/machines"
+        portables = self.top / "@/var/lib/portables"
+        snapshots.mkdir(parents=True)
+        machines.mkdir(parents=True)
+        portables.mkdir(parents=True)
+        (snapshots / "historical-user-data").write_text("must-not-copy")
+        (machines / "approved-machine-data").write_text("baseline")
+        self.runner.nested_sources = [
+            "@/.snapshots",
+            "@/var/lib/machines",
+            "@/var/lib/portables",
+        ]
+
+        self.engine.freeze()
+
+        self.assertFalse((self.top / "@golden/.snapshots/historical-user-data").exists())
+        self.assertTrue((self.top / "@golden/var/lib/machines/approved-machine-data").exists())
+        self.assertTrue((snapshots / "historical-user-data").exists())
+        self.assertFalse((self.top / "@cachy-capture").exists())
 
     def test_repeated_freeze_does_not_accumulate_history(self) -> None:
         for marker in ("first", "second", "third"):
@@ -167,6 +283,22 @@ class LifecycleTests(unittest.TestCase):
         self.assertTrue((self.top / "@active/runtime").exists())
         self.assertFalse((self.state / "transaction.json").exists())
         self.assertFalse((self.top / "@golden.next").exists())
+
+    def test_interrupted_auxiliary_capture_is_removed_during_recovery(self) -> None:
+        (self.top / "@/home").mkdir()
+        (self.top / "@home").mkdir()
+        self.runner.mounted_sources["/home"] = "@home"
+        self.runner.fail_snapshot_destination = "home"
+
+        with self.assertRaisesRegex(IntegrityError, "injected"):
+            self.engine.freeze()
+        self.assertTrue((self.top / "@cachy-capture").exists())
+        self.assertTrue((self.state / "transaction.json").exists())
+
+        self.runner.fail_snapshot_destination = None
+        self.engine.status()
+        self.assertFalse((self.top / "@cachy-capture").exists())
+        self.assertFalse((self.state / "transaction.json").exists())
 
     def test_legacy_snapshot_migration_requires_exact_owned_catalog(self) -> None:
         history = self.top / "@cachy-snapshots"

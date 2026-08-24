@@ -28,6 +28,11 @@ delete_subvol() {
   btrfs subvolume delete --commit-after "$TOP/$1"
 }
 
+delete_disposable_subvol() {
+  subvol_exists "$1" || return 0
+  btrfs subvolume delete --recursive --commit-after "$TOP/$1"
+}
+
 # A baseline transaction keeps only transaction-scoped pending objects. If a
 # reboot interrupts it before the engine closes the journal, roll back to the
 # pre-transaction roots. Never turn pending objects into retained history.
@@ -38,11 +43,12 @@ recover_baseline_transaction() {
     mv "$TOP/$GOLDEN_PENDING_SUBVOL" "$TOP/$GOLDEN_SUBVOL"
   fi
   if subvol_exists "$ACTIVE_PENDING_SUBVOL"; then
-    delete_subvol "$ACTIVE_SUBVOL"
+    delete_disposable_subvol "$ACTIVE_SUBVOL"
     mv "$TOP/$ACTIVE_PENDING_SUBVOL" "$TOP/$ACTIVE_SUBVOL"
   fi
   delete_subvol "$GOLDEN_NEXT_SUBVOL"
-  delete_subvol "$ACTIVE_NEXT_SUBVOL"
+  delete_disposable_subvol "$ACTIVE_NEXT_SUBVOL"
+  delete_disposable_subvol "$CAPTURE_SUBVOL"
   if [ -f "$TOP/$STATE_SUBVOL/transaction.json" ]; then
     mv \
       "$TOP/$STATE_SUBVOL/transaction.json" \
@@ -62,6 +68,7 @@ main() {
   [ "${ACTIVE_SUBVOL:-}" = "@active" ] || fail "Invalid Active subvolume contract"
   [ "${ACTIVE_NEXT_SUBVOL:-}" = "@active.next" ] || fail "Invalid Active candidate contract"
   [ "${ACTIVE_PENDING_SUBVOL:-}" = "@active.pending" ] || fail "Invalid Active pending contract"
+  [ "${CAPTURE_SUBVOL:-}" = "@cachy-capture" ] || fail "Invalid capture subvolume contract"
   [ "${STATE_SUBVOL:-}" = "@cachy-state" ] || fail "Invalid state subvolume contract"
 
   if [ -n "${ROOT_DEVICE:-}" ]; then
@@ -107,9 +114,10 @@ main() {
 
   # @active is disposable by contract. Delete every prior runtime and create
   # exactly one fresh runtime from Golden; no previous runtime is retained.
-  delete_subvol "$ACTIVE_NEXT_SUBVOL"
-  delete_subvol "$ACTIVE_PENDING_SUBVOL"
-  delete_subvol "$ACTIVE_SUBVOL"
+  delete_disposable_subvol "$CAPTURE_SUBVOL"
+  delete_disposable_subvol "$ACTIVE_NEXT_SUBVOL"
+  delete_disposable_subvol "$ACTIVE_PENDING_SUBVOL"
+  delete_disposable_subvol "$ACTIVE_SUBVOL"
   log "Creating a fresh disposable runtime from $GOLDEN_SUBVOL"
   btrfs subvolume snapshot "$TOP/$GOLDEN_SUBVOL" "$TOP/$ACTIVE_NEXT_SUBVOL"
   subvol_exists "$ACTIVE_NEXT_SUBVOL" || fail "The new disposable runtime is invalid"

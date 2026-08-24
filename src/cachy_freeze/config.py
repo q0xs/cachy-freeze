@@ -28,6 +28,7 @@ class Config:
     ACTIVE_SUBVOL: str = "@active"
     ACTIVE_NEXT_SUBVOL: str = "@active.next"
     ACTIVE_PENDING_SUBVOL: str = "@active.pending"
+    CAPTURE_SUBVOL: str = "@cachy-capture"
     LEGACY_SNAPSHOT_SUBVOL: str = "@cachy-snapshots"
     LOG_FILE: str = "/var/log/cachy-freeze/operations.jsonl"
     LOCK_FILE: str = "/run/lock/cachy-freeze.lock"
@@ -70,6 +71,7 @@ class Config:
             "ACTIVE_SUBVOL": "@active",
             "ACTIVE_NEXT_SUBVOL": "@active.next",
             "ACTIVE_PENDING_SUBVOL": "@active.pending",
+            "CAPTURE_SUBVOL": "@cachy-capture",
             "LEGACY_SNAPSHOT_SUBVOL": "@cachy-snapshots",
         }
         for name, expected in required_contract.items():
@@ -105,6 +107,7 @@ class Config:
                 self.ACTIVE_SUBVOL,
                 self.ACTIVE_NEXT_SUBVOL,
                 self.ACTIVE_PENDING_SUBVOL,
+                self.CAPTURE_SUBVOL,
                 self.LEGACY_SNAPSHOT_SUBVOL,
             }
         )

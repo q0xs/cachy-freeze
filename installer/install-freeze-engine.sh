@@ -62,6 +62,7 @@ expected = {
     "NEXT_SUBVOL": {"@active.next"},
     "ACTIVE_NEXT_SUBVOL": {"@active.next"},
     "ACTIVE_PENDING_SUBVOL": {"@active.previous.pending", "@active.pending"},
+    "CAPTURE_SUBVOL": {"@cachy-capture"},
     "SNAPSHOT_SUBVOL": {"@cachy-snapshots"},
     "LEGACY_SNAPSHOT_SUBVOL": {"@cachy-snapshots"},
 }
@@ -277,6 +278,7 @@ GOLDEN_PENDING_SUBVOL=@golden.pending
 ACTIVE_SUBVOL=@active
 ACTIVE_NEXT_SUBVOL=@active.next
 ACTIVE_PENDING_SUBVOL=@active.pending
+CAPTURE_SUBVOL=@cachy-capture
 STATE_SUBVOL=@cachy-state
 EOF
 chmod 0600 /etc/cachy-freeze-initrd.conf

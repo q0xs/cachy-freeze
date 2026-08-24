@@ -41,13 +41,17 @@ fi
 grep -qx 'MAINTENANCE_SUBVOL=@' "$ROOT/etc/cachy-freeze.conf"
 grep -qx 'GOLDEN_SUBVOL=@golden' "$ROOT/etc/cachy-freeze.conf"
 grep -qx 'ACTIVE_SUBVOL=@active' "$ROOT/etc/cachy-freeze.conf"
+grep -qx 'CAPTURE_SUBVOL=@cachy-capture' "$ROOT/etc/cachy-freeze.conf"
 grep -qx 'STATE_SUBVOL=@cachy-state' "$ROOT/etc/cachy-freeze.conf"
 ! grep -q '^SNAPSHOT_SUBVOL=' "$ROOT/etc/cachy-freeze.conf"
 ! grep -q 'RETENTION_COUNT' "$ROOT/etc/cachy-freeze.conf"
 grep -q 'ConditionKernelCommandLine=cachy.freeze=1' \
   "$ROOT/initcpio/cachy-freeze-reset.service"
 grep -q 'no prior runtime was retained' "$ROOT/initcpio/cachy-freeze-reset"
+grep -q 'subvolume delete --recursive --commit-after' \
+  "$ROOT/initcpio/cachy-freeze-reset"
 ! grep -q '@active.previous' "$ROOT/initcpio/cachy-freeze-reset"
+grep -q 'cachy.freeze=1 fstab=no' "$ROOT/grub/40_cachy_freeze"
 grep -q 'class OperationJournal' "$PROJECT_ROOT/src/cachy_freeze/catalog.py"
 grep -q 'def freeze' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'def thaw' "$PROJECT_ROOT/src/cachy_freeze/engine.py"

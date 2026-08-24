@@ -43,6 +43,12 @@ printf "%s\n" "menuentry test --id 'cachyos-current' {" "}" \
 grub-editenv "$TOP/@/boot/grub/grubenv" create
 grub-editenv "$TOP/@/boot/grub/grubenv" set cachy_mode=thawed saved_entry=cachyos-current
 printf '%s\n' maintained-a >"$TOP/@/approved"
+mkdir -p "$TOP/@/var/lib"
+btrfs subvolume create "$TOP/@/.snapshots" >/dev/null
+btrfs subvolume create "$TOP/@/var/lib/machines" >/dev/null
+btrfs subvolume create "$TOP/@/var/lib/portables" >/dev/null
+printf '%s\n' historical-third-party-data >"$TOP/@/.snapshots/old-marker"
+printf '%s\n' approved-machine-data >"$TOP/@/var/lib/machines/approved-marker"
 
 cat >"$CONFIG" <<EOF
 STATE_DIR=$STATE
@@ -55,6 +61,7 @@ GOLDEN_PENDING_SUBVOL=@golden.pending
 ACTIVE_SUBVOL=@active
 ACTIVE_NEXT_SUBVOL=@active.next
 ACTIVE_PENDING_SUBVOL=@active.pending
+CAPTURE_SUBVOL=@cachy-capture
 LEGACY_SNAPSHOT_SUBVOL=@cachy-snapshots
 LOG_FILE=$STATE/operations.jsonl
 LOCK_FILE=$TEST_ROOT/cachy-freeze.lock
@@ -65,6 +72,14 @@ EOF
 run_backend freeze >"$TEST_ROOT/freeze.json"
 [[ -f $TOP/@golden/approved && -f $TOP/@active/approved ]] ||
   fail "FREEZE did not create the Golden/Active pair."
+[[ -f $TOP/@golden/var/lib/machines/approved-marker ]] ||
+  fail "The standard nested machine data was not flattened into Golden."
+[[ ! -e $TOP/@golden/.snapshots/old-marker ]] ||
+  fail "Third-party Snapper history was copied into Golden."
+[[ -f $TOP/@/.snapshots/old-marker ]] ||
+  fail "Third-party Snapper history was modified."
+[[ ! -e $TOP/@cachy-capture ]] ||
+  fail "The transaction-scoped capture remained after FREEZE."
 [[ $(btrfs property get -ts "$TOP/@golden" ro) == ro=true ]] ||
   fail "Golden is not read-only."
 grep -qx 'cachy_mode=frozen' <(grub-editenv "$TOP/@/boot/grub/grubenv" list) ||
@@ -77,7 +92,7 @@ for cycle in 1 2 3 4; do
 done
 for forbidden in \
   @golden.next @golden.pending @active.next @active.pending \
-  @golden.previous @active.previous @cachy-snapshots; do
+  @golden.previous @active.previous @cachy-capture @cachy-snapshots; do
   [[ ! -e $TOP/$forbidden ]] || fail "History accumulated: $forbidden"
 done
 

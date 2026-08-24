@@ -50,6 +50,7 @@ GOLDEN_PENDING_SUBVOL=@golden.pending
 ACTIVE_SUBVOL=@active
 ACTIVE_NEXT_SUBVOL=@active.next
 ACTIVE_PENDING_SUBVOL=@active.pending
+CAPTURE_SUBVOL=@cachy-capture
 STATE_SUBVOL=@cachy-state
 EOF
 
@@ -57,13 +58,17 @@ run_reset
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 [[ -f $TOP/@active/approved ]] || fail "The first FROZEN runtime is incomplete."
 printf '%s\n' runtime-only >"$TOP/@active/unique-marker"
+btrfs subvolume create "$TOP/@active/runtime-nested" >/dev/null
+printf '%s\n' nested-runtime-only >"$TOP/@active/runtime-nested/unique-marker"
 umount "$TOP"
 
 run_reset
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 [[ ! -e $TOP/@active/unique-marker ]] || fail "FROZEN runtime data survived reset."
+[[ ! -e $TOP/@active/runtime-nested ]] || fail "Nested FROZEN runtime data survived reset."
 [[ -f $TOP/@active/approved ]] || fail "Golden content was not restored."
-for forbidden in @active.next @active.pending @golden.next @golden.pending; do
+for forbidden in \
+  @active.next @active.pending @golden.next @golden.pending @cachy-capture; do
   [[ ! -e $TOP/$forbidden ]] || fail "Transaction object remains: $forbidden"
 done
 

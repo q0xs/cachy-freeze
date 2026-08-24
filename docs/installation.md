@@ -6,10 +6,19 @@
 - UEFI, GRUB, and Btrfs root subvolume `@`
 - EFI mounted at `/boot/efi`
 - no separate `/boot` filesystem
-- no nested subvolumes inside `@`
+- the standard CachyOS data layout using any subset of `@home`, `@root`,
+  `@srv`, `@cache`, `@tmp`, and `@log`
+- only the standard systemd `var/lib/machines` and `var/lib/portables`
+  subvolumes nested in `@`; an existing Snapper `.snapshots` tree is preserved
+  but excluded from Golden
 
 Compatibility checks run inside the graphical installer before CachyFreeze
 changes Btrfs or GRUB. A failed critical check stops installation.
+
+During FREEZE, mounted CachyOS data subvolumes are captured read-only and
+reflinked into the staged Golden root. FROZEN boots use `fstab=no`; persistent
+THAWED mounts such as `@home` remain unmounted and all session changes land in
+disposable `@active`. THAWED boots use the original `/etc/fstab` unchanged.
 
 ## Graphical single-file install
 

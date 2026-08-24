@@ -4,6 +4,43 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-24 — stock CachyOS Btrfs layout support — local rc3 working tree
+
+- PASS — `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:app python -m unittest
+  discover -s tests -v`: all 44 backend, GUI, helper, installer, lifecycle,
+  runner, and migration tests passed.
+- PASS — Ruff 0.12.4 `check` and `format --check` passed for `src`, the GUI,
+  and `tests`.
+- PASS — `bash deepfreeze/tests/static.sh`,
+  `QT_QPA_PLATFORM=offscreen bash deepfreeze/tests/ui-smoke.sh`, and `bash
+  deepfreeze/tests/grub-generation.sh` passed. ShellCheck was unavailable, so
+  the static script performed Bash syntax validation without representing
+  ShellCheck as executed.
+- PASS — the privileged, disposable-loopback `integration-engine.sh` and
+  `integration-btrfs.sh` tests passed. The engine flattened supported nested
+  data into Golden, excluded third-party Snapper history, removed its temporary
+  capture, and recursively discarded a nested FROZEN runtime without retaining
+  history. No host subvolume or host boot configuration was a test target.
+- PASS — `deepfreeze/tests/build-initramfs.sh` generated and inspected temporary
+  initramfs images for both installed kernels, then removed its temporary
+  installed test inputs. It did not overwrite a host initramfs image.
+- PASS — the non-mutating privileged preflight completed against the physical
+  workstation's stock CachyOS layout. It verified THAWED `@`, UEFI/GRUB/Btrfs,
+  the standard data mounts, the supported systemd nested subvolumes, and the
+  excluded Snapper tree. The temporary top-level inspection mount and audit
+  file were removed; no Golden, Active, GRUB, or persistent configuration was
+  changed.
+- PASS — two `SOURCE_DATE_EPOCH=0 bash packaging/build-installer.sh` builds
+  produced an identical `CachyFreeze-Installer-1.0.0rc3.run`; its generated
+  SHA-256 sidecar verified successfully.
+- BLOCKED — `deepfreeze/tests/boot-acceptance-vm.sh`:
+  `qemu-system-x86_64` is unavailable locally. GitHub Actions must provide the
+  disposable UEFI GRUB VM result for the pushed commit.
+- NOT RUN — a full installer, reboot, FROZEN reset, THAWED persistence, and
+  re-FREEZE lifecycle in a disposable CachyOS VM. No live installation,
+  baseline publication, host GRUB write, host root replacement, or reboot was
+  performed.
+
 ## 2026-08-24 — two-mode simplification — local unprivileged checkout
 
 - PASS — `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:app python -m unittest

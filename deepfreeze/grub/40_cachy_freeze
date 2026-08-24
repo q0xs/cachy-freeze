@@ -38,7 +38,7 @@ else
     set cachy_title="FROZEN"
     set cachy_subvol="$ACTIVE_SUBVOL"
     set cachy_boot_subvol="$GOLDEN_SUBVOL"
-    set cachy_freeze_arg="cachy.freeze=1"
+    set cachy_freeze_arg="cachy.freeze=1 fstab=no"
 fi
 
 menuentry "\${cachy_title}" --class cachyos --class gnu-linux --class os --id 'cachyos-current' --unrestricted {

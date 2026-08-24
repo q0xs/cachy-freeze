@@ -51,8 +51,8 @@ grep -q 'set cachy_subvol="@active"' "$OUTPUT" ||
   fail "The FROZEN root selection is incorrect."
 grep -q 'set cachy_subvol="@"' "$OUTPUT" ||
   fail "The THAWED root selection is incorrect."
-grep -q 'set cachy_freeze_arg="cachy.freeze=1"' "$OUTPUT" ||
-  fail "The FROZEN kernel argument is incorrect."
+grep -q 'set cachy_freeze_arg="cachy.freeze=1 fstab=no"' "$OUTPUT" ||
+  fail "The FROZEN kernel arguments do not isolate persistent fstab mounts."
 grep -q 'set cachy_freeze_arg="cachy.freeze=0"' "$OUTPUT" ||
   fail "The THAWED kernel argument is incorrect."
 grep -q 'set cachy_boot_subvol="@golden"' "$OUTPUT" ||

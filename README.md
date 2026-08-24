@@ -37,19 +37,27 @@ Deleting a Btrfs subvolume is logical non-retention, not forensic media erasure.
 CachyFreeze does not claim to overwrite old CoW extents, SSD flash cells, or
 controller-managed storage.
 
-Data on separate or nested subvolumes/filesystems is outside the frozen root.
-The installer rejects nested subvolumes inside `@` because they would not reset.
+The standard CachyOS data subvolumes (`@home`, `@root`, `@srv`, `@cache`,
+`@tmp`, and `@log`) are captured into Golden with same-filesystem CoW clones.
+FROZEN boots disable `/etc/fstab` mounts, so those persistent THAWED subvolumes
+are not modified by a FROZEN session. Existing third-party Snapper history is
+not copied into Golden and is never deleted by CachyFreeze.
+
+Unknown Btrfs submounts or nested subvolumes fail closed. Filesystems outside
+the supported CachyOS root layout are not part of the reset guarantee.
 
 ## Requirements
 
 - CachyOS or Arch Linux with KDE Plasma
 - UEFI and GRUB
 - Btrfs root subvolume `@`
+- standard CachyOS `@home`, `@root`, `@srv`, `@cache`, `@tmp`, and `@log`
+  layout (a subset is allowed)
 - EFI System Partition mounted at `/boot/efi`
 - `/boot` stored inside the Btrfs root
 - recovery media and a restorable backup
 
-ext4, BIOS, systemd-boot, separate `/boot`, and custom/nested root layouts are
+ext4, BIOS, systemd-boot, separate `/boot`, and custom Btrfs mount layouts are
 not supported.
 
 ## Install
