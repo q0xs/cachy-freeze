@@ -17,10 +17,15 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
   physical boot. rc5 sets the stable managed entry ID directly as GRUB's
   default. Unrelated recovery and firmware entries remain generated but the
   normal one-second menu is hidden; Esc exposes the preserved menu.
-- PASS — all 45 Python tests, repository static/Bash contracts, isolated GRUB
-  generation, Qt offscreen smoke, privileged disposable-loop engine and
-  recursive-reset integrations, and `git diff --check` passed. ShellCheck and
-  Ruff were unavailable locally and were not represented as executed.
+- PASS — all 45 Python tests, Ruff 0.12.4 check/format, repository static/Bash
+  contracts, isolated GRUB generation, Qt offscreen smoke, privileged
+  disposable-loop engine and recursive-reset integrations, and `git diff
+  --check` passed. ShellCheck was unavailable locally and was not represented
+  as locally executed.
+- PASS — GitHub Actions run `32730407596` for commit `5eb4b73` passed both
+  jobs: ShellCheck, Ruff, all Python/Qt/static checks, isolated GRUB generation,
+  and disposable QEMU/OVMF authentication acceptance for passwordless FROZEN
+  plus protected THAWED.
 - PASS — two `SOURCE_DATE_EPOCH=0 bash packaging/build-installer.sh` builds
   produced an identical `CachyFreeze-Installer-1.0.0rc5.run`; its SHA-256
   sidecar verified successfully.
