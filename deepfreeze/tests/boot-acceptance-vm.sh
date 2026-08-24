@@ -111,7 +111,7 @@ set timeout 60
 # OVMF's emulated serial input can drop characters while GRUB redraws its
 # authentication prompt. Keep every character well outside that window; a
 # truncated username can otherwise look like an authorization regression.
-set send_slow {1 0.25}
+set send_slow {1 0.5}
 log_file -noappend $env(VM_TRANSCRIPT)
 spawn qemu-system-x86_64 \
   -machine q35,accel=tcg \
@@ -127,18 +127,18 @@ if {$env(VM_PASSWORD) ne ""} {
     timeout { exit 42 }
     eof { exit 43 }
   }
-  after 1500
+  after 2000
   send -s -- "$env(VM_USER)"
-  after 1000
+  after 2000
   send -- "\r"
   expect {
     "Enter password:" {}
     timeout { exit 44 }
     eof { exit 45 }
   }
-  after 1500
+  after 2000
   send -s -- "$env(VM_PASSWORD)"
-  after 1000
+  after 2000
   send -- "\r"
 }
 if {$env(VM_EXPECTED) eq "allowed"} {
@@ -174,11 +174,12 @@ run_case() {
   local attempt=1 max_attempts=1 vm_status=0
   build_case "$mode" "$case_root"
 
-  # OVMF's emulated serial receiver can very rarely drop a hidden password
-  # character even with deliberately slow input. Retry only that exact
-  # allowed-case denial; a real authentication regression still fails all
-  # three fresh-firmware attempts, while denied/passwordless cases never retry.
-  if [[ -n $password && $expected == allowed ]]; then
+  # OVMF's emulated serial receiver can very rarely drop an input character
+  # even with deliberately slow input. Retry only the two observable transport
+  # symptoms: an incompletely echoed username, or an allowed-case denial. A
+  # real authentication regression still fails all three fresh-firmware
+  # attempts, while the passwordless case never retries.
+  if [[ -n $password ]]; then
     max_attempts=3
   fi
   while ((attempt <= max_attempts)); do
@@ -186,14 +187,19 @@ run_case() {
     cp "$ovmf_vars" "$case_root/OVMF_VARS.fd"
     if run_vm "$case_root" "$password" "$expected" "$transcript"; then
       vm_status=0
-      break
+      if [[ -n $password ]] && ! grep -q "$TEST_USER" "$transcript"; then
+        vm_status=53
+      fi
     else
       vm_status=$?
     fi
-    if ((vm_status != 47 || attempt == max_attempts)); then
+    if ((vm_status == 0)); then
+      break
+    fi
+    if (((vm_status != 47 && vm_status != 53) || attempt == max_attempts)); then
       return "$vm_status"
     fi
-    printf 'RETRY: %s serial password attempt %d/%d was denied.\n' \
+    printf 'RETRY: %s serial input attempt %d/%d was incomplete.\n' \
       "$name" "$attempt" "$max_attempts" >&2
     ((attempt += 1))
   done
