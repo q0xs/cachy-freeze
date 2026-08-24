@@ -63,18 +63,100 @@ the supported CachyOS root layout are not part of the reset guarantee.
 ext4, BIOS, systemd-boot, separate `/boot`, and custom Btrfs mount layouts are
 not supported.
 
-## Install
+## Download and install
 
-1. Download `CachyFreeze-Installer-<version>.run` and its checksum.
-2. Mark the downloaded artifact executable if the browser removed that bit.
-3. Open it from KDE.
-4. Authorize the verified transient staging request, then enter a
-   boot-maintenance password and approve installation.
-5. When installation succeeds, save work and select **REBOOT NOW**.
+> [!IMPORTANT]
+> The current published build is
+> [CachyFreeze v1.0.0rc6](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc6),
+> which is marked as a pre-release. Keep recovery media and a restorable backup
+> available before installing it.
 
-After reboot, open **CachyFreeze** from the KDE Application Launcher. No Git
-checkout, terminal workflow, `pip install`, manual Btrfs setup, or manual GRUB
-configuration is required.
+### 1. Download the official files
+
+Download both files from the `Assets` section of the release. They must have
+the same version number:
+
+- [CachyFreeze-Installer-1.0.0rc6.run](https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc6/CachyFreeze-Installer-1.0.0rc6.run)
+- [CachyFreeze-Installer-1.0.0rc6.run.sha256](https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc6/CachyFreeze-Installer-1.0.0rc6.run.sha256)
+
+Do not download GitHub's **Source code (zip)** or **Source code (tar.gz)** for a
+normal installation. Those archives are for development and are not the
+graphical installer.
+
+### 2. Verify the download
+
+Open Konsole and run:
+
+```bash
+cd "$(xdg-user-dir DOWNLOAD)"
+sha256sum --check CachyFreeze-Installer-1.0.0rc6.run.sha256
+```
+
+Continue only if the result is:
+
+```text
+CachyFreeze-Installer-1.0.0rc6.run: OK
+```
+
+If verification reports `FAILED`, delete both downloaded files and download
+them again from the release page.
+
+### 3. Start the graphical installer
+
+Make the verified file executable and open it:
+
+```bash
+chmod +x CachyFreeze-Installer-1.0.0rc6.run
+./CachyFreeze-Installer-1.0.0rc6.run
+```
+
+Do not run the installer with `sudo`. It requests administrator authorization
+through PolicyKit only when privileged work is required. You can also open the
+executable from Dolphin after enabling **Is executable** in its file
+permissions.
+
+### 4. Complete setup
+
+1. Approve the PolicyKit request that places the verified installer in a
+   temporary root-owned staging directory.
+2. Enter and confirm a boot-maintenance password in the setup window. It must
+   contain 12-256 characters and at least three of these classes: lowercase,
+   uppercase, digits, and symbols. A colon (`:`) is not supported.
+3. Select **INSTALL CACHYFREEZE** and approve any additional PolicyKit request.
+4. Wait for the success message. Do not interrupt package installation,
+   Golden publication, initramfs generation, or GRUB generation.
+5. Save all work and select **REBOOT NOW**. The installer never reboots the
+   computer without this explicit request.
+
+The initial installation creates and verifies the Golden baseline, then
+schedules FROZEN for the next boot. After reboot, open **CachyFreeze** from the
+KDE Application Launcher.
+
+The fixed GRUB maintenance username is `cachyadmin`; it is separate from Linux
+desktop accounts. FROZEN starts without this password. Starting THAWED from
+GRUB requires `cachyadmin` and the boot-maintenance password chosen during
+installation.
+
+The installer performs compatibility checks before changing the boot stack,
+installs required Arch packages, installs the unprivileged GUI and its
+PolicyKit helper, builds the initramfs integration, generates the managed GRUB
+entry, publishes the initial Golden baseline, and schedules FROZEN. A network
+connection may be required to install missing packages. No Git checkout,
+`pip install`, manual Btrfs setup, or manual GRUB configuration is required.
+
+### Update an existing installation
+
+Run a newer installer only while the computer is actually booted in THAWED
+mode from persistent `@`:
+
+1. In CachyFreeze, select **THAW COMPUTER**, then **REBOOT NOW**.
+2. Confirm that the application reports **THAWED** after reboot.
+3. Download and verify the newer installer and checksum from
+   [GitHub Releases](https://github.com/q0xs/cachy-freeze/releases).
+4. Run the newer installer normally, without `sudo`, and reboot when setup
+   succeeds.
+
+Never reinstall or update CachyFreeze from a FROZEN session.
 
 The stable CachyFreeze entry is the direct GRUB default. A visible five-second
 menu shows exactly one normal entry, named FROZEN or THAWED according to the mode
@@ -83,7 +165,9 @@ for the fixed `cachyadmin` boot-maintenance user and its password. Vendor,
 firmware, snapshot, and custom entries remain generated behind an explicit
 administrator recovery gate instead of appearing in the normal appliance menu.
 
-Build the single-file installer from an unprivileged checkout:
+## Build from source
+
+Developers can build the single-file installer from an unprivileged checkout:
 
 ```bash
 bash packaging/build-installer.sh
