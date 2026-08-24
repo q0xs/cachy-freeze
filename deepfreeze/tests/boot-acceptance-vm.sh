@@ -110,7 +110,7 @@ run_case() {
     VM_TRANSCRIPT=$transcript \
     timeout 90 expect <<'EOF'
 set timeout 60
-set send_slow {1 0.03}
+set send_slow {1 0.10}
 log_file -noappend $env(VM_TRANSCRIPT)
 spawn qemu-system-x86_64 \
   -machine q35,accel=tcg \
@@ -126,18 +126,18 @@ if {$env(VM_PASSWORD) ne ""} {
     timeout { exit 42 }
     eof { exit 43 }
   }
-  after 250
+  after 750
   send -s -- "$env(VM_USER)"
-  after 250
+  after 750
   send -- "\r"
   expect {
     "Enter password:" {}
     timeout { exit 44 }
     eof { exit 45 }
   }
-  after 250
+  after 750
   send -s -- "$env(VM_PASSWORD)"
-  after 250
+  after 750
   send -- "\r"
 }
 if {$env(VM_EXPECTED) eq "allowed"} {
@@ -167,6 +167,9 @@ expect {
 EOF
 
   grep -q 'CACHY_GRUB_READY' "$transcript" || fail "$name did not start GRUB."
+  if [[ -n $password ]]; then
+    grep -q "$TEST_USER" "$transcript" || fail "$name did not receive the complete username."
+  fi
   if [[ $expected == denied ]]; then
     ! grep -q 'CACHY_PROTECTED_LOAD_REACHED' "$transcript" ||
       fail "$name reached the protected load marker."
