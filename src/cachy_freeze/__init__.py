@@ -1,6 +1,4 @@
-"""CachyFreeze workstation management backend."""
+"""CachyFreeze FROZEN/THAWED backend."""
 
-from .models import SnapshotMetadata
-
-__all__ = ["SnapshotMetadata"]
+__all__: list[str] = []
 __version__ = "1.0.0rc2"

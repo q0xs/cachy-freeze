@@ -11,7 +11,7 @@ from . import __version__ as APP_VERSION
 from .catalog import AuditLogger, atomic_json_write
 from .errors import IntegrityError
 
-STATE_SCHEMA_VERSION = 1
+STATE_SCHEMA_VERSION = 2
 
 
 def _now() -> str:
@@ -98,5 +98,10 @@ class StateMigrationManager:
         if (previous, target) == (0, 1):
             # Schema 1 formalizes the existing durable files. They already use
             # independent atomic writers, so no legacy content rewrite is needed.
+            return
+        if (previous, target) == (1, 2):
+            # Filesystem-owned snapshot history is validated and removed by
+            # FreezeEngine before this version marker is advanced. Schema 2
+            # records the minimal two-mode state contract.
             return
         raise IntegrityError(f"No state migration exists for schema {previous} -> {target}")

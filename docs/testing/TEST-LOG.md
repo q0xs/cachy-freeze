@@ -4,6 +4,41 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-24 — two-mode simplification — local unprivileged checkout
+
+- PASS — `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:app python -m unittest
+  discover -s tests -v`: 39 tests passed; 6 PyQt6-dependent GUI tests were
+  skipped because PyQt6 is not installed in the development environment.
+- PASS — `SHELLCHECK_OPTS=--severity=error bash deepfreeze/tests/static.sh`:
+  repository Bash syntax, Python compilation contracts, desktop entries,
+  PolicyKit XML, removed-feature contracts, and systemd inputs passed. ShellCheck
+  itself was unavailable and was not represented as executed.
+- PASS — `bash deepfreeze/tests/grub-generation.sh`: the generated managed GRUB
+  entry passed its content and `grub-script-check` validation. FROZEN boot files
+  are loaded from read-only Golden while the selected root remains disposable
+  Active.
+- PASS — `bash packaging/build-installer.sh`: generated the native single-file
+  `.run` installer and matching SHA-256 sidecar. Two consecutive builds with the
+  same inputs produced identical artifact checksums. Extraction verified the
+  embedded per-file manifest, regular-file-only payload, executable helper mode,
+  and absence of tests, documentation, vendor trees, bytecode, and legacy user
+  assets from the runtime payload.
+- BLOCKED — `QT_QPA_PLATFORM=offscreen bash deepfreeze/tests/ui-smoke.sh`:
+  PyQt6 is not installed. The six equivalent unittest cases were skipped for the
+  same explicit reason.
+- BLOCKED — `bash deepfreeze/tests/integration-btrfs.sh` and `bash
+  deepfreeze/tests/integration-engine.sh`: the current account is unprivileged.
+  Both scripts stopped at their initial root guard; no loop device, Btrfs
+  filesystem, host subvolume, or host boot state was changed.
+- BLOCKED — `bash deepfreeze/tests/build-initramfs.sh`: the script stopped at its
+  initial root guard; no installed file or initramfs image was changed.
+- BLOCKED — `bash deepfreeze/tests/boot-acceptance-vm.sh`: the disposable GRUB
+  guest prerequisites are unavailable (`expect` was the first missing command).
+- NOT RUN — Ruff lint/format and ShellCheck; the executables are unavailable.
+- NOT RUN — full disposable CachyOS install/FROZEN/THAWED/reboot lifecycle and
+  physical-device validation. No host installation, GRUB modification, root
+  replacement, subvolume deletion, or reboot was performed.
+
 ## 2026-08-21 — password-required login selection and reliable first FROZEN finalization — physical workstation
 
 - RELEASE — these fixes are prepared as `v1.0.0rc2`; release metadata is

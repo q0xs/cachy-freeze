@@ -1,7 +1,7 @@
 [project]
 name = "cachyfreeze"
 version = "1.0.0rc2"
-description = "Btrfs-based system freeze and recovery manager for CachyOS"
+description = "Minimal Btrfs-based FROZEN and THAWED utility for CachyOS"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"

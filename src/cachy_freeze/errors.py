@@ -22,4 +22,4 @@ class CommandError(CachyFreezeError):
 
 
 class IntegrityError(CachyFreezeError):
-    """Raised when snapshot metadata or a Btrfs object does not verify."""
+    """Raised when transaction metadata or a Btrfs object does not verify."""

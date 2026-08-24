@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Slack
-Exec=/usr/bin/slack
-Icon=slack
-Terminal=false
-Categories=Network;InstantMessaging;
-

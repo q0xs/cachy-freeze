@@ -1,26 +1,21 @@
 # Boot recovery
 
-CachyFreeze keeps Golden and Active publication recoverable with staged names
-and a persistent transaction journal. Early boot validates the expected Btrfs
-device and subvolume names before completing or rolling back an interrupted step.
+Keep recovery media and a restorable backup before installation.
 
-If FROZEN does not reach the graphical target repeatedly, boot-attempt tracking
-can restore the previous healthy Golden. THAWED maintenance uses the fixed GRUB
-username `cachyadmin` and the password chosen on the Setup page. `cachyadmin` is
-a GRUB-only credential, not a Linux administrator account.
+If a FROZEN boot stops in initramfs, record the CachyFreeze error and do not
+delete or rename subvolumes manually. Boot the persistent THAWED entry with the
+GRUB maintenance password when that entry remains available, or use recovery
+media to inspect the filesystem read-only.
 
-Publishing a new Golden arms a first-FROZEN validation record. That boot is not
-accepted merely because the graphical target started: its boot ID, FROZEN mode,
-`@active` mount, Golden/Active presence, managed-home reset, administrator
-restriction, and expected graphical session must all agree. Until then, attempt
-tracking stays armed and setup does not report completion.
+Transaction-scoped `.next` and `.pending` names are part of the recovery
+protocol. Their presence without a valid journal or an expected initramfs
+transition is an integrity error, not permission to guess which copy is valid.
 
-When recovery is needed:
+Do not run `btrfs check --repair`. Do not delete `@`, `@golden`, `@active`,
+`@cachy-state`, or similarly named objects based only on their names. Confirm
+filesystem UUID, subvolume metadata, mounted root, CachyFreeze state, and backup
+readiness first.
 
-1. Preserve the current and previous boot journals.
-2. Check the kernel mode argument, mounted root, transaction journal, Golden,
-   Active, and Btrfs device error counters without mutating them.
-3. Use THAWED or recovery media only after identifying the failed phase.
-4. Never run `btrfs check --repair` or manually delete managed subvolumes.
-
-Physical destructive recovery tests require explicit approval and full backup readiness.
+CachyFreeze intentionally has no historical snapshot rollback archive. Restore
+from the administrator’s independent system backup when Golden and persistent
+THAWED state cannot be verified.

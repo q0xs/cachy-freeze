@@ -11,10 +11,11 @@ These rules apply to the entire repository. A nested `AGENTS.md` adds rules for 
 
 ## Product contract
 
-- Engine installation, user management, and FROZEN activation are independent.
-  A user account must never be required to install or freeze CachyFreeze.
-- Public installation entries are the graphical setup launcher and documented
-  one-command installer. The GUI remains unprivileged; root work uses PolicyKit.
+- The normal product has only FROZEN and THAWED modes. Do not add workstation,
+  user, application, power, diagnostics, or snapshot-history management.
+- The public installation entry is the reproducible graphical single-file
+  installer. The installed GUI remains unprivileged; root work uses PolicyKit.
+- Never promote FROZEN runtime data or retain historical runtime/Golden copies.
 
 ## Safety
 
@@ -27,7 +28,8 @@ These rules apply to the entire repository. A nested `AGENTS.md` adds rules for 
 
 ## Quality and GitHub
 
-- Preserve locking, atomic writes, validation, and transaction recovery.
+- Preserve locking, atomic writes, validation, transient transaction recovery,
+  logical runtime non-retention, and unrelated Btrfs/GRUB state.
 - Run Ruff, all Python tests, Bash/ShellCheck, systemd/desktop validation, and Qt smoke.
 - Run boot-stack integration only on a disposable VM or approved pilot.
 - Record actual results in `docs/testing/TEST-LOG.md`; never claim an unrun test passed.

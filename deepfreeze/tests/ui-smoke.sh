@@ -11,48 +11,47 @@ QT_QPA_PLATFORM=offscreen \
 XDG_CONFIG_HOME="$TEST_ROOT/config" \
 PYTHONPATH="$PROJECT_ROOT/src:$PROJECT_ROOT/app" \
 python - <<'PY'
+from pathlib import Path
+from unittest.mock import Mock
+
 from PyQt6.QtWidgets import QApplication
 
 from cachy_freeze_gui.backend import BackendClient
-from cachy_freeze_gui.i18n import configure
-from cachy_freeze_gui.widgets import retranslate_tree
 from cachy_freeze_gui.window import MainWindow
 
 application = QApplication([])
-window = MainWindow(BackendClient())
-assert window.pages.count() == 7
-assert window.snapshot_table.columnCount() == 9
-assert window.user_table.columnCount() == 7
-assert window.update_apply_button.text()
-assert window.settings_save_button.text()
-assert window.setup_preflight_button.text()
-assert window.setup_start_button.text()
-assert window.setup_finish_button.text()
-assert window._password_is_strong("Correct-Horse-42")
-assert not window._password_is_strong("short")
-configure("tr")
-retranslate_tree(window)
-assert "Genel Bakış" in window.nav_buttons[0].text()
-assert window.language_combo.itemText(1) == "Türkçe"
-configure("en")
+
+backend = BackendClient()
+backend.refresh_local = Mock()
+backend.run = Mock(return_value=True)
+window = MainWindow(backend)
+assert window.freeze_button.text() == "FREEZE COMPUTER"
+assert window.thaw_button.text() == "THAW COMPUTER"
+assert not hasattr(window, "pages")
+assert not hasattr(window, "snapshot_table")
+window._status_changed(
+    {
+        "verified": True,
+        "running_mode": "frozen",
+        "scheduled_mode": "frozen",
+        "reboot_required": False,
+    }
+)
+assert window.mode_label.text() == "FROZEN"
+assert window.thaw_button.isEnabled()
+assert not window.freeze_button.isEnabled()
 window.close()
+
+installer_backend = BackendClient(setup_root=Path("."))
+installer_backend.refresh_local = Mock()
+installer_backend.run = Mock(return_value=True)
+installer = MainWindow(installer_backend)
+assert installer.install_button.text() == "INSTALL CACHYFREEZE"
+assert not hasattr(installer, "freeze_button")
+assert installer._strong_password("Correct-Horse-42")
+assert not installer._strong_password("short")
+installer.close()
 application.quit()
 PY
-
-set +e
-launcher_log="$TEST_ROOT/setup-launcher.log"
-QT_QPA_PLATFORM=offscreen \
-XDG_CONFIG_HOME="$TEST_ROOT/config-launcher" \
-PYTHONPATH="$PROJECT_ROOT/src:$PROJECT_ROOT/app" \
-  timeout 2s python -m cachy_freeze_gui.main \
-    --setup-source "$PROJECT_ROOT" >"$launcher_log" 2>&1
-launcher_rc=$?
-set -e
-[[ $launcher_rc -eq 124 ]] || {
-  printf 'Setup launcher did not remain in the event loop (code: %s).\n' \
-    "$launcher_rc" >&2
-  sed -n '1,120p' "$launcher_log" >&2
-  exit 1
-}
 
 printf '%s\n' "Qt offscreen UI smoke test passed."

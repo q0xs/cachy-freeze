@@ -4,8 +4,7 @@ DefaultDependencies=no
 # The same unit file is installed in the real root so mkinitcpio can copy it
 # into the image.  systemd retains units across switch-root, therefore without
 # this guard it can run a second time after /sysroot is mounted.  That second
-# reset renames the mounted @active to @active.previous and leaves the system
-# running from the wrong subvolume.
+# reset would otherwise try to replace the already-mounted disposable root.
 ConditionPathExists=/etc/initrd-release
 ConditionKernelCommandLine=cachy.freeze=1
 After=systemd-udev-trigger.service

@@ -20,10 +20,10 @@ except ImportError:  # pragma: no cover - Windows-only test compatibility
 class CommandRunner:
     def __init__(self) -> None:
         self.environment = {
-            **os.environ,
             "LC_ALL": "C",
             "LANG": "C",
             "PATH": "/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin",
+            "SYSTEMD_COLORS": "0",
         }
 
     def run(
@@ -64,8 +64,12 @@ class ProcessLock(AbstractContextManager["ProcessLock"]):
 
     def __enter__(self) -> ProcessLock:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._handle = self.path.open("a+", encoding="utf-8")
-        os.chmod(self.path, 0o600)
+        flags = os.O_RDWR | os.O_APPEND | os.O_CREAT
+        flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(self.path, flags, 0o600)
+        if hasattr(os, "fchmod"):
+            os.fchmod(descriptor, 0o600)
+        self._handle = os.fdopen(descriptor, "a+", encoding="utf-8")
         if fcntl is not None:
             try:
                 fcntl.flock(self._handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)

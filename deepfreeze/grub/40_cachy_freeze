@@ -9,7 +9,8 @@ BOOT_DIR=${CACHY_FREEZE_BOOT_DIR:-/boot}
 source "$CONFIG"
 
 root_uuid=$(findmnt -n -o UUID /)
-[[ -n $root_uuid ]] || exit 0
+[[ $root_uuid =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]] || exit 1
+[[ $MAINTENANCE_SUBVOL == @ && $GOLDEN_SUBVOL == @golden && $ACTIVE_SUBVOL == @active ]] || exit 1
 
 kernel_args=$(sed -n \
   "s/^GRUB_CMDLINE_LINUX_DEFAULT=['\"]\\(.*\\)['\"]$/\\1/p" \
@@ -19,26 +20,24 @@ emit_entry() {
   local kernel=$1 initramfs=$2
   local initrd_line
   [[ -r $BOOT_DIR/$kernel && -r $BOOT_DIR/$initramfs ]] || return 0
-  initrd_line="/\$cachy_subvol/boot/$initramfs"
+  initrd_line="/\$cachy_boot_subvol/boot/$initramfs"
   if [[ -r $BOOT_DIR/intel-ucode.img ]]; then
-    initrd_line="/\$cachy_subvol/boot/intel-ucode.img $initrd_line"
+    initrd_line="/\$cachy_boot_subvol/boot/intel-ucode.img $initrd_line"
   elif [[ -r $BOOT_DIR/amd-ucode.img ]]; then
-    initrd_line="/\$cachy_subvol/boot/amd-ucode.img $initrd_line"
+    initrd_line="/\$cachy_boot_subvol/boot/amd-ucode.img $initrd_line"
   fi
 
   cat <<EOF
-if [ "\${cachy_once}" = "thawed" ]; then
-    set cachy_effective_mode="thawed"
-else
-    set cachy_effective_mode="\${cachy_mode}"
-fi
+set cachy_effective_mode="\${cachy_mode}"
 if [ "\${cachy_effective_mode}" = "thawed" ]; then
     set cachy_title="THAWED"
     set cachy_subvol="$MAINTENANCE_SUBVOL"
+    set cachy_boot_subvol="$MAINTENANCE_SUBVOL"
     set cachy_freeze_arg="cachy.freeze=0"
 else
     set cachy_title="FROZEN"
     set cachy_subvol="$ACTIVE_SUBVOL"
+    set cachy_boot_subvol="$GOLDEN_SUBVOL"
     set cachy_freeze_arg="cachy.freeze=1"
 fi
 
@@ -56,7 +55,7 @@ menuentry "\${cachy_title}" --class cachyos --class gnu-linux --class os --id 'c
         insmod part_gpt
         insmod btrfs
         search --no-floppy --fs-uuid --set=root $root_uuid
-        linux /\$cachy_subvol/boot/$kernel root=UUID=$root_uuid rw rootflags=subvol=\$cachy_subvol \$cachy_freeze_arg $kernel_args
+        linux /\$cachy_boot_subvol/boot/$kernel root=UUID=$root_uuid rw rootflags=subvol=\$cachy_subvol \$cachy_freeze_arg $kernel_args
         initrd $initrd_line
     fi
 }

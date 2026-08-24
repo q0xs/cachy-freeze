@@ -13,42 +13,20 @@ readonly BACKEND=$PROJECT_ROOT/deepfreeze/bin/cachy-freeze
 LOOP_DEVICE=
 
 cleanup() {
-  if mountpoint -q "$TOP"; then
-    umount "$TOP"
-  fi
-  if [[ -n $LOOP_DEVICE ]]; then
-    losetup -d "$LOOP_DEVICE"
-  fi
+  mountpoint -q "$TOP" && umount "$TOP" || true
+  [[ -z $LOOP_DEVICE ]] || losetup -d "$LOOP_DEVICE"
   rm -rf --one-file-system "$TEST_ROOT"
 }
-
-fail() {
-  printf 'TEST ERROR: %s\n' "$*" >&2
-  exit 1
-}
-
+fail() { printf 'TEST ERROR: %s\n' "$*" >&2; exit 1; }
 run_backend() {
   CACHY_FREEZE_CONFIG=$CONFIG \
-    CACHY_FREEZE_ROOT_SUBVOLUME=@ \
+    CACHY_FREEZE_ROOT_SUBVOLUME=${TEST_RUNNING_SUBVOL:-@} \
     "$BACKEND" "$@"
 }
 
-json_result_field() {
-  local path=$1 field=$2
-  python - "$path" "$field" <<'PY'
-import json
-import sys
-
-value = json.load(open(sys.argv[1], encoding="utf-8"))["result"]
-for component in sys.argv[2].split("."):
-    value = value[component]
-print(value)
-PY
-}
-
-(( EUID == 0 )) || fail "Entegrasyon testi root gerektirir."
+(( EUID == 0 )) || fail "The disposable loopback test requires root."
 for command in btrfs blkid grub-editenv losetup mkfs.btrfs python; do
-  command -v "$command" >/dev/null || fail "Gerekli test komutu yok: $command"
+  command -v "$command" >/dev/null || fail "Missing test command: $command"
 done
 trap cleanup EXIT
 
@@ -59,107 +37,65 @@ mkdir -p "$TOP" "$STATE"
 mount -o subvolid=5 "$LOOP_DEVICE" "$TOP"
 btrfs subvolume create "$TOP/@" >/dev/null
 mkdir -p "$TOP/@/boot/grub"
-touch \
-  "$TOP/@/boot/vmlinuz-linux-cachyos" \
-  "$TOP/@/boot/initramfs-linux-cachyos.img"
+touch "$TOP/@/boot/vmlinuz-linux-cachyos" "$TOP/@/boot/initramfs-linux-cachyos.img"
 printf "%s\n" "menuentry test --id 'cachyos-current' {" "}" \
   >"$TOP/@/boot/grub/grub.cfg"
 grub-editenv "$TOP/@/boot/grub/grubenv" create
+grub-editenv "$TOP/@/boot/grub/grubenv" set cachy_mode=thawed saved_entry=cachyos-current
+printf '%s\n' maintained-a >"$TOP/@/approved"
 
 cat >"$CONFIG" <<EOF
 STATE_DIR=$STATE
+STATE_SUBVOL=@cachy-state
 TOP_MOUNT=$TOP
 MAINTENANCE_SUBVOL=@
 GOLDEN_SUBVOL=@golden
-GOLDEN_PREVIOUS_SUBVOL=@golden.previous
 GOLDEN_NEXT_SUBVOL=@golden.next
-GOLDEN_PENDING_SUBVOL=@golden.previous.pending
+GOLDEN_PENDING_SUBVOL=@golden.pending
 ACTIVE_SUBVOL=@active
-PREVIOUS_SUBVOL=@active.previous
-NEXT_SUBVOL=@active.next
-ACTIVE_PENDING_SUBVOL=@active.previous.pending
-STATE_SUBVOL=@cachy-state
-SNAPSHOT_SUBVOL=@cachy-snapshots
-EXPORT_DIR=$STATE/exports
+ACTIVE_NEXT_SUBVOL=@active.next
+ACTIVE_PENDING_SUBVOL=@active.pending
+LEGACY_SNAPSHOT_SUBVOL=@cachy-snapshots
 LOG_FILE=$STATE/operations.jsonl
 LOCK_FILE=$TEST_ROOT/cachy-freeze.lock
-RETENTION_COUNT=3
 ROOT_UUID=
 ROOT_DEVICE=$LOOP_DEVICE
 EOF
 
-run_backend snapshot create --description 'Golden v1' >"$TEST_ROOT/one.json"
-snapshot_one=$(json_result_field "$TEST_ROOT/one.json" snapshot_id)
-printf '%s\n' v2 >"$TOP/@/version"
-run_backend snapshot create --description 'Golden v2' >"$TEST_ROOT/two.json"
-snapshot_two=$(json_result_field "$TEST_ROOT/two.json" snapshot_id)
-
-run_backend snapshot verify "$snapshot_one" >"$TEST_ROOT/verify.json"
-[[ $(json_result_field "$TEST_ROOT/verify.json" healthy) == True ]] ||
-  fail "Snapshot hizli dogrulamadan gecmedi."
-run_backend snapshot compare "$snapshot_one" "$snapshot_two" \
-  >"$TEST_ROOT/compare.json"
-
-run_backend publish --description 'Publish v2' >"$TEST_ROOT/publish.json"
-btrfs subvolume show "$TOP/@golden" >/dev/null || fail "Golden olusmadi."
-btrfs subvolume show "$TOP/@active" >/dev/null || fail "Active olusmadi."
-[[ $(btrfs property get -ts "$TOP/@golden" ro) == ro=true ]] ||
-  fail "Golden salt-okunur degil."
-[[ $(btrfs property get -ts "$TOP/@active" ro) == ro=false ]] ||
-  fail "Active yazilabilir degil."
-
-run_backend snapshot export "$snapshot_one" >"$TEST_ROOT/export.json"
-[[ -s $STATE/exports/$snapshot_one.btrfs ]] || fail "Export stream olusmadi."
-(cd "$STATE/exports" && sha256sum "$snapshot_one.btrfs") >/dev/null
-run_backend snapshot delete "$snapshot_one" >"$TEST_ROOT/delete.json"
-run_backend snapshot import "$snapshot_one.btrfs" >"$TEST_ROOT/import.json"
-imported=$(json_result_field "$TEST_ROOT/import.json" snapshot_id)
-run_backend snapshot rollback "$imported" >"$TEST_ROOT/rollback.json"
-grep -qx 'cachy_mode=frozen' <(
-  grub-editenv "$TOP/@/boot/grub/grubenv" list
-) || fail "Rollback Frozen boot modunu ayarlamadi."
-run_backend thaw-once >"$TEST_ROOT/thaw-once.json"
-grep -qx 'cachy_once=thawed' <(
-  grub-editenv "$TOP/@/boot/grub/grubenv" list
-) || fail "One-time THAWED boot could not be scheduled."
-run_backend thaw >"$TEST_ROOT/thaw.json"
-! grep -qx 'cachy_once=thawed' <(
-  grub-editenv "$TOP/@/boot/grub/grubenv" list
-) || fail "Persistent THAWED did not clear the one-time setting."
 run_backend freeze >"$TEST_ROOT/freeze.json"
+[[ -f $TOP/@golden/approved && -f $TOP/@active/approved ]] ||
+  fail "FREEZE did not create the Golden/Active pair."
+[[ $(btrfs property get -ts "$TOP/@golden" ro) == ro=true ]] ||
+  fail "Golden is not read-only."
+grep -qx 'cachy_mode=frozen' <(grub-editenv "$TOP/@/boot/grub/grubenv" list) ||
+  fail "FROZEN was not scheduled."
 
-# Simulate power loss after current Golden was moved to its pending name.
-btrfs subvolume snapshot -r "$TOP/@" "$TOP/@golden.next" >/dev/null
-btrfs subvolume snapshot "$TOP/@golden.next" "$TOP/@active.next" >/dev/null
-PYTHONPATH=$PROJECT_ROOT/src python - "$STATE" <<'PY'
-import sys
-from pathlib import Path
-from cachy_freeze.catalog import SnapshotCatalog
-
-SnapshotCatalog(Path(sys.argv[1])).begin_transaction(
-    "publish", "prepared", {"snapshot_id": "power-loss-test"}
-)
-PY
-mv "$TOP/@golden" "$TOP/@golden.previous.pending"
-run_backend status >"$TEST_ROOT/recovered-status.json"
-[[ ! -e $STATE/transaction.json ]] || fail "Transaction journal temizlenmedi."
-btrfs subvolume show "$TOP/@golden" >/dev/null || fail "Golden kurtarilamadi."
-btrfs subvolume show "$TOP/@active" >/dev/null || fail "Active kurtarilamadi."
-
-# Exercise repeated metadata/catalog/subvolume lifecycle operations to catch
-# leaks, ID collisions, and retention regressions under sustained use.
-for iteration in $(seq 1 25); do
-  printf 'stress-%s\n' "$iteration" >"$TOP/@/stress-state"
-  run_backend snapshot create --description "Stress snapshot $iteration" \
-    >"$TEST_ROOT/stress-$iteration.json"
-  if (( iteration % 5 == 0 )); then
-    printf 'Snapshot stress progress: %s/25\n' "$iteration"
-  fi
+for cycle in 1 2 3 4; do
+  printf 'maintained-%s\n' "$cycle" >"$TOP/@/approved"
+  grub-editenv "$TOP/@/boot/grub/grubenv" set cachy_mode=thawed
+  run_backend freeze >"$TEST_ROOT/freeze-$cycle.json"
+done
+for forbidden in \
+  @golden.next @golden.pending @active.next @active.pending \
+  @golden.previous @active.previous @cachy-snapshots; do
+  [[ ! -e $TOP/$forbidden ]] || fail "History accumulated: $forbidden"
 done
 
-run_backend health >"$TEST_ROOT/health.json"
-run_backend snapshot cleanup --keep 2 >"$TEST_ROOT/cleanup.json"
-[[ $(run_backend snapshot list | python -c 'import json,sys; print(len(json.load(sys.stdin)["result"]))') -eq 2 ]] ||
-  fail "Snapshot retention politikasi uygulanmadi."
+printf '%s\n' runtime-only >"$TOP/@active/unique-marker"
+TEST_RUNNING_SUBVOL=@active run_backend thaw >"$TEST_ROOT/thaw.json"
+[[ ! -e $TOP/@/unique-marker && ! -e $TOP/@golden/unique-marker ]] ||
+  fail "THAW promoted disposable runtime data."
+TEST_RUNNING_SUBVOL=@ run_backend boot-success >"$TEST_ROOT/boot-success.json"
+[[ ! -e $TOP/@active ]] || fail "THAWED boot retained stale @active."
 
-printf '%s\n' "Snapshot engine integration tests passed."
+# Mismatched legacy contents must fail closed without deletion.
+btrfs subvolume create "$TOP/@cachy-snapshots" >/dev/null
+btrfs subvolume create "$TOP/@cachy-snapshots/unowned" >/dev/null
+printf '%s\n' '{"schema":1,"snapshots":[]}' >"$STATE/snapshots.json"
+if run_backend migrate >"$TEST_ROOT/migrate.json" 2>"$TEST_ROOT/migrate.err"; then
+  fail "Ambiguous legacy history was accepted."
+fi
+btrfs subvolume show "$TOP/@cachy-snapshots/unowned" >/dev/null ||
+  fail "Fail-closed migration deleted unowned data."
+
+printf '%s\n' "Freeze/thaw engine integration tests passed."

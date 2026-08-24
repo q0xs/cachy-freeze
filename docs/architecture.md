@@ -1,67 +1,72 @@
 # Architecture
 
-CachyFreeze separates persistent maintenance, immutable baseline, and disposable runtime state.
+CachyFreeze is a local two-mode appliance. The unprivileged PyQt6 GUI sends an
+exact allow-listed action through PolicyKit. The privileged helper invokes the
+Python engine with structured arguments. Only the engine may mutate Btrfs or
+GRUB state.
 
 | Subvolume | Purpose |
 | --- | --- |
-| `@` | Persistent THAWED maintenance root |
-| `@golden` | Read-only known-good baseline |
-| `@active` | Writable FROZEN root recreated from Golden |
-| `@cachy-state` | Persistent metadata, audit, and transaction state |
-| `@cachy-snapshots` | Managed snapshots |
+| `@` | Persistent writable THAWED maintenance root |
+| `@golden` | Read-only approved FROZEN baseline |
+| `@active` | Writable disposable FROZEN root, recreated at every FROZEN boot |
+| `@cachy-state` | Minimal version, transaction, boot proof, and status metadata |
 
-The GRUB entry supplies `cachy.freeze=0` or `cachy.freeze=1`. In FROZEN mode,
-the initramfs reset service validates the root device and transaction journal,
-then recreates Active atomically from Golden before switching root.
+`@golden.next`, `@golden.pending`, `@active.next`, and `@active.pending` are
+transaction-scoped names. They are not recovery history and must not remain
+after a successful operation.
 
-The PyQt6 application is unprivileged. It calls a narrow PolicyKit helper with
-validated action names and arguments. The helper invokes the Python engine and
-internal installer scripts without `shell=True`. Passwords use stdin only.
+## State transitions
 
-Engine installation, user management, and FROZEN activation are deliberately
-independent. Templates are refreshed for `localadm` and for any optional managed
-users that exist; the absence of a managed user never blocks Golden publication.
+### FREEZE
 
-GUI-created users follow the native `useradd` standard-account path. CachyFreeze
-does not rewrite their group membership. Before the account is committed, a
-verified provisioner checks the managed application set, installs desktop and KDE
-defaults, creates the per-user MicroSIP Wine prefix, rejects unexpected
-administrator membership, and only then captures the FROZEN home template.
-Provisioning failure removes the partial account and candidate template.
+```text
+verified running @ (THAWED)
+→ lock and validate filesystem/boot state
+→ sync and snapshot @ read-only to @golden.next
+→ validate candidate boot files and read-only state
+→ create and validate @active.next
+→ move current roots to transaction-scoped pending names
+→ activate candidates
+→ verify and schedule FROZEN in GRUB environment
+→ delete pending objects and close the journal
+```
 
-The optional login-screen selection targets the display manager that is actually
-enabled and only preselects the managed account; PAM password authentication is
-never bypassed. Before finalization, CachyFreeze disables its owned Plasma Login
-Manager/SDDM automatic-login drop-ins and reapplies the password-required greeter
-selection. User creation itself never publishes Golden or changes the scheduled
-boot mode.
+Before the final commit, interruption recovery restores pending predecessors.
+After the boot-mode commit, recovery validates the new pair and removes pending
+objects. An invalid candidate is never activated deliberately.
 
-Golden/Active replacement uses staged subvolumes and a durable transaction
-journal. Early boot can roll forward interrupted publication. Boot-health resets
-the failure counter only after a pending first-FROZEN validation proves the
-expected boot ID, FROZEN mode, `@active` root, Golden/Active presence, home reset,
-administrator restriction, and graphical managed-user session. Repeated failures
-can restore the previous healthy Golden.
+### FROZEN boot
 
-Finalization is logout-aware. The GUI asks the desktop to end the normal session,
-while a persistent system service waits for managed sessions and processes to
-leave, restores every managed home from its existing clean template, then
-publishes Golden and schedules FROZEN as one locked operation. Session artifacts
-are never promoted into the baseline. A timeout fails closed and leaves an
-auditable pending/error state.
+GRUB loads the FROZEN kernel, microcode, and initramfs from read-only `@golden`,
+never from the previous writable `@active`; the selected root remains
+`@active`. The initramfs hook then verifies the configured Btrfs device and
+Golden, rolls back an interrupted pre-boot transaction when pending names prove
+the old roots, deletes all disposable runtime objects, creates a fresh writable
+runtime from Golden, validates it, and exposes it as `@active`.
 
-The installed idle-power service reads the logind seat idle hint. After one hour
-without activity it uses an RTC-timed suspend for one further hour. A complete
-timed sleep powers off the workstation; a manual/early wake clears the RTC alarm,
-cancels shutdown, and requires a new active-to-idle cycle. Missing RTC support is
-reported as unsupported and never triggers a partial suspend policy.
+No previous runtime is renamed into history. Failure enters initramfs emergency
+handling rather than booting an unverified root.
 
-Application provisioning, finalization, first-boot validation, diagnostics,
-power policy, and state versioning are separate engine modules. Persistent state
-has an explicit schema and idempotent migration record. Live deployment stages
-and compiles the candidate, backs up only managed paths, migrates and verifies
-the installation, and restores the allow-listed backup set on failure.
+### THAW
 
-Diagnostic export is bounded and redacts user names, home paths, devices,
-addresses, hardware identifiers, boot identifiers, credentials, tokens, hashes,
-and sensitive key/value fields before creating a mode-0600 archive.
+While verified FROZEN, the engine verifies persistent `@`, writes and verifies
+the managed GRUB environment, and schedules THAWED. It never snapshots or copies
+`@active`. Once a THAWED graphical boot is verified, the boot-verification
+service deletes stale CachyFreeze runtime objects.
+
+## Existing installations
+
+Migration removes `@cachy-snapshots` only when every child exactly matches the
+owned, valid `snapshots.json` catalog. Missing, malformed, or mismatched
+ownership evidence aborts migration without deletion. Unrelated Snapper,
+Timeshift, Btrfs, and GRUB resources are never migration targets.
+
+The installer disables and removes only known CachyFreeze legacy services and
+binaries. It preserves unrelated GRUB generators and entries.
+
+## Data guarantee
+
+CachyFreeze keeps no logically accessible historical FROZEN runtime or Golden
+archive. This is not physical secure erase; Btrfs CoW, TRIM, SSD wear leveling,
+and storage-controller behavior remain outside this guarantee.

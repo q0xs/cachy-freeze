@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin
+unset CDPATH ENV BASH_ENV PYTHONHOME PYTHONPATH
+
 PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 readonly PROJECT_ROOT
 readonly AUTH_GENERATOR=$PROJECT_ROOT/deepfreeze/grub/01_cachy_auth
@@ -18,6 +21,24 @@ command -v grub-mkpasswd-pbkdf2 >/dev/null ||
 command -v grub-mkconfig >/dev/null || die "grub-mkconfig was not found."
 [[ -r $AUTH_GENERATOR ]] || die "The GRUB authorization generator is missing."
 
+backup_dir=$(mktemp -d /run/cachy-freeze-grub-auth.XXXXXXXX)
+readonly backup_dir
+[[ ! -e $AUTH_CONFIG ]] || cp -a "$AUTH_CONFIG" "$backup_dir/auth.conf"
+cp -a /boot/grub/grub.cfg "$backup_dir/grub.cfg"
+restore_auth() {
+  local rc=$?
+  trap - ERR
+  if [[ -e $backup_dir/auth.conf ]]; then
+    cp -a "$backup_dir/auth.conf" "$AUTH_CONFIG"
+  else
+    rm -f "$AUTH_CONFIG"
+  fi
+  cp -a "$backup_dir/grub.cfg" /boot/grub/grub.cfg
+  rm -rf --one-file-system "$backup_dir"
+  exit "$rc"
+}
+trap restore_auth ERR
+
 if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
   IFS= read -r grub_password || die "GRUB password was not received from the GUI channel."
   (( ${#grub_password} >= 12 && ${#grub_password} <= 256 )) ||
@@ -25,6 +46,12 @@ if [[ ${CACHY_SETUP_NONINTERACTIVE:-0} == 1 ]]; then
   [[ $grub_password != *:* && $grub_password != *$'\n'* && \
     $grub_password != *$'\r'* ]] ||
     die "GRUB password contains an unsupported character."
+  password_classes=0
+  [[ $grub_password =~ [a-z] ]] && ((password_classes += 1))
+  [[ $grub_password =~ [A-Z] ]] && ((password_classes += 1))
+  [[ $grub_password =~ [0-9] ]] && ((password_classes += 1))
+  [[ $grub_password =~ [^A-Za-z0-9] ]] && ((password_classes += 1))
+  (( password_classes >= 3 )) || die "Use at least three password character classes."
   hash=$(
     printf '%s\n%s\n' "$grub_password" "$grub_password" |
       grub-mkpasswd-pbkdf2 |
@@ -46,6 +73,7 @@ install -m 0755 "$AUTH_GENERATOR" /etc/grub.d/01_cachy_auth
 umask 077
 printf 'GRUB_AUTH_USER=%q\nGRUB_AUTH_HASH=%q\n' \
   "$AUTH_USER" "$hash" >"$AUTH_CONFIG"
+chmod 0600 "$AUTH_CONFIG"
 
 grub-mkconfig -o /boot/grub/grub.cfg
 grep -q "^set superusers=\"$AUTH_USER\"$" /boot/grub/grub.cfg ||
@@ -61,11 +89,14 @@ grep -q 'set cachy_boot_authorized="false"' /boot/grub/grub.cfg ||
   die "The fail-closed GRUB authorization guard was not added."
 grep -q 'if \[ "\${cachy_boot_authorized}" = "true" \]; then' /boot/grub/grub.cfg ||
   die "GRUB boot commands are not protected by the authorization result."
-[[ $(grep -c '^menuentry ' /boot/grub/grub.cfg) -eq 1 ]] ||
-  die "The GRUB menu contains more than one entry."
+[[ $(grep -c -- "--id 'cachyos-current'" /boot/grub/grub.cfg) -eq 1 ]] ||
+  die "Exactly one managed CachyFreeze entry is required."
+
+trap - ERR
+rm -rf --one-file-system "$backup_dir"
 
 printf '%s\n' \
   "GRUB maintenance protection was enabled." \
   "Fixed GRUB username: $AUTH_USER" \
-  "The menu shows one entry named FROZEN or THAWED according to the mode." \
+  "The managed entry is named FROZEN or THAWED according to the mode." \
   "FROZEN is passwordless; THAWED requires $AUTH_USER and the GRUB password."

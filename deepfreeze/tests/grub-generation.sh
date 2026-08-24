@@ -55,8 +55,12 @@ grep -q 'set cachy_freeze_arg="cachy.freeze=1"' "$OUTPUT" ||
   fail "The FROZEN kernel argument is incorrect."
 grep -q 'set cachy_freeze_arg="cachy.freeze=0"' "$OUTPUT" ||
   fail "The THAWED kernel argument is incorrect."
-grep -Fq 'linux /$cachy_subvol/boot/vmlinuz-linux-cachyos ' "$OUTPUT" ||
-  fail "The kernel is not loaded from the dynamic subvolume."
+grep -q 'set cachy_boot_subvol="@golden"' "$OUTPUT" ||
+  fail "FROZEN boot files are not pinned to the Golden baseline."
+grep -Fq 'linux /$cachy_boot_subvol/boot/vmlinuz-linux-cachyos ' "$OUTPUT" ||
+  fail "The kernel is not loaded from the verified boot subvolume."
+grep -Fq 'initrd /$cachy_boot_subvol/boot/intel-ucode.img /$cachy_boot_subvol/boot/initramfs-linux-cachyos.img' "$OUTPUT" ||
+  fail "The initramfs and microcode are not loaded from the verified boot subvolume."
 grep -Fq 'if [ "${cachy_effective_mode}" = "thawed" ]; then' "$OUTPUT" ||
   fail "The THAWED authorization condition is missing."
 grep -q '^[[:space:]]*if authenticate; then$' "$OUTPUT" ||
@@ -65,8 +69,6 @@ grep -q 'set cachy_boot_authorized="false"' "$OUTPUT" ||
   fail "The GRUB authorization guard does not fail closed."
 grep -q 'if \[ "\${cachy_boot_authorized}" = "true" \]; then' "$OUTPUT" ||
   fail "Kernel loading is not guarded by successful authentication."
-grep -Fq 'set cachy_effective_mode="thawed"' "$OUTPUT" ||
-  fail "One-time Thawed mode is not selected."
 grep -q "^menuentry .*--unrestricted" "$OUTPUT" ||
   fail "Passwordless selection of the FROZEN entry is missing."
 

@@ -25,7 +25,7 @@ fail() {
   exit 1
 }
 
-(( EUID == 0 )) || fail "Initramfs testi root gerektirir."
+(( EUID == 0 )) || fail "The disposable initramfs test requires root."
 
 for path in \
   "$INSTALLED_RESET" \
@@ -45,16 +45,12 @@ cat >"$INSTALLED_CONFIG" <<EOF
 ROOT_UUID=$(findmnt -n -o UUID /)
 MAINTENANCE_SUBVOL=@
 GOLDEN_SUBVOL=@golden
-GOLDEN_PREVIOUS_SUBVOL=@golden.previous
 GOLDEN_NEXT_SUBVOL=@golden.next
-GOLDEN_PENDING_SUBVOL=@golden.previous.pending
-FAILED_GOLDEN_SUBVOL=@golden.failed
+GOLDEN_PENDING_SUBVOL=@golden.pending
 ACTIVE_SUBVOL=@active
-PREVIOUS_SUBVOL=@active.previous
-NEXT_SUBVOL=@active.next
-ACTIVE_PENDING_SUBVOL=@active.previous.pending
+ACTIVE_NEXT_SUBVOL=@active.next
+ACTIVE_PENDING_SUBVOL=@active.pending
 STATE_SUBVOL=@cachy-state
-BOOT_FAILURE_LIMIT=3
 EOF
 chmod 0600 "$INSTALLED_CONFIG"
 
@@ -63,7 +59,7 @@ for kernel in /usr/lib/modules/*; do
   version=${kernel##*/}
   image="$TEST_DIR/initramfs-$version.img"
 
-  printf 'Kernel initramfs testi: %s\n' "$version"
+  printf 'Testing kernel initramfs: %s\n' "$version"
   mkinitcpio -n -k "$version" -g "$image" -A cachy-freeze
 
   listing="$TEST_DIR/initramfs-$version.list"

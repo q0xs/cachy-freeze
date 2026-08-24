@@ -1,22 +1,4 @@
-# Temporary GitHub CLI downloads
-/.tools/
-/gh_*_windows_*.zip
-/gh_*_checksums.txt
-
-# Accidental nested repository copy
-/cachy-freeze/
-
-# Runtime, cache, and log files
-*.log
-*.tmp
-*.bak
-*.swp
-*~
 __pycache__/
 *.py[cod]
-
-# Operating-system and editor files
-.DS_Store
-Thumbs.db
-/.idea/
-/.vscode/
+dist/*.run
+dist/*.run.sha256

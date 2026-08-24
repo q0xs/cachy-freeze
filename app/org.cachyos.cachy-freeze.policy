@@ -3,12 +3,12 @@
  "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
 <policyconfig>
-  <vendor>CachyOS Workstation</vendor>
+  <vendor>CachyFreeze</vendor>
   <vendor_url>https://cachyos.org/</vendor_url>
 
   <action id="org.cachyos.cachy-freeze.manage">
-    <description>Manage the CachyOS workstation platform</description>
-    <message>Administrator authentication is required for this management operation</message>
+    <description>Change CachyFreeze system mode</description>
+    <message>Administrator authentication is required for this CachyFreeze operation</message>
     <defaults>
       <allow_any>no</allow_any>
       <allow_inactive>no</allow_inactive>

@@ -1,11 +1,11 @@
 [Desktop Entry]
 Type=Application
-Name=CachyFreeze Management Center
-GenericName=CachyOS Workstation Management
-Comment=Manage freeze, snapshots, users, and updates
+Name=CachyFreeze
+GenericName=System Freeze Utility
+Comment=Switch this computer between FROZEN and THAWED modes
 Exec=/usr/bin/cachy-freeze-manager
 Icon=cachy-freeze
 Terminal=false
 Categories=System;
-Keywords=freeze;deepfreeze;thaw;maintenance;snapshot;
+Keywords=freeze;thaw;maintenance;
 StartupNotify=true

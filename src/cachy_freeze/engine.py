@@ -1,21 +1,11 @@
-"""Btrfs, GRUB, snapshot, and recovery orchestration.
-
-All mutating operations are serialized. Commands are passed as argument arrays,
-never through a shell, and every multi-step rotation leaves enough state for a
-forward recovery after an interrupted rename.
-"""
+"""Fail-closed Btrfs and GRUB orchestration for FROZEN and THAWED modes."""
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
-import platform
 import re
-import shlex
 import shutil
-import subprocess
-import time
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -23,26 +13,24 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .applications import ApplicationVerifier
-from .catalog import AuditLogger, SnapshotCatalog, atomic_json_write, atomic_text_write
+from .catalog import AuditLogger, OperationJournal, atomic_json_write
 from .config import Config
-from .diagnostics import DiagnosticBundleBuilder
-from .errors import CachyFreezeError, CommandError, IntegrityError
-from .finalization import FinalizationManager
-from .models import SnapshotMetadata
-from .power import IdlePowerManager
+from .errors import CachyFreezeError, IntegrityError
 from .runner import CommandRunner, ProcessLock
-from .settings import SettingsStore
-from .validation import BootValidationManager
 from .versioning import APP_VERSION, STATE_SCHEMA_VERSION, StateMigrationManager
 
-try:
-    import pwd
-except ImportError:  # pragma: no cover - Windows-only test compatibility
-    pwd = None  # type: ignore[assignment]
-
-
-_SNAPSHOT_ID_RE = re.compile(r"^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$")
+_LEGACY_SNAPSHOT_ID = re.compile(r"^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$")
+_FILESYSTEM_UUID = re.compile(
+    r"^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
+    r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
+)
+_LEGACY_TRANSIENTS = (
+    "@golden.previous",
+    "@golden.previous.pending",
+    "@golden.failed",
+    "@active.previous",
+    "@active.previous.pending",
+)
 
 
 class FreezeEngine:
@@ -51,19 +39,19 @@ class FreezeEngine:
         config: Config,
         *,
         runner: CommandRunner | None = None,
-        catalog: SnapshotCatalog | None = None,
+        journal: OperationJournal | None = None,
         logger: AuditLogger | None = None,
     ) -> None:
         self.config = config
         self.runner = runner or CommandRunner()
-        self.catalog = catalog or SnapshotCatalog(Path(config.STATE_DIR))
+        self.journal = journal or OperationJournal(Path(config.STATE_DIR))
         self.logger = logger or AuditLogger(Path(config.LOG_FILE))
         self.top = Path(config.TOP_MOUNT)
 
     @staticmethod
     def require_root() -> None:
         if not hasattr(os, "geteuid") or os.geteuid() != 0:
-            raise CachyFreezeError("This operation requires root privileges.")
+            raise CachyFreezeError("This operation requires administrator authorization.")
 
     def _root_source(self) -> str:
         source = self.runner.text(["findmnt", "-n", "-o", "SOURCE", "/"])
@@ -72,28 +60,32 @@ class FreezeEngine:
         return source
 
     def _root_device(self) -> str:
-        if self.config.ROOT_DEVICE:
-            return self.config.ROOT_DEVICE
-        return self._root_source().split("[", 1)[0]
+        return self.config.ROOT_DEVICE or self._root_source().split("[", 1)[0]
 
     def _root_uuid(self) -> str:
-        if self.config.ROOT_DEVICE:
-            value = self.runner.text(
+        test_override = os.environ.get("CACHY_FREEZE_ROOT_SUBVOLUME")
+        if test_override and self.config.ROOT_DEVICE:
+            mounted_uuid = self.runner.text(
                 ["blkid", "-s", "UUID", "-o", "value", self.config.ROOT_DEVICE]
             )
-            if value:
-                return value
-        value = self.runner.text(["findmnt", "-n", "-o", "UUID", "/"])
-        if not value:
-            raise CachyFreezeError("The root filesystem UUID could not be detected.")
-        return value
+        else:
+            mounted_uuid = self.runner.text(["findmnt", "-n", "-o", "UUID", "/"])
+        if not _FILESYSTEM_UUID.fullmatch(mounted_uuid):
+            raise CachyFreezeError("The mounted root filesystem UUID is missing or malformed.")
+        if self.config.ROOT_DEVICE:
+            device_uuid = self.runner.text(
+                ["blkid", "-s", "UUID", "-o", "value", self.config.ROOT_DEVICE]
+            )
+            if not device_uuid or device_uuid.lower() != mounted_uuid.lower():
+                raise IntegrityError("Configured root device does not match the running root")
+        if self.config.ROOT_UUID and self.config.ROOT_UUID.lower() != mounted_uuid.lower():
+            raise IntegrityError("Configured root UUID does not match the running root")
+        return mounted_uuid
 
     def _root_subvolume(self) -> str:
-        if override := os.environ.get("CACHY_FREEZE_ROOT_SUBVOLUME"):
-            if override not in {
-                self.config.MAINTENANCE_SUBVOL,
-                self.config.ACTIVE_SUBVOL,
-            }:
+        override = os.environ.get("CACHY_FREEZE_ROOT_SUBVOLUME")
+        if override:
+            if override not in {self.config.MAINTENANCE_SUBVOL, self.config.ACTIVE_SUBVOL}:
                 raise CachyFreezeError("Invalid test root-subvolume override.")
             return override
         source = self._root_source()
@@ -106,29 +98,41 @@ class FreezeEngine:
             arguments = Path("/proc/cmdline").read_text(encoding="utf-8").split()
         except OSError:
             arguments = []
-        if "cachy.freeze=1" in arguments:
-            return "frozen"
-        if "cachy.freeze=0" in arguments:
-            return "thawed"
+        marker = "frozen" if "cachy.freeze=1" in arguments else None
+        marker = "thawed" if "cachy.freeze=0" in arguments else marker
         try:
-            current_subvolume = self._root_subvolume()
+            subvolume = self._root_subvolume()
         except CachyFreezeError:
             return "unknown"
-        if current_subvolume == self.config.MAINTENANCE_SUBVOL:
-            return "thawed"
-        if current_subvolume == self.config.ACTIVE_SUBVOL:
-            return "frozen"
-        return "unknown"
+        actual = {
+            self.config.MAINTENANCE_SUBVOL: "thawed",
+            self.config.ACTIVE_SUBVOL: "frozen",
+        }.get(subvolume, "unknown")
+        if marker is not None and marker != actual:
+            return "unknown"
+        return marker or actual
 
     @contextmanager
     def mounted_top(self) -> Iterator[None]:
+        if self.top.is_symlink():
+            raise IntegrityError("The top-level Btrfs mount path must not be a symlink")
         self.top.mkdir(parents=True, exist_ok=True)
-        mounted = self.runner.run(["mountpoint", "-q", str(self.top)], check=False).returncode == 0
+        mounted = self.runner.run(
+            ["mountpoint", "-q", str(self.top)], check=False
+        ).returncode == 0
         mounted_here = False
         if mounted:
+            filesystem = self.runner.text(["findmnt", "-n", "-o", "FSTYPE", str(self.top)])
             mounted_uuid = self.runner.text(["findmnt", "-n", "-o", "UUID", str(self.top)])
-            if mounted_uuid != self._root_uuid():
-                raise CachyFreezeError(f"A different filesystem is mounted at {self.top}.")
+            filesystem_root = self.runner.text(
+                ["findmnt", "-n", "-o", "FSROOT", str(self.top)]
+            )
+            if (
+                filesystem != "btrfs"
+                or mounted_uuid != self._root_uuid()
+                or filesystem_root != "/"
+            ):
+                raise CachyFreezeError(f"An unexpected filesystem is mounted at {self.top}.")
         else:
             self.runner.run(
                 [
@@ -143,323 +147,168 @@ class FreezeEngine:
             )
             mounted_here = True
         try:
+            filesystem = self.runner.text(["findmnt", "-n", "-o", "FSTYPE", str(self.top)])
+            mounted_uuid = self.runner.text(["findmnt", "-n", "-o", "UUID", str(self.top)])
+            filesystem_root = self.runner.text(
+                ["findmnt", "-n", "-o", "FSROOT", str(self.top)]
+            )
+            if (
+                filesystem != "btrfs"
+                or mounted_uuid != self._root_uuid()
+                or filesystem_root != "/"
+            ):
+                raise CachyFreezeError(f"An unexpected filesystem is mounted at {self.top}.")
             yield
         finally:
             if mounted_here:
                 self.runner.run(["umount", str(self.top)], check=False)
 
-    def _subvolume_path(self, name: str) -> Path:
-        return self.top / name
+    def _managed_path(self, name: str) -> Path:
+        if name not in self.config.managed_subvolumes:
+            raise IntegrityError(f"Refusing unmanaged Btrfs target: {name}")
+        path = self.top / name
+        if path.parent != self.top or path.name != name or path.is_symlink():
+            raise IntegrityError(f"Unsafe Btrfs target: {name}")
+        return path
 
-    def _subvolume_exists(self, name_or_path: str | Path) -> bool:
-        path = (
-            name_or_path if isinstance(name_or_path, Path) else self._subvolume_path(name_or_path)
-        )
-        return (
-            self.runner.run(["btrfs", "subvolume", "show", str(path)], check=False).returncode == 0
-        )
+    def _subvolume_exists(self, name: str) -> bool:
+        path = self._managed_path(name)
+        return self.runner.run(
+            ["btrfs", "subvolume", "show", str(path)], check=False
+        ).returncode == 0
 
-    def _delete_subvolume(self, name_or_path: str | Path) -> None:
-        path = (
-            name_or_path if isinstance(name_or_path, Path) else self._subvolume_path(name_or_path)
-        )
-        if self._subvolume_exists(path):
-            # Commit the directory removal before returning, so a crash cannot
-            # resurrect the subvolume name.  Full block reclamation remains an
-            # asynchronous Btrfs job; waiting for ``subvolume sync`` here made
-            # retention cleanup stall for many seconds per snapshot.
+    def _delete_subvolume(self, name: str) -> None:
+        path = self._managed_path(name)
+        if self._subvolume_exists(name):
             self.runner.run(["btrfs", "subvolume", "delete", "--commit-after", str(path)])
 
-    def _subvolume_details(self, path: Path) -> dict[str, str]:
-        output = self.runner.text(["btrfs", "subvolume", "show", str(path)])
-        details: dict[str, str] = {}
-        for raw_line in output.splitlines():
-            if ":" not in raw_line:
-                continue
-            key, value = raw_line.strip().split(":", 1)
-            details[key.strip().lower().replace(" ", "_")] = value.strip()
-        if not details.get("uuid"):
-            raise IntegrityError(f"Btrfs UUID could not be read for {path}")
-        return details
-
-    def _subvolume_sizes(self, path: Path) -> tuple[int, int]:
-        output = self.runner.text(["btrfs", "filesystem", "du", "-s", "--raw", str(path)])
-        for raw_line in reversed(output.splitlines()):
-            fields = raw_line.split()
-            if len(fields) >= 3 and fields[0].isdigit() and fields[1].isdigit():
-                return int(fields[0]), int(fields[1])
-        raise IntegrityError(f"Btrfs size information could not be read for {path}")
-
-    def _is_read_only(self, path: Path) -> bool:
-        output = self.runner.text(["btrfs", "property", "get", "-ts", str(path), "ro"])
+    def _is_read_only(self, name: str) -> bool:
+        output = self.runner.text(
+            ["btrfs", "property", "get", "-ts", str(self._managed_path(name)), "ro"]
+        )
         return output == "ro=true"
 
-    def _ensure_snapshot_parent(self) -> Path:
-        parent = self._subvolume_path(self.config.SNAPSHOT_SUBVOL)
-        if not self._subvolume_exists(parent):
-            self.runner.run(["btrfs", "subvolume", "create", str(parent)])
-        return parent
+    def _validate_golden(self, name: str) -> None:
+        path = self._managed_path(name)
+        if not self._subvolume_exists(name):
+            raise IntegrityError(f"Golden candidate is missing: {name}")
+        if not self._is_read_only(name):
+            raise IntegrityError(f"Golden candidate is not read-only: {name}")
+        for relative in ("boot/vmlinuz-linux-cachyos", "boot/initramfs-linux-cachyos.img"):
+            if not (path / relative).is_file():
+                raise IntegrityError(f"Golden candidate is missing required boot file: {relative}")
 
-    @staticmethod
-    def _creator() -> str:
-        if pwd is not None and (uid := os.environ.get("PKEXEC_UID")):
-            try:
-                return pwd.getpwuid(int(uid)).pw_name
-            except (KeyError, ValueError):
-                pass
-        return os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
+    def _validate_active(self, name: str) -> None:
+        if not self._subvolume_exists(name):
+            raise IntegrityError(f"Disposable runtime is missing: {name}")
+        if self._is_read_only(name):
+            raise IntegrityError(f"Disposable runtime is unexpectedly read-only: {name}")
 
-    def _create_snapshot_locked(
-        self,
-        source: Path,
-        description: str,
-        *,
-        frozen: bool,
-    ) -> SnapshotMetadata:
-        description = " ".join(description.split())
-        if not description or len(description) > 512:
-            raise CachyFreezeError("Snapshot description must contain 1-512 characters.")
-        parent = self._ensure_snapshot_parent()
-        snapshot_id = f"snap-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
-        temporary = parent / f".{snapshot_id}.next"
-        destination = parent / snapshot_id
-        started = time.monotonic()
-        self._delete_subvolume(temporary)
-        try:
-            self.runner.run(["btrfs", "subvolume", "snapshot", "-r", str(source), str(temporary)])
-            if not self._is_read_only(temporary):
-                raise IntegrityError("Created snapshot is not read-only")
-            os.replace(temporary, destination)
-            self.runner.run(["sync"])
-            details = self._subvolume_details(destination)
-            apparent, exclusive = self._subvolume_sizes(destination)
-            relative = f"{self.config.SNAPSHOT_SUBVOL}/{snapshot_id}"
-            metadata = SnapshotMetadata.create(
-                snapshot_id=snapshot_id,
-                subvolume=relative,
-                btrfs_uuid=details["uuid"],
-                parent_uuid=details.get("parent_uuid", "-"),
-                created_at=datetime.now(UTC).isoformat(),
-                kernel=platform.release(),
-                apparent_size_bytes=apparent,
-                exclusive_size_bytes=exclusive,
-                description=description,
-                created_by=self._creator(),
-                frozen=frozen,
-                bootable=(destination / "boot" / "vmlinuz-linux-cachyos").is_file(),
-                creation_duration_ms=round((time.monotonic() - started) * 1000),
-                source_subvolume=source.name,
-            )
-            self.catalog.add(metadata)
-        except Exception:
-            self._delete_subvolume(temporary)
-            self._delete_subvolume(destination)
-            raise
-        self.logger.write(
-            "INFO",
-            "snapshot.create",
-            "Snapshot created",
-            snapshot_id=snapshot_id,
-            btrfs_uuid=metadata.btrfs_uuid,
-            source=source.name,
-        )
-        return metadata
-
-    def _restore_pair(
-        self,
-        current: str,
-        candidate: str,
-        previous: str,
-        pending: str,
-        *,
-        require_current: bool = True,
-    ) -> None:
-        current_path = self._subvolume_path(current)
-        candidate_path = self._subvolume_path(candidate)
-        previous_path = self._subvolume_path(previous)
-        pending_path = self._subvolume_path(pending)
-
-        has_current = self._subvolume_exists(current_path)
-        has_candidate = self._subvolume_exists(candidate_path)
-        has_pending = self._subvolume_exists(pending_path)
-        if not has_current and has_candidate:
-            os.replace(candidate_path, current_path)
-            has_current = True
-            has_candidate = False
-        if not has_current and has_pending:
-            os.replace(pending_path, current_path)
-            has_current = True
-            has_pending = False
-        if has_current and has_pending:
-            self._delete_subvolume(previous_path)
-            os.replace(pending_path, previous_path)
-            has_pending = False
-        if has_current and has_candidate:
-            self._delete_subvolume(candidate_path)
-        if require_current and not has_current:
-            raise IntegrityError(f"Recovery could not restore subvolume {current}")
-        if has_pending:
-            raise IntegrityError(f"Recovery could not finalize subvolume {pending}")
-
-    def _commit_pair(self, current: str, candidate: str, previous: str, pending: str) -> None:
-        current_path = self._subvolume_path(current)
-        candidate_path = self._subvolume_path(candidate)
-        previous_path = self._subvolume_path(previous)
-        pending_path = self._subvolume_path(pending)
-        if not self._subvolume_exists(candidate_path):
+    def _replace_with_candidate(self, current: str, candidate: str, pending: str) -> None:
+        if not self._subvolume_exists(candidate):
             raise IntegrityError(f"Transaction candidate is missing: {candidate}")
-        if self._subvolume_exists(pending_path):
-            self._restore_pair(current, candidate, previous, pending)
-            return
-        if self._subvolume_exists(current_path):
-            os.replace(current_path, pending_path)
-        os.replace(candidate_path, current_path)
-        self._delete_subvolume(previous_path)
-        if self._subvolume_exists(pending_path):
-            os.replace(pending_path, previous_path)
+        if self._subvolume_exists(pending):
+            raise IntegrityError(f"Transaction pending target already exists: {pending}")
+        if self._subvolume_exists(current):
+            os.replace(self._managed_path(current), self._managed_path(pending))
+        os.replace(self._managed_path(candidate), self._managed_path(current))
         self.runner.run(["sync"])
 
+    def _rollback_pair(self, current: str, candidate: str, pending: str) -> None:
+        if self._subvolume_exists(pending):
+            self._delete_subvolume(current)
+            os.replace(self._managed_path(pending), self._managed_path(current))
+        self._delete_subvolume(candidate)
+
+    def _cleanup_transaction_subvolumes(self) -> None:
+        for name in (
+            self.config.GOLDEN_NEXT_SUBVOL,
+            self.config.ACTIVE_NEXT_SUBVOL,
+            self.config.GOLDEN_PENDING_SUBVOL,
+            self.config.ACTIVE_PENDING_SUBVOL,
+        ):
+            self._delete_subvolume(name)
+
     def _recover_transaction_locked(self) -> None:
-        transaction = self.catalog.transaction()
+        transaction = self.journal.load()
         if transaction is None:
+            unexpected = [
+                name
+                for name in (
+                    self.config.GOLDEN_NEXT_SUBVOL,
+                    self.config.GOLDEN_PENDING_SUBVOL,
+                    self.config.ACTIVE_NEXT_SUBVOL,
+                    self.config.ACTIVE_PENDING_SUBVOL,
+                )
+                if self._subvolume_exists(name)
+            ]
+            if unexpected:
+                raise IntegrityError(
+                    "Unowned transaction subvolumes require manual review: "
+                    + ", ".join(unexpected)
+                )
             return
-        if transaction["kind"] not in {"publish", "rollback"}:
-            raise IntegrityError(f"Unsupported interrupted transaction: {transaction['kind']}")
-        phase = str(transaction.get("phase", ""))
+
+        phase = str(transaction["phase"])
         self.logger.write(
             "WARNING",
             "transaction.recover",
-            "Recovering an interrupted snapshot operation",
-            kind=transaction["kind"],
+            "Reconciling an interrupted baseline transaction",
             phase=phase,
+            baseline_id=transaction["baseline_id"],
         )
-        if phase == "preparing":
-            self._delete_subvolume(self.config.GOLDEN_NEXT_SUBVOL)
-            self._delete_subvolume(self.config.NEXT_SUBVOL)
-            self._restore_pair(
-                self.config.GOLDEN_SUBVOL,
-                self.config.GOLDEN_NEXT_SUBVOL,
-                self.config.GOLDEN_PREVIOUS_SUBVOL,
-                self.config.GOLDEN_PENDING_SUBVOL,
-                require_current=False,
-            )
-            self._restore_pair(
-                self.config.ACTIVE_SUBVOL,
-                self.config.NEXT_SUBVOL,
-                self.config.PREVIOUS_SUBVOL,
-                self.config.ACTIVE_PENDING_SUBVOL,
-                require_current=False,
-            )
-            self.catalog.finish_transaction()
-            return
-
-        if phase == "prepared":
-            self._commit_pair(
-                self.config.GOLDEN_SUBVOL,
-                self.config.GOLDEN_NEXT_SUBVOL,
-                self.config.GOLDEN_PREVIOUS_SUBVOL,
-                self.config.GOLDEN_PENDING_SUBVOL,
-            )
-            self.catalog.set_transaction_phase("golden-committed")
-            phase = "golden-committed"
+        if phase == "boot-committed":
+            self._validate_golden(self.config.GOLDEN_SUBVOL)
+            self._validate_active(self.config.ACTIVE_SUBVOL)
+            self._cleanup_transaction_subvolumes()
         else:
-            self._restore_pair(
+            self._rollback_pair(
                 self.config.GOLDEN_SUBVOL,
                 self.config.GOLDEN_NEXT_SUBVOL,
-                self.config.GOLDEN_PREVIOUS_SUBVOL,
                 self.config.GOLDEN_PENDING_SUBVOL,
             )
+            self._rollback_pair(
+                self.config.ACTIVE_SUBVOL,
+                self.config.ACTIVE_NEXT_SUBVOL,
+                self.config.ACTIVE_PENDING_SUBVOL,
+            )
+            # A crash can occur after grub-editenv succeeds but before the
+            # durable commit phase is recorded. A rolled-back publication must
+            # remain THAWED rather than booting the predecessor unexpectedly.
+            self._set_boot_mode_locked("thawed")
+        self.journal.finish()
+        self.runner.run(["sync"])
 
-        if phase == "golden-committed":
-            if not self._subvolume_exists(self.config.NEXT_SUBVOL):
-                self.runner.run(
-                    [
-                        "btrfs",
-                        "subvolume",
-                        "snapshot",
-                        str(self._subvolume_path(self.config.GOLDEN_SUBVOL)),
-                        str(self._subvolume_path(self.config.NEXT_SUBVOL)),
-                    ]
-                )
-            self._commit_pair(
-                self.config.ACTIVE_SUBVOL,
-                self.config.NEXT_SUBVOL,
-                self.config.PREVIOUS_SUBVOL,
-                self.config.ACTIVE_PENDING_SUBVOL,
-            )
-            self.catalog.set_transaction_phase("active-committed")
-        else:
-            self._restore_pair(
-                self.config.ACTIVE_SUBVOL,
-                self.config.NEXT_SUBVOL,
-                self.config.PREVIOUS_SUBVOL,
-                self.config.ACTIVE_PENDING_SUBVOL,
-            )
-        self.catalog.finish_transaction()
-        self.logger.write(
-            "INFO",
-            "transaction.recover",
-            "Interrupted snapshot operation completed successfully",
-            kind=transaction["kind"],
-        )
+    def _grub_environment(self) -> tuple[Path, dict[str, str]]:
+        grub_env = self._managed_path(self.config.MAINTENANCE_SUBVOL) / "boot/grub/grubenv"
+        if not grub_env.is_file():
+            raise CachyFreezeError("Canonical maintenance GRUB environment was not found.")
+        environment: dict[str, str] = {}
+        for line in self.runner.text(["grub-editenv", str(grub_env), "list"]).splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                environment[key] = value
+        return grub_env, environment
 
-    def _publish_source_locked(self, source: Path, kind: str, snapshot_id: str) -> None:
-        golden_candidate = self._subvolume_path(self.config.GOLDEN_NEXT_SUBVOL)
-        active_candidate = self._subvolume_path(self.config.NEXT_SUBVOL)
-        self.catalog.begin_transaction(
-            kind,
-            "preparing",
-            {"source": str(source), "snapshot_id": snapshot_id},
-        )
-        try:
-            self._delete_subvolume(golden_candidate)
-            self._delete_subvolume(active_candidate)
-            self.runner.run(
-                [
-                    "btrfs",
-                    "subvolume",
-                    "snapshot",
-                    "-r",
-                    str(source),
-                    str(golden_candidate),
-                ]
-            )
-            if not self._is_read_only(golden_candidate):
-                raise IntegrityError("Golden candidate is not read-only")
-            self.runner.run(
-                [
-                    "btrfs",
-                    "subvolume",
-                    "snapshot",
-                    str(golden_candidate),
-                    str(active_candidate),
-                ]
-            )
-            self.runner.run(["sync"])
-            self.catalog.set_transaction_phase("prepared")
-            self._commit_pair(
-                self.config.GOLDEN_SUBVOL,
-                self.config.GOLDEN_NEXT_SUBVOL,
-                self.config.GOLDEN_PREVIOUS_SUBVOL,
-                self.config.GOLDEN_PENDING_SUBVOL,
-            )
-            self.catalog.set_transaction_phase("golden-committed")
-            self._commit_pair(
-                self.config.ACTIVE_SUBVOL,
-                self.config.NEXT_SUBVOL,
-                self.config.PREVIOUS_SUBVOL,
-                self.config.ACTIVE_PENDING_SUBVOL,
-            )
-            self.catalog.set_transaction_phase("active-committed")
-            self.catalog.finish_transaction()
-        except Exception:
-            self.logger.write(
-                "ERROR",
-                f"{kind}.failed",
-                "Snapshot rotation failed; the recovery journal was retained",
-                snapshot_id=snapshot_id,
-            )
-            raise
+    def _set_boot_mode_locked(self, mode: str) -> None:
+        if mode not in {"frozen", "thawed"}:
+            raise CachyFreezeError(f"Invalid boot mode: {mode}")
+        maintenance = self._managed_path(self.config.MAINTENANCE_SUBVOL)
+        grub_cfg = maintenance / "boot/grub/grub.cfg"
+        if not grub_cfg.is_file():
+            raise CachyFreezeError("Canonical maintenance GRUB configuration was not found.")
+        if "--id 'cachyos-current'" not in grub_cfg.read_text(
+            encoding="utf-8", errors="replace"
+        ):
+            raise IntegrityError("The managed CachyFreeze GRUB entry was not found")
+        grub_env, _environment = self._grub_environment()
+        assignments = [f"cachy_mode={mode}", "saved_entry=cachyos-current"]
+        self.runner.run(["grub-editenv", str(grub_env), "set", *assignments])
+        _path, environment = self._grub_environment()
+        if environment.get("cachy_mode") != mode or environment.get("saved_entry") != (
+            "cachyos-current"
+        ):
+            raise IntegrityError("GRUB boot mode could not be verified after writing")
 
     def preflight(self) -> dict[str, Any]:
         self.require_root()
@@ -468,1066 +317,337 @@ class FreezeEngine:
             raise CachyFreezeError("The root filesystem is not Btrfs.")
         if not Path("/sys/firmware/efi").is_dir():
             raise CachyFreezeError("The system was not booted in UEFI mode.")
+        os_release = Path("/etc/os-release").read_text(encoding="utf-8", errors="replace")
+        if not re.search(r"^(ID|ID_LIKE)=.*\b(arch|cachyos)\b", os_release, re.MULTILINE):
+            raise CachyFreezeError("Only CachyOS/Arch Linux is supported.")
         for command in ("btrfs", "grub-editenv", "grub-mkconfig", "mkinitcpio"):
             if shutil.which(command) is None:
                 raise CachyFreezeError(f"Required command was not found: {command}")
-        if not Path("/boot/grub").is_dir():
-            raise CachyFreezeError("/boot/grub was not found.")
-        if not Path("/boot/efi/EFI").is_dir():
-            raise CachyFreezeError("The EFI system partition is not mounted at /boot/efi.")
-        boot_target = self.runner.text(["findmnt", "-n", "-o", "TARGET", "--target", "/boot"])
-        if boot_target != "/":
-            raise CachyFreezeError(
-                "/boot is a separate filesystem; the supported layout keeps /boot in "
-                "the Btrfs root and mounts EFI at /boot/efi."
-            )
-        for image in (
-            Path("/boot/vmlinuz-linux-cachyos"),
-            Path("/boot/initramfs-linux-cachyos.img"),
-        ):
-            if not image.is_file():
-                raise CachyFreezeError(f"Required boot image was not found: {image}")
+        if not Path("/boot/grub").is_dir() or not Path("/boot/efi/EFI").is_dir():
+            raise CachyFreezeError("The supported GRUB and /boot/efi layout was not found.")
+        if self.runner.text(["findmnt", "-n", "-o", "TARGET", "--target", "/boot"]) != "/":
+            raise CachyFreezeError("A separate /boot filesystem is not supported.")
+        if self.runner.text(
+            ["findmnt", "-n", "-o", "TARGET", "--target", "/boot/efi"]
+        ) != "/boot/efi" or self.runner.text(
+            ["findmnt", "-n", "-o", "FSTYPE", "--target", "/boot/efi"]
+        ) != "vfat":
+            raise CachyFreezeError("The EFI System Partition is not mounted as vfat at /boot/efi.")
         current = self._root_subvolume()
-        if current not in {
-            self.config.MAINTENANCE_SUBVOL,
-            self.config.ACTIVE_SUBVOL,
-        }:
+        if current not in {self.config.MAINTENANCE_SUBVOL, self.config.ACTIVE_SUBVOL}:
             raise CachyFreezeError(f"Unexpected root subvolume: {current}")
+        for image in ("/boot/vmlinuz-linux-cachyos", "/boot/initramfs-linux-cachyos.img"):
+            if not Path(image).is_file():
+                raise CachyFreezeError(f"Required boot image was not found: {image}")
         with self.mounted_top():
             if not self._subvolume_exists(self.config.MAINTENANCE_SUBVOL):
-                raise CachyFreezeError(
-                    f"Maintenance subvolume was not found: {self.config.MAINTENANCE_SUBVOL}"
-                )
-            nested_output = self.runner.text(
+                raise CachyFreezeError("The persistent maintenance subvolume was not found.")
+            nested = self.runner.text(
                 [
                     "btrfs",
                     "subvolume",
                     "list",
                     "-o",
-                    str(self._subvolume_path(self.config.MAINTENANCE_SUBVOL)),
+                    str(self._managed_path(self.config.MAINTENANCE_SUBVOL)),
                 ]
             )
+            nested_count = len([line for line in nested.splitlines() if line.strip()])
+            if nested_count:
+                raise CachyFreezeError(
+                    "Nested subvolumes inside @ are unsupported because their data would not reset."
+                )
         result = {
-            "root_device": self._root_device(),
-            "root_uuid": self._root_uuid(),
             "current_subvolume": current,
-            "nested_subvolume_count": len(
-                [line for line in nested_output.splitlines() if line.strip()]
-            ),
             "firmware": "UEFI",
             "filesystem": filesystem,
+            "nested_subvolume_count": 0,
         }
-        self.logger.write("INFO", "preflight", "Preflight passed", **result)
+        self.logger.write("INFO", "preflight", "Compatibility validation passed", **result)
         return result
 
     def status(self) -> dict[str, Any]:
         self.require_root()
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
             self._recover_transaction_locked()
-            grub_environment: dict[str, str] = {}
-            grub_env = self._subvolume_path(self.config.MAINTENANCE_SUBVOL) / "boot/grub/grubenv"
-            if grub_env.is_file():
-                output = self.runner.text(["grub-editenv", str(grub_env), "list"])
-                for line in output.splitlines():
-                    if "=" in line:
-                        key, value = line.split("=", 1)
-                        grub_environment[key] = value
-            snapshots = self.catalog.list()
-            state_dir = Path(self.config.STATE_DIR)
-            boot_attempts = 0
-            try:
-                boot_attempts = int(
-                    (state_dir / "boot-attempts").read_text(encoding="utf-8").strip() or "0"
-                )
-            except (OSError, ValueError):
-                pass
-            try:
-                boot_health = json.loads(
-                    (state_dir / "boot-health.json").read_text(encoding="utf-8")
-                )
-            except (OSError, json.JSONDecodeError):
-                boot_health = {}
-            finalization = FinalizationManager(
-                state_dir,
-                self.logger,
-                runner=self.runner,
-            ).status()
-            boot_validation = BootValidationManager(
-                state_dir,
-                self.logger,
-                runner=self.runner,
-            ).status()
-            state_schema = StateMigrationManager(state_dir, self.logger).status()
-            power_policy = IdlePowerManager(
-                state_dir,
-                self.logger,
-                runner=self.runner,
-            ).status()
+            _path, environment = self._grub_environment()
+            scheduled_mode = environment.get("cachy_mode")
+            if scheduled_mode not in {"frozen", "thawed"}:
+                raise IntegrityError("The scheduled GRUB mode is missing or invalid")
+            if environment.get("saved_entry") != "cachyos-current":
+                raise IntegrityError("The managed CachyFreeze GRUB entry is not scheduled")
+            running_mode = self._current_mode()
+            if running_mode not in {"frozen", "thawed"}:
+                raise IntegrityError("The running boot mode cannot be verified")
+            golden_present = self._subvolume_exists(self.config.GOLDEN_SUBVOL)
+            active_present = self._subvolume_exists(self.config.ACTIVE_SUBVOL)
+            golden_valid = False
+            if golden_present:
+                try:
+                    self._validate_golden(self.config.GOLDEN_SUBVOL)
+                    golden_valid = True
+                except IntegrityError:
+                    golden_valid = False
             return {
-                "schema": 2,
+                "schema": 3,
                 "application_version": APP_VERSION,
-                "state_schema": state_schema,
-                "running_mode": self._current_mode(),
-                "scheduled_mode": (
-                    "thawed-once"
-                    if grub_environment.get("cachy_once") == "thawed"
-                    else grub_environment.get("cachy_mode", "frozen")
-                ),
-                "grub_entry": grub_environment.get("saved_entry", "unset"),
+                "state_schema": STATE_SCHEMA_VERSION,
+                "running_mode": running_mode,
+                "scheduled_mode": scheduled_mode,
                 "current_subvolume": self._root_subvolume(),
-                "golden_present": self._subvolume_exists(self.config.GOLDEN_SUBVOL),
-                "active_present": self._subvolume_exists(self.config.ACTIVE_SUBVOL),
-                "previous_present": self._subvolume_exists(self.config.PREVIOUS_SUBVOL),
-                "failed_golden_present": self._subvolume_exists(self.config.FAILED_GOLDEN_SUBVOL),
-                "snapshot_count": len(snapshots),
-                "last_snapshot": snapshots[0].to_dict() if snapshots else None,
-                "transaction_pending": self.catalog.transaction() is not None,
-                "boot_attempts": boot_attempts,
-                "boot_failure_limit": self.config.BOOT_FAILURE_LIMIT,
-                "last_successful_boot": boot_health.get("last_successful_boot"),
-                "last_automatic_recovery": boot_health.get("last_automatic_recovery"),
-                "finalization": finalization,
-                "boot_validation": boot_validation,
-                "power_policy": power_policy,
+                "golden_present": golden_present,
+                "golden_valid": golden_valid,
+                "active_present": active_present,
+                "transaction_pending": self.journal.load() is not None,
+                "reboot_required": scheduled_mode != running_mode,
             }
 
-    def power_policy_status(self) -> dict[str, Any]:
+    def freeze(self) -> dict[str, Any]:
         self.require_root()
-        return IdlePowerManager(
-            Path(self.config.STATE_DIR), self.logger, runner=self.runner
-        ).status()
-
-    def run_power_policy(self, poll_seconds: int = 15) -> dict[str, Any]:
-        self.require_root()
-        manager = IdlePowerManager(Path(self.config.STATE_DIR), self.logger, runner=self.runner)
-        manager.run_forever(poll_seconds)
-        raise AssertionError("Idle power policy returned unexpectedly")
-
-    def version_info(self) -> dict[str, Any]:
-        """Return code and persistent-state compatibility information."""
-
-        state = StateMigrationManager(Path(self.config.STATE_DIR), self.logger).status()
-        return {
-            "application_version": APP_VERSION,
-            "supported_state_schema": STATE_SCHEMA_VERSION,
-            "installed_state_schema": state["state_schema"],
-            "migration_required": state["migration_required"],
-        }
-
-    def migrate_state(self) -> dict[str, Any]:
-        """Run state migrations under the global mutation lock."""
-
-        self.require_root()
-        with ProcessLock(Path(self.config.LOCK_FILE)):
-            return StateMigrationManager(Path(self.config.STATE_DIR), self.logger).migrate()
-
-    def mark_boot_successful(self) -> dict[str, Any]:
-        """Confirm graphical userspace reached its healthy target.
-
-        The initramfs increments the durable attempt counter before mounting
-        the root. Reaching this service is the positive acknowledgement that
-        prevents a failed Golden from boot-looping forever.
-        """
-
-        self.require_root()
-        state_dir = Path(self.config.STATE_DIR)
-        validation_manager = BootValidationManager(
-            state_dir,
-            self.logger,
-            runner=self.runner,
-        )
-        validation = validation_manager.status()
-        if validation.get("status") not in {"idle", "verified"}:
-            with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-                validation = validation_manager.validate(
-                    running_mode=self._current_mode(),
-                    current_subvolume=self._root_subvolume(),
-                    golden_present=self._subvolume_exists(self.config.GOLDEN_SUBVOL),
-                    active_present=self._subvolume_exists(self.config.ACTIVE_SUBVOL),
-                )
-        event_path = state_dir / "recovery-event"
-        event = ""
-        try:
-            event = event_path.read_text(encoding="utf-8").strip()
-        except OSError:
-            pass
-        now = datetime.now(UTC).isoformat()
-        one_time_thaw_cleared = False
-        if self._current_mode() == "thawed":
-            grub_env = Path("/boot/grub/grubenv")
-            if grub_env.is_file():
-                environment = self.runner.text(["grub-editenv", str(grub_env), "list"])
-                if "cachy_once=thawed" in environment.splitlines():
-                    self.runner.run(["grub-editenv", str(grub_env), "unset", "cachy_once"])
-                    verified = self.runner.text(["grub-editenv", str(grub_env), "list"])
-                    if "cachy_once=thawed" in verified.splitlines():
-                        raise IntegrityError("One-time THAWED boot setting could not be cleared")
-                    one_time_thaw_cleared = True
-        try:
-            current = json.loads((state_dir / "boot-health.json").read_text(encoding="utf-8"))
-            if not isinstance(current, dict):
-                current = {}
-        except (OSError, json.JSONDecodeError):
-            current = {}
-        current.update({"schema": 1, "last_successful_boot": now})
-        automatic_recovery = "automatic-rollback" in event
-        if automatic_recovery:
-            current["last_automatic_recovery"] = now
-        atomic_text_write(state_dir / "boot-attempts", "0\n")
-        atomic_json_write(state_dir / "boot-health.json", current, mode=0o644)
-        event_path.unlink(missing_ok=True)
-        self.logger.write(
-            "WARNING" if event else "INFO",
-            "boot.success",
-            "Boot verified after recovery" if event else "Boot health verification completed",
-            recovery_event=event or None,
-            automatic_recovery=automatic_recovery,
-            one_time_thaw_cleared=one_time_thaw_cleared,
-        )
-        return {
-            "healthy": True,
-            "boot_validation": validation,
-            "automatic_recovery": automatic_recovery,
-            "confirmed_at": now,
-            "one_time_thaw_cleared": one_time_thaw_cleared,
-        }
-
-    def get_settings(self) -> dict[str, Any]:
-        self.require_root()
-        return SettingsStore(Path(self.config.STATE_DIR)).load()
-
-    def update_settings(self, changes: dict[str, Any]) -> dict[str, Any]:
-        self.require_root()
-        with ProcessLock(Path(self.config.LOCK_FILE)):
-            result = SettingsStore(Path(self.config.STATE_DIR)).update(changes)
-            self._trim_audit_log(int(result["log_retention_lines"]))
-        self.logger.write(
-            "WARNING",
-            "settings.update",
-            "Management settings changed",
-            changed=sorted(changes),
-        )
-        return result
-
-    def _trim_audit_log(self, keep: int) -> None:
-        path = Path(self.config.LOG_FILE)
-        if not path.is_file():
-            return
-        lines = path.read_bytes().splitlines(keepends=True)
-        if len(lines) <= keep:
-            return
-        temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-        try:
-            with temporary.open("wb") as handle:
-                handle.writelines(lines[-keep:])
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.chmod(temporary, 0o640)
-            os.replace(temporary, path)
-        finally:
-            temporary.unlink(missing_ok=True)
-
-    def automatic_snapshot(self) -> dict[str, Any]:
-        self.require_root()
-        settings = SettingsStore(Path(self.config.STATE_DIR)).load()
-        if not settings["auto_snapshot_enabled"]:
-            return {"created": False, "reason": "disabled"}
-        if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
-            return {"created": False, "reason": "frozen"}
-        marker = Path(self.config.STATE_DIR) / "last-auto-snapshot"
-        try:
-            last_run = float(marker.read_text(encoding="utf-8").strip())
-        except (OSError, ValueError):
-            last_run = 0.0
-        interval = int(settings["auto_snapshot_interval_minutes"]) * 60
-        if time.time() - last_run < interval:
-            return {"created": False, "reason": "interval"}
+        if self._current_mode() != "thawed" or self._root_subvolume() != (
+            self.config.MAINTENANCE_SUBVOL
+        ):
+            raise CachyFreezeError("FREEZE is allowed only from verified THAWED mode.")
+        baseline_id = uuid.uuid4().hex
         with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
             self._recover_transaction_locked()
-            snapshot = self._create_snapshot_locked(
-                self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                "Scheduled automatic snapshot",
-                frozen=False,
-            )
-            atomic_text_write(marker, f"{time.time()}\n")
-            removed = self._cleanup_snapshots_locked(int(settings["retention_count"]))
-        return {"created": True, "snapshot": snapshot.to_dict(), "removed": removed}
-
-    def check_updates(self) -> dict[str, Any]:
-        self.require_root()
-        settings = SettingsStore(Path(self.config.STATE_DIR)).load()
-        if not settings["update_checks_enabled"]:
-            return {"enabled": False, "reason": "disabled", "count": 0, "packages": []}
-        if not settings["network_online_checks"]:
-            return {"enabled": False, "reason": "network", "count": 0, "packages": []}
-        command = ["timeout", "120", "checkupdates"]
-        if shutil.which("checkupdates") is None:
-            command = ["pacman", "-Qu"]
-        completed = self.runner.run(command, check=False)
-        if completed.returncode not in {0, 2}:
-            detail = completed.stderr.decode("utf-8", errors="replace")
-            raise CommandError(command, completed.returncode, detail)
-        output = (completed.stdout or b"").decode("utf-8", errors="replace")
-        packages = [line.strip() for line in output.splitlines() if line.strip()]
-        result = {"enabled": True, "count": len(packages), "packages": packages[:500]}
-        self.logger.write("INFO", "updates.check", "Updates checked", count=len(packages))
-        return result
-
-    def apply_updates(self) -> dict[str, Any]:
-        self.require_root()
-        if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
-            raise CachyFreezeError("Updates can be applied only in THAWED maintenance mode.")
-        settings = SettingsStore(Path(self.config.STATE_DIR)).load()
-        if not settings["network_online_checks"]:
-            raise CachyFreezeError("Online management operations are disabled in settings.")
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            self._recover_transaction_locked()
-            before = self._create_snapshot_locked(
-                self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                "Automatic snapshot before system update",
-                frozen=False,
+            source = self._managed_path(self.config.MAINTENANCE_SUBVOL)
+            if not self._subvolume_exists(self.config.MAINTENANCE_SUBVOL):
+                raise IntegrityError("The THAWED source subvolume is missing")
+            if self._is_read_only(self.config.MAINTENANCE_SUBVOL):
+                raise IntegrityError("The THAWED source subvolume is read-only")
+            self.journal.begin(
+                baseline_id=baseline_id,
+                source_subvolume=self.config.MAINTENANCE_SUBVOL,
             )
             try:
-                self.runner.run(
-                    ["pacman", "-Syu", "--needed", "--noconfirm"],
-                    stdout=subprocess.DEVNULL,
-                )
-                self.runner.run(["pacman", "-Dk"], stdout=subprocess.DEVNULL)
-                after = self._create_snapshot_locked(
-                    self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                    "Golden after system update",
-                    frozen=True,
-                )
-                self._publish_source_locked(
-                    self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                    "publish",
-                    after.snapshot_id,
-                )
-                self._cleanup_snapshots_locked(int(settings["retention_count"]))
-            except Exception:
-                self.logger.write(
-                    "ERROR",
-                    "updates.apply.failed",
-                    "System update failed; the rollback snapshot was retained",
-                    rollback_snapshot=before.snapshot_id,
-                )
-                raise
-        self.logger.write(
-            "INFO",
-            "updates.apply",
-            "System updated and a new Golden published",
-            before_snapshot=before.snapshot_id,
-            after_snapshot=after.snapshot_id,
-        )
-        return {"before_snapshot": before.to_dict(), "after_snapshot": after.to_dict()}
-
-    def application_status(self) -> dict[str, Any]:
-        self.require_root()
-        return ApplicationVerifier(
-            self.runner,
-            which=shutil.which,
-            chrome_check=self._chrome_policy_status,
-            microsip_check=self._microsip_status,
-        ).status()
-
-    @staticmethod
-    def _chrome_policy_status(
-        installed: Path = Path("/etc/opt/chrome/policies/managed/company.json"),
-        expected: Path = Path("/usr/lib/cachy-freeze/deployment/policies/chrome/managed.json"),
-    ) -> dict[str, Any]:
-        return ApplicationVerifier.chrome_policy_status(installed, expected)
-
-    @staticmethod
-    def _microsip_status(microsip_root: Path) -> dict[str, Any]:
-        return ApplicationVerifier.microsip_status(microsip_root)
-
-    def install_applications(self) -> dict[str, Any]:
-        self.require_root()
-        if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
-            raise CachyFreezeError("Applications can be installed only in THAWED mode.")
-        settings = SettingsStore(Path(self.config.STATE_DIR)).load()
-        if not settings["network_online_checks"]:
-            raise CachyFreezeError("Online management operations are disabled in settings.")
-        script = Path("/usr/lib/cachy-freeze/deployment/installer/install-applications.sh")
-        if not script.is_file():
-            raise CachyFreezeError("The verified application installer was not found.")
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            self._recover_transaction_locked()
-            before = self._create_snapshot_locked(
-                self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                "Snapshot before application installation",
-                frozen=False,
-            )
-            try:
-                self.runner.run(["bash", str(script)], stdout=subprocess.DEVNULL)
-                status = self.application_status()
-                if not status["all_installed"]:
-                    raise IntegrityError("One or more applications could not be verified")
-                after = self._create_snapshot_locked(
-                    self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                    "Golden after application installation",
-                    frozen=True,
-                )
-                self._publish_source_locked(
-                    self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                    "publish",
-                    after.snapshot_id,
-                )
-                self._cleanup_snapshots_locked(int(settings["retention_count"]))
-            except Exception:
-                self.logger.write(
-                    "ERROR",
-                    "applications.install.failed",
-                    "Application installation failed; the rollback snapshot was retained",
-                    rollback_snapshot=before.snapshot_id,
-                )
-                raise
-        self.logger.write(
-            "INFO",
-            "applications.install",
-            "Applications verified and a new Golden published",
-            before_snapshot=before.snapshot_id,
-            after_snapshot=after.snapshot_id,
-        )
-        return {**status, "before_snapshot": before.to_dict(), "after_snapshot": after.to_dict()}
-
-    def create_snapshot(self, description: str) -> SnapshotMetadata:
-        self.require_root()
-        if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
-            raise CachyFreezeError("Snapshots can be created only in THAWED mode.")
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            self._recover_transaction_locked()
-            snapshot = self._create_snapshot_locked(
-                self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-                description,
-                frozen=False,
-            )
-            self._cleanup_snapshots_locked(self._retention_count())
-            return snapshot
-
-    def list_snapshots(self) -> list[SnapshotMetadata]:
-        return self.catalog.list()
-
-    def verify_snapshot(self, snapshot_id: str, *, full: bool = False) -> dict[str, Any]:
-        self.require_root()
-        metadata = self.catalog.get(snapshot_id)
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            result = self._verify_snapshot_locked(metadata, full=full)
-            self.logger.write(
-                "INFO" if result["healthy"] else "ERROR",
-                "snapshot.verify",
-                "Snapshot verification completed",
-                **result,
-            )
-            return result
-
-    def _verify_snapshot_locked(
-        self, metadata: SnapshotMetadata, *, full: bool = False
-    ) -> dict[str, Any]:
-        path = self._subvolume_path(metadata.subvolume)
-        errors: list[str] = []
-        if not metadata.verifies():
-            errors.append("metadata checksum mismatch")
-        if not self._subvolume_exists(path):
-            errors.append("Btrfs subvolume is missing")
-        else:
-            details = self._subvolume_details(path)
-            if details.get("uuid") != metadata.btrfs_uuid:
-                errors.append("Btrfs UUID mismatch")
-            if not self._is_read_only(path):
-                errors.append("snapshot is not read-only")
-        stream_checksum: str | None = None
-        if full and not errors:
-            digest = hashlib.sha256()
-            process = subprocess.Popen(
-                ["btrfs", "send", str(path)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=self.runner.environment,
-            )
-            assert process.stdout is not None
-            for block in iter(lambda: process.stdout.read(1024 * 1024), b""):
-                digest.update(block)
-            _, stderr = process.communicate()
-            if process.returncode != 0:
-                raise CommandError(
-                    ["btrfs", "send", str(path)],
-                    process.returncode,
-                    stderr.decode("utf-8", errors="replace"),
-                )
-            stream_checksum = digest.hexdigest()
-        healthy = not errors
-        desired_health = "healthy" if healthy else "error"
-        if metadata.health != desired_health:
-            self.catalog.set_health(metadata.snapshot_id, desired_health)
-        return {
-            "snapshot_id": metadata.snapshot_id,
-            "healthy": healthy,
-            "errors": errors,
-            "metadata_checksum": metadata.checksum,
-            "stream_sha256": stream_checksum,
-        }
-
-    def delete_snapshot(self, snapshot_id: str) -> SnapshotMetadata:
-        self.require_root()
-        if not _SNAPSHOT_ID_RE.fullmatch(snapshot_id):
-            raise CachyFreezeError("Invalid snapshot ID.")
-        metadata = self.catalog.get(snapshot_id)
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            path = self._subvolume_path(metadata.subvolume)
-            self._delete_subvolume(path)
-            removed = self.catalog.remove(snapshot_id)
-            self.logger.write(
-                "INFO",
-                "snapshot.delete",
-                "Snapshot silindi",
-                snapshot_id=snapshot_id,
-                btrfs_uuid=removed.btrfs_uuid,
-            )
-            return removed
-
-    def compare_snapshots(self, older_id: str, newer_id: str) -> dict[str, Any]:
-        self.require_root()
-        older = self.catalog.get(older_id)
-        newer = self.catalog.get(newer_id)
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            older_path = self._subvolume_path(older.subvolume)
-            newer_path = self._subvolume_path(newer.subvolume)
-            send_command = [
-                "btrfs",
-                "send",
-                "--no-data",
-                "-q",
-                "-p",
-                str(older_path),
-                str(newer_path),
-            ]
-            dump_command = ["btrfs", "receive", "--dump"]
-            sender = subprocess.Popen(
-                send_command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=self.runner.environment,
-            )
-            assert sender.stdout is not None
-            receiver = subprocess.Popen(
-                dump_command,
-                stdin=sender.stdout,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=self.runner.environment,
-            )
-            sender.stdout.close()
-            dump, receiver_stderr = receiver.communicate()
-            sender_stderr = sender.stderr.read() if sender.stderr is not None else b""
-            sender_returncode = sender.wait()
-            if sender_returncode != 0:
-                raise CommandError(
-                    send_command,
-                    sender_returncode,
-                    sender_stderr.decode("utf-8", errors="replace"),
-                )
-            if receiver.returncode != 0:
-                raise CommandError(
-                    dump_command,
-                    receiver.returncode,
-                    receiver_stderr.decode("utf-8", errors="replace"),
-                )
-            changed_paths = self._changed_paths_from_send_dump(
-                dump.decode("utf-8", errors="replace"), newer_path.name
-            )
-            return {
-                "older": older_id,
-                "newer": newer_id,
-                "changed_path_count": len(changed_paths),
-                "changed_paths": changed_paths[:5000],
-                "truncated": len(changed_paths) > 5000,
-            }
-
-    @staticmethod
-    def _changed_paths_from_send_dump(output: str, snapshot_name: str) -> list[str]:
-        prefix = f"./{snapshot_name}/"
-        changed: set[str] = set()
-        for line in output.splitlines():
-            try:
-                fields = shlex.split(line)
-            except ValueError:
-                continue
-            candidates = fields[1:2]
-            candidates.extend(
-                field.removeprefix("dest=") for field in fields if field.startswith("dest=")
-            )
-            for candidate in candidates:
-                if candidate.startswith(prefix):
-                    relative = candidate.removeprefix(prefix)
-                    if relative and re.fullmatch(r"o[0-9]+-[0-9]+-[0-9]+", relative) is None:
-                        changed.add(relative)
-        return sorted(changed)
-
-    def export_snapshot(self, snapshot_id: str) -> dict[str, Any]:
-        self.require_root()
-        metadata = self.catalog.get(snapshot_id)
-        export_dir = Path(self.config.EXPORT_DIR)
-        destination = export_dir / f"{snapshot_id}.btrfs"
-        manifest = export_dir / f"{snapshot_id}.json"
-        if destination.exists() or manifest.exists():
-            raise CachyFreezeError(
-                "An export already exists for this snapshot; move it to a safe location first."
-            )
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            verification = self._verify_snapshot_locked(metadata)
-            if not verification["healthy"]:
-                raise IntegrityError("Bozuk snapshot export edilemez")
-            export_dir.mkdir(parents=True, exist_ok=True)
-            os.chmod(export_dir, 0o700)
-            temporary = export_dir / f".{snapshot_id}.{uuid.uuid4().hex}.tmp"
-            source = self._subvolume_path(metadata.subvolume)
-            try:
-                descriptor = os.open(
-                    temporary,
-                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-                    0o600,
-                )
-                with os.fdopen(descriptor, "wb") as handle:
-                    self.runner.run(["btrfs", "send", str(source)], stdout=handle)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                digest = hashlib.sha256()
-                with temporary.open("rb") as handle:
-                    for block in iter(lambda: handle.read(1024 * 1024), b""):
-                        digest.update(block)
-                stream_checksum = digest.hexdigest()
-                size = temporary.stat().st_size
-                if size == 0:
-                    raise IntegrityError("Btrfs export stream is empty")
-                os.replace(temporary, destination)
-                atomic_json_write(
-                    manifest,
-                    {
-                        "schema": 1,
-                        "created_at": datetime.now(UTC).isoformat(),
-                        "stream_sha256": stream_checksum,
-                        "stream_size_bytes": size,
-                        "snapshot": metadata.to_dict(),
-                    },
-                    mode=0o600,
-                )
-            finally:
-                temporary.unlink(missing_ok=True)
-            result = {
-                "snapshot_id": snapshot_id,
-                "archive": str(destination),
-                "manifest": str(manifest),
-                "stream_sha256": stream_checksum,
-                "stream_size_bytes": size,
-            }
-            self.logger.write(
-                "INFO",
-                "snapshot.export",
-                "Snapshot Btrfs send stream olarak export edildi",
-                **result,
-            )
-            return result
-
-    def import_snapshot(self, archive_name: str) -> SnapshotMetadata:
-        self.require_root()
-        if Path(archive_name).name != archive_name or not archive_name.endswith(".btrfs"):
-            raise CachyFreezeError("Import accepts only a filename from the export directory.")
-        source = Path(self.config.EXPORT_DIR) / archive_name
-        manifest = source.with_suffix(".json")
-        if not source.is_file() or not manifest.is_file():
-            raise CachyFreezeError("Snapshot archive or manifest was not found.")
-        try:
-            document = json.loads(manifest.read_text(encoding="utf-8"))
-            expected_checksum = str(document["stream_sha256"])
-            exported_metadata = SnapshotMetadata.from_dict(document["snapshot"])
-        except (KeyError, TypeError, json.JSONDecodeError) as error:
-            raise IntegrityError(f"Snapshot export manifest is invalid: {error}") from error
-        if not exported_metadata.verifies():
-            raise IntegrityError("Snapshot export metadata checksum verification failed")
-        digest = hashlib.sha256()
-        with source.open("rb") as handle:
-            for block in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(block)
-        if digest.hexdigest() != expected_checksum:
-            raise IntegrityError("Snapshot export checksum verification failed")
-
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            parent = self._ensure_snapshot_parent()
-            staging = parent / f".import-{uuid.uuid4().hex}"
-            staging.mkdir(mode=0o700)
-            received: Path | None = None
-            destination: Path | None = None
-            try:
-                with source.open("rb") as handle:
-                    self.runner.run(
-                        ["btrfs", "receive", str(staging)],
-                        stdin=handle,
-                        stdout=subprocess.DEVNULL,
-                    )
-                children = list(staging.iterdir())
-                if len(children) != 1 or not self._subvolume_exists(children[0]):
-                    raise IntegrityError("Btrfs receive did not produce exactly one snapshot")
-                received = children[0]
-                snapshot_id = (
-                    f"snap-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
-                )
-                destination = parent / snapshot_id
-                # A received subvolume carries received_uuid and is read-only.
-                # Some Btrfs versions reject renaming that object with EROFS.
-                # Create a local read-only snapshot instead, then remove the
-                # transient received object. This also gives the catalog a
-                # normal local UUID without weakening the received snapshot.
+                self.runner.run(["sync"])
                 self.runner.run(
                     [
                         "btrfs",
                         "subvolume",
                         "snapshot",
                         "-r",
-                        str(received),
-                        str(destination),
+                        str(source),
+                        str(self._managed_path(self.config.GOLDEN_NEXT_SUBVOL)),
                     ]
                 )
-                self._delete_subvolume(received)
-                received = None
-                details = self._subvolume_details(destination)
-                apparent, exclusive = self._subvolume_sizes(destination)
-                metadata = SnapshotMetadata.create(
-                    snapshot_id=snapshot_id,
-                    subvolume=f"{self.config.SNAPSHOT_SUBVOL}/{snapshot_id}",
-                    btrfs_uuid=details["uuid"],
-                    parent_uuid=details.get("parent_uuid", "-"),
-                    created_at=datetime.now(UTC).isoformat(),
-                    kernel=exported_metadata.kernel,
-                    apparent_size_bytes=apparent,
-                    exclusive_size_bytes=exclusive,
-                    description=f"Imported: {exported_metadata.description}"[:512],
-                    created_by=self._creator(),
-                    frozen=exported_metadata.frozen,
-                    bootable=(destination / "boot" / "vmlinuz-linux-cachyos").is_file(),
-                    creation_duration_ms=0,
-                    source_subvolume=f"import:{exported_metadata.snapshot_id}",
+                self._validate_golden(self.config.GOLDEN_NEXT_SUBVOL)
+                self.runner.run(
+                    [
+                        "btrfs",
+                        "subvolume",
+                        "snapshot",
+                        str(self._managed_path(self.config.GOLDEN_NEXT_SUBVOL)),
+                        str(self._managed_path(self.config.ACTIVE_NEXT_SUBVOL)),
+                    ]
                 )
-                self.catalog.add(metadata)
-            except Exception:
-                if destination is not None:
-                    self._delete_subvolume(destination)
-                if staging.exists():
-                    for child in staging.iterdir():
-                        if self._subvolume_exists(child):
-                            self._delete_subvolume(child)
-                        elif child.is_dir():
-                            shutil.rmtree(child)
-                        else:
-                            child.unlink(missing_ok=True)
-                raise
-            finally:
-                if staging.exists():
-                    staging.rmdir()
-            self._cleanup_snapshots_locked(self._retention_count())
-            self.logger.write(
-                "INFO",
-                "snapshot.import",
-                "Snapshot imported with checksum verification",
-                snapshot_id=metadata.snapshot_id,
-                source_archive=archive_name,
-            )
-            return metadata
-
-    def health(self) -> dict[str, Any]:
-        self.require_root()
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            snapshot_results = [
-                self._verify_snapshot_locked(snapshot) for snapshot in self.catalog.list()
-            ]
-            device_output = self.runner.text(["btrfs", "device", "stats", self._root_device()])
-            device_errors: dict[str, int] = {}
-            for line in device_output.splitlines():
-                if "." not in line or " " not in line:
-                    continue
-                key, raw_value = line.rsplit(None, 1)
-                if raw_value.isdigit():
-                    device_errors[key] = int(raw_value)
-            scrub = self.runner.text(["btrfs", "scrub", "status", self._root_device()], check=False)
-            power_policy = IdlePowerManager(
-                Path(self.config.STATE_DIR), self.logger, runner=self.runner
-            ).status()
-            unhealthy = [
-                result["snapshot_id"] for result in snapshot_results if not result["healthy"]
-            ]
-            freeze_ready = not unhealthy and not any(device_errors.values())
-            result = {
-                "freeze_ready": freeze_ready,
-                "healthy": (
-                    freeze_ready
-                    and bool(power_policy["supported"])
-                    and power_policy["status"] not in {"failed", "unsupported"}
-                ),
-                "unhealthy_snapshots": unhealthy,
-                "device_errors": device_errors,
-                "scrub_status": scrub,
-                "power_policy": power_policy,
-            }
-            self.logger.write(
-                "INFO" if result["healthy"] else "ERROR",
-                "health",
-                "Btrfs and snapshot health check completed",
-                **result,
-            )
-            return result
-
-    def _publish_locked(
-        self, description: str, *, restore_managed_homes: bool = False
-    ) -> SnapshotMetadata:
-        from .users import UserManager
-
-        self._recover_transaction_locked()
-        user_manager = UserManager(
-            state_dir=Path(self.config.STATE_DIR),
-            lock_file=Path(self.config.LOCK_FILE),
-            logger=self.logger,
-            runner=self.runner,
-        )
-        expected_user = user_manager.prepare_login_for_finalization(already_locked=True)
-        if restore_managed_homes:
-            user_manager.restore_managed_homes(already_locked=True)
-        else:
-            user_manager.refresh_templates(already_locked=True)
-        archived = self._create_snapshot_locked(
-            self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-            description,
-            frozen=True,
-        )
-        self._publish_source_locked(
-            self._subvolume_path(self.config.MAINTENANCE_SUBVOL),
-            "publish",
-            archived.snapshot_id,
-        )
-        self._cleanup_snapshots_locked(self._retention_count())
-        BootValidationManager(
-            Path(self.config.STATE_DIR),
-            self.logger,
-            runner=self.runner,
-        ).arm(archived.snapshot_id, expected_user)
-        self.logger.write(
-            "INFO",
-            "publish",
-            "New Golden and Active snapshots published atomically",
-            snapshot_id=archived.snapshot_id,
-        )
-        return archived
-
-    def publish(self, description: str) -> SnapshotMetadata:
-        self.require_root()
-        if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
-            raise CachyFreezeError("Golden can be published only in THAWED mode.")
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            return self._publish_locked(description)
-
-    def publish_and_freeze(self, description: str) -> SnapshotMetadata:
-        """Publish Golden and schedule FROZEN under one operation lock."""
-
-        self.require_root()
-        if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
-            raise CachyFreezeError("Golden can be published only in THAWED mode.")
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            archived = self._publish_locked(description, restore_managed_homes=True)
-            self._set_boot_mode_locked("frozen")
-            self.logger.write(
-                "INFO",
-                "publish.freeze",
-                "Golden published and the next boot set to FROZEN atomically",
-                snapshot_id=archived.snapshot_id,
-            )
-            return archived
-
-    def request_finalization(self, username: str, uid: int) -> dict[str, Any]:
-        self.require_root()
-        if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
-            raise CachyFreezeError("Finalization can be requested only in THAWED mode.")
-        from .users import UserManager
-
-        UserManager(
-            state_dir=Path(self.config.STATE_DIR),
-            lock_file=Path(self.config.LOCK_FILE),
-            logger=self.logger,
-            runner=self.runner,
-        ).prepare_login_for_finalization()
-        return FinalizationManager(
-            Path(self.config.STATE_DIR),
-            self.logger,
-            runner=self.runner,
-        ).request(username, uid)
-
-    def run_pending_finalization(self, timeout_seconds: int = 180) -> dict[str, Any]:
-        self.require_root()
-        if self._root_subvolume() != self.config.MAINTENANCE_SUBVOL:
-            raise CachyFreezeError("Finalization can run only in THAWED mode.")
-        return FinalizationManager(
-            Path(self.config.STATE_DIR),
-            self.logger,
-            runner=self.runner,
-        ).run(self.publish_and_freeze, timeout_seconds=timeout_seconds)
-
-    def finalization_status(self) -> dict[str, Any]:
-        self.require_root()
-        return FinalizationManager(
-            Path(self.config.STATE_DIR),
-            self.logger,
-            runner=self.runner,
-        ).status()
-
-    def rollback(self, snapshot_id: str) -> SnapshotMetadata:
-        self.require_root()
-        metadata = self.catalog.get(snapshot_id)
-        if not metadata.bootable:
-            raise CachyFreezeError("The selected snapshot is not bootable.")
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            self._recover_transaction_locked()
-            result = self._verify_snapshot_locked(metadata)
-            if not result["healthy"]:
-                raise IntegrityError("An unhealthy snapshot cannot be restored")
-            self._publish_source_locked(
-                self._subvolume_path(metadata.subvolume), "rollback", snapshot_id
-            )
-            updated = self.catalog.increment_rollback(snapshot_id)
-            self._set_boot_mode_locked("frozen")
-            self.logger.write(
-                "WARNING",
-                "snapshot.rollback",
-                "Golden rolled back to the selected snapshot",
-                snapshot_id=snapshot_id,
-                rollback_count=updated.rollback_count,
-            )
-            return updated
-
-    def _retention_count(self) -> int:
-        store = SettingsStore(Path(self.config.STATE_DIR))
-        if not store.path.exists():
-            return self.config.RETENTION_COUNT
-        settings = store.load()
-        return int(settings.get("retention_count", self.config.RETENTION_COUNT))
-
-    def _cleanup_snapshots_locked(self, retention: int) -> list[str]:
-        if not 1 <= retention <= 1000:
-            raise CachyFreezeError("Retention count must be between 1 and 1000.")
-        snapshots = self.catalog.list()
-        removed: list[str] = []
-        for snapshot in snapshots[retention:]:
-            self._delete_subvolume(self._subvolume_path(snapshot.subvolume))
-            self.catalog.remove(snapshot.snapshot_id)
-            removed.append(snapshot.snapshot_id)
-        return removed
-
-    def cleanup(self, keep: int | None = None) -> list[str]:
-        self.require_root()
-        retention = keep if keep is not None else self._retention_count()
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            self._recover_transaction_locked()
-            removed = self._cleanup_snapshots_locked(retention)
-        self.logger.write(
-            "INFO",
-            "snapshot.cleanup",
-            "Snapshot retention policy applied",
-            retention=retention,
-            removed=removed,
-        )
-        return removed
-
-    def _set_boot_mode_locked(self, mode: str) -> None:
-        if mode not in {"frozen", "thawed", "thawed-once"}:
-            raise CachyFreezeError(f"Invalid boot mode: {mode}")
-        maintenance = self._subvolume_path(self.config.MAINTENANCE_SUBVOL)
-        grub_cfg = maintenance / "boot/grub/grub.cfg"
-        grub_env = maintenance / "boot/grub/grubenv"
-        if not grub_cfg.is_file() or not grub_env.is_file():
-            raise CachyFreezeError("Canonical maintenance GRUB files were not found.")
-        if "--id 'cachyos-current'" not in grub_cfg.read_text(encoding="utf-8", errors="replace"):
-            raise IntegrityError("The cachyos-current GRUB entry was not found")
-        persistent_mode = "frozen" if mode == "thawed-once" else mode
-        assignments = [
-            f"cachy_mode={persistent_mode}",
-            "saved_entry=cachyos-current",
-        ]
-        if mode == "thawed-once":
-            assignments.append("cachy_once=thawed")
-        self.runner.run(["grub-editenv", str(grub_env), "set", *assignments])
-        if mode != "thawed-once":
-            self.runner.run(["grub-editenv", str(grub_env), "unset", "cachy_once"], check=False)
-        environment = self.runner.text(["grub-editenv", str(grub_env), "list"])
-        expected = {f"cachy_mode={persistent_mode}", "saved_entry=cachyos-current"}
-        if mode == "thawed-once":
-            expected.add("cachy_once=thawed")
-        if not expected.issubset(set(environment.splitlines())):
-            raise IntegrityError("GRUB boot mode could not be verified after writing")
-
-    def set_boot_mode(self, mode: str) -> None:
-        self.require_root()
-        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
-            self._recover_transaction_locked()
-            if mode in {"frozen", "thawed-once"}:
-                for required in (
+                self._validate_active(self.config.ACTIVE_NEXT_SUBVOL)
+                self.journal.set_phase("prepared")
+                self._replace_with_candidate(
                     self.config.GOLDEN_SUBVOL,
+                    self.config.GOLDEN_NEXT_SUBVOL,
+                    self.config.GOLDEN_PENDING_SUBVOL,
+                )
+                self._validate_golden(self.config.GOLDEN_SUBVOL)
+                self.journal.set_phase("golden-committed")
+                self._replace_with_candidate(
                     self.config.ACTIVE_SUBVOL,
-                ):
-                    if not self._subvolume_exists(required):
-                        raise CachyFreezeError(f"Gerekli snapshot yok: {required}")
-            self._set_boot_mode_locked(mode)
-            self.logger.write(
-                "INFO",
-                "boot.mode",
-                "Next persistent boot mode changed",
-                mode=mode,
+                    self.config.ACTIVE_NEXT_SUBVOL,
+                    self.config.ACTIVE_PENDING_SUBVOL,
+                )
+                self._validate_active(self.config.ACTIVE_SUBVOL)
+                self.journal.set_phase("active-committed")
+                self._set_boot_mode_locked("frozen")
+                self.journal.set_phase("boot-committed")
+                self._cleanup_transaction_subvolumes()
+                self.journal.finish()
+                self.runner.run(["sync"])
+            except Exception:
+                self.logger.write(
+                    "ERROR",
+                    "freeze.failed",
+                    "Baseline update failed; recovery metadata was retained",
+                    baseline_id=baseline_id,
+                )
+                raise
+        result = {"mode": "frozen", "baseline_id": baseline_id, "reboot_required": True}
+        self.logger.write("INFO", "freeze", "Golden replaced and FROZEN scheduled", **result)
+        return result
+
+    def thaw(self) -> dict[str, Any]:
+        self.require_root()
+        if self._current_mode() != "frozen" or self._root_subvolume() != self.config.ACTIVE_SUBVOL:
+            raise CachyFreezeError("THAW is allowed only from verified FROZEN mode.")
+        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
+            self._recover_transaction_locked()
+            if not self._subvolume_exists(self.config.MAINTENANCE_SUBVOL):
+                raise IntegrityError("The persistent THAWED environment is missing")
+            self._set_boot_mode_locked("thawed")
+        result = {"mode": "thawed", "reboot_required": True}
+        self.logger.write("INFO", "thaw", "THAWED scheduled without runtime promotion")
+        return result
+
+    def mark_boot_successful(self) -> dict[str, Any]:
+        self.require_root()
+        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
+            self._recover_transaction_locked()
+            mode = self._current_mode()
+            if mode == "frozen":
+                self._validate_golden(self.config.GOLDEN_SUBVOL)
+                self._validate_active(self.config.ACTIVE_SUBVOL)
+            elif mode == "thawed":
+                self._delete_subvolume(self.config.ACTIVE_SUBVOL)
+                self._delete_subvolume(self.config.ACTIVE_NEXT_SUBVOL)
+                self._delete_subvolume(self.config.ACTIVE_PENDING_SUBVOL)
+            else:
+                raise IntegrityError("The running boot mode cannot be verified")
+        result = {"mode": mode, "verified_at": datetime.now(UTC).isoformat()}
+        atomic_json_write(Path(self.config.STATE_DIR) / "boot-success.json", result, mode=0o600)
+        self.logger.write("INFO", "boot.success", "Boot state verified", mode=mode)
+        return result
+
+    def _delete_legacy_history_locked(self) -> list[str]:
+        parent_name = self.config.LEGACY_SNAPSHOT_SUBVOL
+        catalog_path = Path(self.config.STATE_DIR) / "snapshots.json"
+        migration_path = Path(self.config.STATE_DIR) / "history-migration.json"
+        parent_exists = self._subvolume_exists(parent_name)
+        if not parent_exists and not migration_path.exists() and not catalog_path.exists():
+            return []
+        if not catalog_path.is_file():
+            raise IntegrityError(
+                "Legacy snapshot ownership cannot be proven because snapshots.json is missing"
             )
+        try:
+            document = json.loads(catalog_path.read_text(encoding="utf-8"))
+            items = document["snapshots"]
+        except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
+            raise IntegrityError(
+                f"Legacy snapshot ownership metadata is invalid: {error}"
+            ) from error
+        if document.get("schema") != 1 or not isinstance(items, list):
+            raise IntegrityError("Legacy snapshot ownership metadata has an unsupported schema")
+        expected: set[str] = set()
+        for item in items:
+            if not isinstance(item, dict):
+                raise IntegrityError("Legacy snapshot ownership metadata is malformed")
+            snapshot_id = str(item.get("snapshot_id", ""))
+            if not _LEGACY_SNAPSHOT_ID.fullmatch(snapshot_id):
+                raise IntegrityError("Legacy snapshot identity is malformed")
+            if item.get("subvolume") != f"{parent_name}/{snapshot_id}":
+                raise IntegrityError("Legacy snapshot path does not match its owned parent")
+            expected.add(snapshot_id)
+        remaining = set(expected)
+        resuming = migration_path.exists()
+        if resuming:
+            try:
+                migration = json.loads(migration_path.read_text(encoding="utf-8"))
+                owned = set(migration["owned_snapshots"])
+                remaining = set(migration["remaining_snapshots"])
+            except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
+                raise IntegrityError(
+                    f"Legacy history migration state is invalid: {error}"
+                ) from error
+            if migration.get("schema") != 1 or owned != expected or not remaining <= expected:
+                raise IntegrityError(
+                    "Legacy history migration ownership does not match the catalog"
+                )
+        if not parent_exists:
+            if resuming and remaining:
+                raise IntegrityError("Legacy snapshot parent disappeared during migration")
+            catalog_path.unlink()
+            migration_path.unlink(missing_ok=True)
+            return sorted(expected)
+
+        parent = self._managed_path(parent_name)
+        actual = {child.name for child in parent.iterdir()}
+        if (not resuming and actual != expected) or (resuming and not actual <= remaining):
+            raise IntegrityError("Legacy snapshot contents do not match the owned catalog")
+        if not resuming:
+            atomic_json_write(
+                migration_path,
+                {
+                    "schema": 1,
+                    "owned_snapshots": sorted(expected),
+                    "remaining_snapshots": sorted(expected),
+                },
+                mode=0o600,
+            )
+        # A crash can occur after a subvolume delete commits but before the
+        # remaining-set update. Missing owned children are therefore treated as
+        # completed work only when the durable migration record exists.
+        remaining = actual
+        for snapshot_id in sorted(actual):
+            child = parent / snapshot_id
+            if child.parent != parent or child.is_symlink():
+                raise IntegrityError("Legacy snapshot path failed validation")
+            if self.runner.run(
+                ["btrfs", "subvolume", "show", str(child)], check=False
+            ).returncode != 0:
+                raise IntegrityError("Legacy catalog entry is not a Btrfs subvolume")
+            self.runner.run(["btrfs", "subvolume", "delete", "--commit-after", str(child)])
+            remaining.remove(snapshot_id)
+            atomic_json_write(
+                migration_path,
+                {
+                    "schema": 1,
+                    "owned_snapshots": sorted(expected),
+                    "remaining_snapshots": sorted(remaining),
+                },
+                mode=0o600,
+            )
+        self._delete_subvolume(parent_name)
+        catalog_path.unlink()
+        migration_path.unlink()
+        return sorted(expected)
+
+    def migrate_state(self) -> dict[str, Any]:
+        self.require_root()
+        state_manager = StateMigrationManager(Path(self.config.STATE_DIR), self.logger)
+        state_manager.status()
+        with ProcessLock(Path(self.config.LOCK_FILE)), self.mounted_top():
+            self._recover_transaction_locked()
+            removed_snapshots = self._delete_legacy_history_locked()
+            state_marker = Path(self.config.STATE_DIR) / "schema-version.json"
+            old_transients: list[str] = []
+            if state_marker.exists():
+                for name in _LEGACY_TRANSIENTS:
+                    path = self.top / name
+                    if path.parent != self.top or path.is_symlink():
+                        raise IntegrityError("Legacy transaction target failed validation")
+                    if self.runner.run(
+                        ["btrfs", "subvolume", "show", str(path)], check=False
+                    ).returncode == 0:
+                        self.runner.run(
+                            ["btrfs", "subvolume", "delete", "--commit-after", str(path)]
+                        )
+                        old_transients.append(name)
+            state = state_manager.migrate()
+            for obsolete in (
+                "settings.json",
+                "boot-attempts",
+                "boot-health.json",
+                "boot-validation.json",
+                "power-policy.json",
+                "last-auto-snapshot",
+            ):
+                (Path(self.config.STATE_DIR) / obsolete).unlink(missing_ok=True)
+        result = {
+            **state,
+            "removed_legacy_snapshots": removed_snapshots,
+            "removed_legacy_transients": old_transients,
+        }
+        self.logger.write("INFO", "state.migrate", "Simplified state migration completed")
+        return result
+
+    def version_info(self) -> dict[str, Any]:
+        state = StateMigrationManager(Path(self.config.STATE_DIR), self.logger).status()
+        return {"application_version": APP_VERSION, "state": state}
 
     def request_reboot(self) -> dict[str, bool]:
-        """Queue a reboot and return before systemd tears down the desktop session."""
-
         self.require_root()
-        self.logger.write(
-            "INFO",
-            "system.reboot",
-            "Reboot requested from CachyFreeze",
-        )
+        self.logger.write("INFO", "system.reboot", "Explicit reboot requested")
         self.runner.run(["systemctl", "reboot", "--no-block"])
         return {"reboot_queued": True}
 
-    def recent_logs(self, limit: int = 100) -> list[dict[str, Any]]:
-        if not 1 <= limit <= 1000:
-            raise CachyFreezeError("Log line limit must be between 1 and 1000.")
-        path = Path(self.config.LOG_FILE)
-        if not path.exists():
-            return []
-        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-        entries: list[dict[str, Any]] = []
-        for line in lines[-limit:]:
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(item, dict):
-                entries.append(item)
-        return entries
-
-    def diagnostics(self) -> dict[str, Any]:
-        """Create a bounded support bundle with identities and identifiers removed."""
-
-        self.require_root()
-        status = self.status()
-        result = DiagnosticBundleBuilder(
-            state_dir=Path(self.config.STATE_DIR),
-            export_dir=Path(self.config.EXPORT_DIR),
-            log_file=Path(self.config.LOG_FILE),
-            runner=self.runner,
-        ).build(status)
-        self.logger.write(
-            "INFO",
-            "diagnostics.export",
-            "Redacted diagnostic bundle created",
-            filename=result["filename"],
-        )
-        return result
-
     def write_status_cache(self, status: dict[str, Any]) -> None:
-        cache = Path(self.config.STATE_DIR) / "status.json"
-        atomic_json_write(cache, status, mode=0o644)
+        atomic_json_write(Path(self.config.STATE_DIR) / "status.json", status, mode=0o644)

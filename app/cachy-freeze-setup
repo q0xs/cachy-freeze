@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin
+unset CDPATH ENV BASH_ENV PYTHONHOME PYTHONPATH
+
 PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 readonly PROJECT_ROOT
 
@@ -15,24 +18,66 @@ show_error() {
   fi
 }
 
-command -v python >/dev/null 2>&1 || {
-  show_error "Python was not found. Verify the CachyOS installation."
+[[ $PROJECT_ROOT == /run/cachyfreeze-installer.* ]] || {
+  show_error "Open the official single-file CachyFreeze Installer artifact."
   exit 1
 }
-command -v pkexec >/dev/null 2>&1 || {
+[[ -f $PROJECT_ROOT/.cachyfreeze-root-staged ]] || {
+  show_error "The root-owned installer staging marker is missing."
+  exit 1
+}
+[[ $(stat -c '%u:%a' "$PROJECT_ROOT") == 0:755 ]] || {
+  show_error "The installer staging directory failed its ownership check."
+  exit 1
+}
+
+[[ -x /usr/bin/pkexec ]] || {
   show_error "PolicyKit was not found. A CachyOS KDE installation is required."
   exit 1
 }
 
-# GitHub ZIP extraction can drop Unix execute bits. The desktop launcher itself
-# uses bash, then restores the helper bit before PolicyKit executes it.
-chmod u+x "$PROJECT_ROOT/app/cachy-freeze-manager-helper"
+# Reject unsupported systems before installing the GUI runtime dependency.
+[[ -x /usr/bin/pacman ]] || {
+  show_error "Only CachyOS/Arch Linux with pacman is supported."
+  exit 1
+}
+grep -Eq '^(ID|ID_LIKE)=.*\b(arch|cachyos)\b' /etc/os-release || {
+  show_error "Only CachyOS/Arch Linux is supported."
+  exit 1
+}
+[[ -d /sys/firmware/efi ]] || {
+  show_error "CachyFreeze requires UEFI boot."
+  exit 1
+}
+[[ $(findmnt -n -o FSTYPE /) == btrfs && $(findmnt -n -o SOURCE /) == *'[/@]' ]] || {
+  show_error "CachyFreeze requires the persistent Btrfs @ root in THAWED mode."
+  exit 1
+}
+[[ $(findmnt -n -o TARGET --target /boot) == / && -d /boot/grub && -d /boot/efi/EFI ]] || {
+  show_error "The supported GRUB, /boot, and /boot/efi layout was not found."
+  exit 1
+}
+[[ $(findmnt -n -o TARGET --target /boot/efi) == /boot/efi &&
+  $(findmnt -n -o FSTYPE --target /boot/efi) == vfat ]] || {
+  show_error "The EFI System Partition must be mounted as vfat at /boot/efi."
+  exit 1
+}
 
-if ! python -s -c 'import PyQt6' >/dev/null 2>&1; then
-  if ! pkexec /usr/bin/pacman -S --needed --noconfirm python-pyqt6; then
+[[ -x $PROJECT_ROOT/app/cachy-freeze-manager-helper ]] || {
+  show_error "The staged privileged helper is not executable."
+  exit 1
+}
+
+if [[ ! -x /usr/bin/python ]] ||
+  ! /usr/bin/python -s -c 'import PyQt6' >/dev/null 2>&1; then
+  if ! /usr/bin/pkexec /usr/bin/pacman -S --needed --noconfirm python python-pyqt6; then
     show_error "The graphical setup component could not be installed. Check the network."
     exit 1
   fi
+fi
+if [[ ! -x /usr/bin/python ]] || ! /usr/bin/python -s -c 'import PyQt6' >/dev/null 2>&1; then
+  show_error "The Python/PyQt6 graphical runtime could not be verified."
+  exit 1
 fi
 
 export PYTHONPATH="$PROJECT_ROOT/src:$PROJECT_ROOT/app"

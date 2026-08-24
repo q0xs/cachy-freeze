@@ -1,72 +1,54 @@
 # Installation
 
-## Requirements
+## Supported environment
 
 - CachyOS/Arch Linux with KDE Plasma
-- UEFI, GRUB, Btrfs root subvolume `@`
-- EFI mounted at `/boot/efi` and no separate `/boot` filesystem
-- AC power, physical access, recovery media, and a restorable backup
+- UEFI, GRUB, and Btrfs root subvolume `@`
+- EFI mounted at `/boot/efi`
+- no separate `/boot` filesystem
+- no nested subvolumes inside `@`
 
-The installer stops when preflight detects an unsupported layout.
-The idle power policy additionally requires an RTC wake alarm exposed at
-`/sys/class/rtc/rtc0/wakealarm`; missing RTC support does not make the Btrfs
-freeze engine unsafe, so it is reported separately instead of aborting setup.
+Compatibility checks run inside the graphical installer before CachyFreeze
+changes Btrfs or GRUB. A failed critical check stops installation.
 
-## ZIP-based graphical install
+## Graphical single-file install
 
-1. Open <https://github.com/q0xs/cachy-freeze> in a browser.
-2. Select **Code → Download ZIP**, or use the direct
-   [CachyFreeze main ZIP](https://github.com/q0xs/cachy-freeze/archive/refs/heads/main.zip).
-3. Extract the entire archive and open the resulting `cachy-freeze-main` folder.
-   Do not launch from the compressed-file preview and do not copy only selected
-   files out of the archive.
-4. Open `cachyfreeze-setup.desktop` and choose **Execute** if KDE prompts.
-5. Follow the five vertical Setup steps: preflight, install, optional user,
-   GRUB maintenance password, then finish and enable FROZEN. The installation
-   confirmation reminds the operator to have recovery media and a backup ready.
+1. Download `CachyFreeze-Installer-<version>.run` and verify its SHA-256 sidecar.
+2. Ensure the artifact is executable, then open it in KDE.
+3. Approve the PolicyKit request that creates a verified, root-owned transient
+   installer staging area.
+4. Enter and confirm the GRUB boot-maintenance password.
+5. Select **INSTALL CACHYFREEZE** and approve any uncached PolicyKit request.
+6. Wait while the installer validates compatibility, installs required Arch
+   packages, configures PolicyKit/initramfs/GRUB, migrates owned legacy state,
+   creates the initial Golden, and schedules FROZEN.
+7. Save work and select **REBOOT NOW**.
 
-The launcher restores any helper execute permission lost during extraction,
-installs the graphical dependency through PolicyKit when necessary, and opens
-the unprivileged Setup page. Root operations still pass through the restricted
-PolicyKit helper. Installation publishes the initial Golden and leaves the next
-boot in THAWED mode.
+The password travels through process standard input and is converted to a GRUB
+PBKDF2 hash. The plaintext is not written to disk, command arguments,
+environment files, logs, source, or fixtures.
 
-Only a complete project archive is supported. Individual scripts, GitHub raw
-file links, and launching directly from inside the ZIP are intentionally
-unsupported. `install.sh` remains a complete-repository fallback, but the ZIP
-and graphical Setup launcher are the documented end-user path.
+The installer never reboots automatically. After reboot, open **CachyFreeze**
+from the KDE Application Launcher.
 
-## Setup workflow
+## Repeat installation and migration
 
-The graphical Setup page is a vertical five-step workflow:
+Run the installer only while actually booted from persistent THAWED `@`.
+Re-running it updates/reconciles owned application files, PolicyKit, initramfs,
+and the one managed GRUB entry. Existing entries from other software remain.
 
-1. Run preflight.
-2. Install CachyFreeze.
-3. Optionally create a user. Selecting it checks required applications and, with
-   one confirmation, prepares missing applications before opening the account form.
-4. Set a strong GRUB maintenance password. The fixed GRUB username is always `cachyadmin`;
-   it is separate from Linux user accounts.
-5. Finish and enable FROZEN. CachyFreeze requests a safe logout, then publishes
-   Golden, schedules FROZEN, and automatically reboots only after finalization
-   completes successfully. A failed finalization remains fail-closed at the login
-   screen and does not reboot.
+Legacy CachyFreeze snapshot history is removed only when its catalog proves
+ownership of every child. Ambiguous data aborts installation and requires
+manual review. The installer never deletes Snapper, Timeshift, or unrelated
+subvolumes.
 
-User creation is never required for installation or FROZEN activation. Account
-creation can preselect the new user on the login screen, but a password is always
-required; it never publishes Golden, schedules FROZEN, or reboots.
-For other mode-changing operations, use the application's reboot confirmation.
-Never interrupt package, initramfs, GRUB, or Golden writes.
+## Build
 
-## Automatic idle power policy
+From an unprivileged checkout:
 
-Installation enables `cachy-freeze-idle-power.service` automatically. With no
-keyboard or pointer activity for one hour, the workstation enters a timed sleep.
-If it remains asleep for the following hour, the RTC wakes it and CachyFreeze
-powers it off, for two hours total unattended time. Waking it manually before
-the deadline cancels shutdown; another complete one-hour idle period is required
-before sleep can be scheduled again.
+```bash
+bash packaging/build-installer.sh
+```
 
-If RTC wake support is unavailable or unwritable, CachyFreeze reports the policy
-as unsupported and does not suspend the workstation, because sleep without a
-reliable shutdown deadline would violate the requested policy. Support status is
-visible in Management Center and in the redacted diagnostic bundle.
+The command writes the `.run` artifact and checksum to `dist/`. Set
+`SOURCE_DATE_EPOCH` to the release timestamp for reproducible release builds.

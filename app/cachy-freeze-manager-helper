@@ -16,368 +16,58 @@ unset CDPATH ENV BASH_ENV PYTHONHOME PYTHONPATH CACHY_FREEZE_CONFIG
 unset CACHY_FREEZE_ROOT_SUBVOLUME CACHY_FREEZE_INITRD_CONFIG CACHY_FREEZE_TOP
 
 (( EUID == 0 )) || {
-  printf '%s\n' "ERROR: Administrator privileges are required." >&2
+  printf '%s\n' "ERROR: Administrator authorization is required." >&2
   exit 1
 }
 
 die() {
-  printf '%s\n' "ERROR: $*" >&2
+  printf 'ERROR: %s\n' "$*" >&2
   exit 1
 }
 
-require_argument_count() {
+require_count() {
   local expected=$1
   shift
-  (( $# == expected )) || {
-    printf '%s\n' "ERROR: Invalid argument count." >&2
-    exit 2
-  }
+  (( $# == expected )) || die "Invalid argument count."
 }
 
-read_employee_secret() {
-  IFS= read -r SETUP_SECRET || die "Password was not received through the secure input channel."
-  (( ${#SETUP_SECRET} >= 4 && ${#SETUP_SECRET} <= 256 )) ||
-    die "Password must contain 4-256 characters."
-  [[ $SETUP_SECRET != *:* && $SETUP_SECRET != *$'\r'* && $SETUP_SECRET != *$'\n'* ]] ||
-    die "Password contains an unsupported character."
-}
-
-read_grub_secret() {
-  read_employee_secret
-  (( ${#SETUP_SECRET} >= 12 )) || die "GRUB password must contain 12-256 characters."
+read_boot_secret() {
+  IFS= read -r BOOT_SECRET || die "The boot-maintenance password was not received."
+  (( ${#BOOT_SECRET} >= 12 && ${#BOOT_SECRET} <= 256 )) ||
+    die "The boot-maintenance password must contain 12-256 characters."
+  [[ $BOOT_SECRET != *:* && $BOOT_SECRET != *$'\r'* && $BOOT_SECRET != *$'\n'* ]] ||
+    die "The boot-maintenance password contains an unsupported character."
   local classes=0
-  [[ $SETUP_SECRET =~ [a-z] ]] && ((classes += 1))
-  [[ $SETUP_SECRET =~ [A-Z] ]] && ((classes += 1))
-  [[ $SETUP_SECRET =~ [0-9] ]] && ((classes += 1))
-  [[ $SETUP_SECRET =~ [^A-Za-z0-9] ]] && ((classes += 1))
-  (( classes >= 3 )) || die "Password must contain at least three character classes."
-}
-
-requester_identity() {
-  REQUEST_UID=${PKEXEC_UID:-${SUDO_UID:-}}
-  [[ $REQUEST_UID =~ ^[0-9]+$ && $REQUEST_UID -gt 0 ]] ||
-    die "The requesting desktop user could not be identified."
-  REQUEST_USER=$(getent passwd "$REQUEST_UID" | cut -d: -f1)
-  [[ $REQUEST_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] ||
-    die "The requesting desktop account is invalid."
-  readonly REQUEST_UID REQUEST_USER
-}
-
-setup_status() {
-  local manager_installed=false employee_configured=false grub_protected=false
-  local employee_user='' backend_status=''
-  [[ -x $BACKEND ]] && manager_installed=true
-  if [[ -r /etc/cachy-employee.conf ]]; then
-    employee_user=$(sed -n 's/^EMPLOYEE_USER=//p' /etc/cachy-employee.conf)
-    if [[ $employee_user =~ ^[a-z][a-z0-9_-]{2,31}$ ]]; then
-      employee_configured=true
-    else
-      employee_user=
-    fi
-  fi
-  [[ -s /etc/cachy-freeze-grub-auth.conf ]] && grub_protected=true
-  if [[ $manager_installed == true && -r /etc/cachy-freeze.conf ]]; then
-    backend_status=$($BACKEND status 2>/dev/null || true)
-  fi
-  MANAGER_INSTALLED=$manager_installed \
-  EMPLOYEE_CONFIGURED=$employee_configured \
-  EMPLOYEE_USER=$employee_user \
-  GRUB_PROTECTED=$grub_protected \
-  BACKEND_STATUS=$backend_status \
-    /usr/bin/python - <<'PY'
-import json
-import os
-
-manager = os.environ["MANAGER_INSTALLED"] == "true"
-employee = os.environ["EMPLOYEE_CONFIGURED"] == "true"
-grub = os.environ["GRUB_PROTECTED"] == "true"
-status = {}
-try:
-    document = json.loads(os.environ.get("BACKEND_STATUS", ""))
-    if document.get("ok") is True and isinstance(document.get("result"), dict):
-        status = document["result"]
-except (json.JSONDecodeError, AttributeError):
-    pass
-
-golden = bool(status.get("golden_present"))
-scheduled_frozen = status.get("scheduled_mode") == "frozen"
-validation = status.get("boot_validation", {})
-if not isinstance(validation, dict):
-    validation = {}
-validation_status = str(validation.get("status", "idle"))
-device_validated = validation_status == "verified"
-finalization = status.get("finalization", {})
-if not isinstance(finalization, dict):
-    finalization = {}
-finalization_status = str(finalization.get("status", "idle"))
-if manager and golden and grub and scheduled_frozen and device_validated:
-    phase = "complete"
-elif manager and (
-    finalization_status in {"pending", "waiting-for-logout", "publishing"}
-    or validation_status in {"awaiting-frozen-boot", "verifying", "failed"}
-):
-    phase = "validating"
-elif manager:
-    phase = "installed"
-elif not manager and not employee and not grub:
-    phase = "ready"
-else:
-    phase = "partial"
-
-print(json.dumps({
-    "ok": True,
-    "result": {
-        "phase": phase,
-        "manager_installed": manager,
-        "employee_configured": employee,
-        "employee_user": os.environ.get("EMPLOYEE_USER", ""),
-        "golden_present": golden,
-        "grub_protected": grub,
-        "scheduled_frozen": scheduled_frozen,
-        "device_validated": device_validated,
-        "boot_validation_status": validation_status,
-        "finalization_status": finalization_status,
-    },
-}, ensure_ascii=False, sort_keys=True))
-PY
+  [[ $BOOT_SECRET =~ [a-z] ]] && ((classes += 1))
+  [[ $BOOT_SECRET =~ [A-Z] ]] && ((classes += 1))
+  [[ $BOOT_SECRET =~ [0-9] ]] && ((classes += 1))
+  [[ $BOOT_SECRET =~ [^A-Za-z0-9] ]] && ((classes += 1))
+  (( classes >= 3 )) || die "Use at least three character classes."
 }
 
 case ${1:-} in
-  setup-status)
-    (( $# == 1 )) || exit 2
-    setup_status
-    exit 0
-    ;;
-  setup-preflight)
-    (( $# == 1 )) || exit 2
-    if [[ -x $BACKEND && -r /etc/cachy-freeze.conf ]]; then
-      exec "$BACKEND" preflight
-    fi
-    [[ -r $PROJECT_ROOT/deepfreeze/bin/cachy-freeze ]] ||
-      die "The repository preflight engine was not found."
-    exec env CACHY_FREEZE_CONFIG="$PROJECT_ROOT/deepfreeze/etc/cachy-freeze.conf" \
-      bash "$PROJECT_ROOT/deepfreeze/bin/cachy-freeze" preflight
-    ;;
   setup-install)
-    (( $# == 1 )) || exit 2
-    [[ ! -s /etc/cachy-freeze-grub-auth.conf ]] ||
-      die "CachyFreeze is already activated; reinstallation was blocked."
+    require_count 1 "$@"
     [[ -r $PROJECT_ROOT/installer/install-cachyfreeze.sh ]] ||
-      die "Verified installer package was not found."
-    bash "$PROJECT_ROOT/installer/install-cachyfreeze.sh" >&2
-    printf '%s\n' '{"ok":true,"result":{"phase":"installed"}}'
-    exit 0
-    ;;
-  setup-grub-password)
-    (( $# == 1 )) || exit 2
-    [[ -x $BACKEND ]] || die "Install CachyFreeze before enabling FROZEN mode."
-    [[ ! -s /etc/cachy-freeze-grub-auth.conf ]] ||
-      die "The GRUB maintenance password is already configured."
-    [[ -r $PROJECT_ROOT/installer/configure-grub-password.sh ]] ||
-      die "Verified GRUB activation package was not found."
-    read_grub_secret
-    printf '%s\n' "$SETUP_SECRET" |
-      CACHY_SETUP_NONINTERACTIVE=1 \
-        bash "$PROJECT_ROOT/installer/configure-grub-password.sh" >&2
-    unset SETUP_SECRET
-    printf '%s\n' '{"ok":true,"result":{"grub_protected":true}}'
-    exit 0
-    ;;
-  setup-freeze)
-    (( $# == 1 )) || exit 2
-    [[ -x $BACKEND ]] || die "Install CachyFreeze before enabling FROZEN mode."
-    [[ -s /etc/cachy-freeze-grub-auth.conf ]] ||
-      die "Set the GRUB maintenance password before enabling FROZEN mode."
-    "$BACKEND" health | /usr/bin/python -c '
-import json
-import sys
-
-document = json.load(sys.stdin)
-result = document.get("result", {}) if document.get("ok") is True else {}
-ready = result.get("freeze_ready", result.get("healthy", False))
-raise SystemExit(0 if ready else 1)
-' || die "FROZEN was not enabled because the final Btrfs or snapshot check failed."
-    requester_identity
-    exec "$BACKEND" finalize request "$REQUEST_USER" --uid "$REQUEST_UID"
-    ;;
-esac
-
-[[ -x $BACKEND ]] || die "CachyFreeze is not installed."
-
-case ${1:-} in
-  status)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" status
-    ;;
-  thaw)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" thaw
-    ;;
-  thaw-once)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" thaw-once
-    ;;
-  freeze)
-    require_argument_count 1 "$@"
-    [[ -s /etc/cachy-freeze-grub-auth.conf ]] ||
-      die "Set the GRUB maintenance password from Setup before the first FROZEN boot."
-    requester_identity
-    exec "$BACKEND" finalize request "$REQUEST_USER" --uid "$REQUEST_UID"
-    ;;
-  freeze-prepare)
-    require_argument_count 1 "$@"
-    [[ -s /etc/cachy-freeze-grub-auth.conf ]] ||
-      die "Set the GRUB maintenance password from Setup before the first FROZEN boot."
-    requester_identity
-    exec "$BACKEND" finalize request "$REQUEST_USER" --uid "$REQUEST_UID"
-    ;;
-  reboot)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" reboot
-    ;;
-  snapshot-list)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" snapshot list
-    ;;
-  snapshot-create)
-    require_argument_count 2 "$@"
-    [[ -n ${2:-} ]] || {
-      printf '%s\n' "ERROR: A snapshot description is required." >&2
-      exit 2
-    }
-    exec "$BACKEND" snapshot create --description "$2"
-    ;;
-  snapshot-verify)
-    require_argument_count 2 "$@"
-    [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
-    exec "$BACKEND" snapshot verify "$2" --full
-    ;;
-  snapshot-compare)
-    require_argument_count 3 "$@"
-    [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
-    [[ ${3:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
-    exec "$BACKEND" snapshot compare "$2" "$3"
-    ;;
-  snapshot-delete)
-    require_argument_count 2 "$@"
-    [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
-    exec "$BACKEND" snapshot delete "$2"
-    ;;
-  snapshot-rollback)
-    require_argument_count 2 "$@"
-    [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
-    exec "$BACKEND" snapshot rollback "$2"
-    ;;
-  snapshot-export)
-    require_argument_count 2 "$@"
-    [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$ ]] || exit 2
-    exec "$BACKEND" snapshot export "$2"
-    ;;
-  snapshot-import)
-    require_argument_count 2 "$@"
-    [[ ${2:-} =~ ^snap-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}\.btrfs$ ]] || exit 2
-    exec "$BACKEND" snapshot import "$2"
-    ;;
-  health)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" health
-    ;;
-  diagnostics)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" diagnostics
-    ;;
-  updates-check)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" updates check
-    ;;
-  updates-apply)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" updates apply
-    ;;
-  applications-status)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" applications status
-    ;;
-  applications-install)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" applications install
-    ;;
-  settings-get)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" settings get
-    ;;
-  settings-set)
-    require_argument_count 10 "$@"
-    [[ $2 =~ ^[0-9]+$ && $4 =~ ^[0-9]+$ && $7 =~ ^[0-9]+$ && $8 =~ ^[0-9]+$ ]] || exit 2
-    [[ $3 == true || $3 == false ]] || exit 2
-    [[ $5 == true || $5 == false ]] || exit 2
-    [[ $6 == true || $6 == false ]] || exit 2
-    [[ $9 == en || $9 == tr ]] || exit 2
-    [[ ${10} == dark || ${10} == light ]] || exit 2
-    exec "$BACKEND" settings set \
-      --retention-count "$2" \
-      --auto-snapshot-enabled "$3" \
-      --auto-snapshot-interval "$4" \
-      --update-checks-enabled "$5" \
-      --network-online-checks "$6" \
-      --boot-failure-limit "$7" \
-      --log-retention-lines "$8" \
-      --language "$9" \
-      --theme "${10}"
-    ;;
-  logs)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" logs --limit 200
-    ;;
-  user-list)
-    require_argument_count 1 "$@"
-    exec "$BACKEND" user list
-    ;;
-  user-create)
-    require_argument_count 3 "$@"
-    [[ ${2:-} =~ ^[a-z][a-z0-9_-]{1,30}$ ]] ||
-      die "Username must contain 2-31 lowercase letters, digits, underscores, or hyphens."
-    [[ -n ${3:-} ]] || die "A display name is required."
-    exec "$BACKEND" user create "$2" --display-name "$3"
-    ;;
-  user-delete)
-    require_argument_count 2 "$@"
-    [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
-    exec "$BACKEND" user delete "$2"
-    ;;
-  user-restore)
-    require_argument_count 2 "$@"
-    [[ ${2:-} =~ ^[0-9]{8}T[0-9]{6}Z-([0-9a-f]{8}-)?[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
-    exec "$BACKEND" user restore "$2"
-    ;;
-  user-password)
-    require_argument_count 2 "$@"
-    [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
-    exec "$BACKEND" user password "$2"
-    ;;
-  user-lock)
-    require_argument_count 2 "$@"
-    [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
-    exec "$BACKEND" user lock "$2"
-    ;;
-  user-unlock)
-    require_argument_count 2 "$@"
-    [[ ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
-    exec "$BACKEND" user unlock "$2"
-    ;;
-  user-autologin)
-    (( $# == 1 || $# == 2 )) || {
-      printf '%s\n' "ERROR: Invalid argument count." >&2
-      exit 2
-    }
-    [[ -z ${2:-} || ${2:-} =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || exit 2
-    if [[ -n ${2:-} ]]; then
-      exec "$BACKEND" user autologin "$2"
+      die "The verified installer payload was not found."
+    read_boot_secret
+    printf '%s\n' "$BOOT_SECRET" | bash "$PROJECT_ROOT/installer/install-cachyfreeze.sh" >&2
+    unset BOOT_SECRET
+    status_payload=$("$BACKEND" status)
+    if [[ $PROJECT_ROOT == /run/cachyfreeze-installer.* && \
+      -f $PROJECT_ROOT/.cachyfreeze-root-staged && \
+      ! -L $PROJECT_ROOT && \
+      $(stat -c '%u:%a' "$PROJECT_ROOT") == 0:755 ]]; then
+      rm -rf --one-file-system "$PROJECT_ROOT"
     fi
-    exec "$BACKEND" user autologin
+    printf '%s\n' "$status_payload"
+    ;;
+  status | freeze | thaw | reboot)
+    require_count 1 "$@"
+    [[ -x $BACKEND ]] || die "CachyFreeze is not installed."
+    exec "$BACKEND" "$1"
     ;;
   *)
-    printf '%s\n' "ERROR: Invalid action." >&2
-    exit 2
+    die "Unsupported CachyFreeze action."
     ;;
 esac
