@@ -110,7 +110,10 @@ run_case() {
     VM_TRANSCRIPT=$transcript \
     timeout 90 expect <<'EOF'
 set timeout 60
-set send_slow {1 0.10}
+# OVMF's emulated serial input can drop characters while GRUB redraws its
+# authentication prompt. Keep every character well outside that window; a
+# truncated username can otherwise look like an authorization regression.
+set send_slow {1 0.25}
 log_file -noappend $env(VM_TRANSCRIPT)
 spawn qemu-system-x86_64 \
   -machine q35,accel=tcg \
@@ -126,18 +129,18 @@ if {$env(VM_PASSWORD) ne ""} {
     timeout { exit 42 }
     eof { exit 43 }
   }
-  after 750
+  after 1500
   send -s -- "$env(VM_USER)"
-  after 750
+  after 1000
   send -- "\r"
   expect {
     "Enter password:" {}
     timeout { exit 44 }
     eof { exit 45 }
   }
-  after 750
+  after 1500
   send -s -- "$env(VM_PASSWORD)"
-  after 750
+  after 1000
   send -- "\r"
 }
 if {$env(VM_EXPECTED) eq "allowed"} {

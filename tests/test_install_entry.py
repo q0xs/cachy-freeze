@@ -46,8 +46,12 @@ class InstallEntryTests(unittest.TestCase):
         self.assertIn(
             "set_grub_setting GRUB_DEFAULT cachyos-current", self.engine_installer
         )
-        self.assertIn("set_grub_setting GRUB_SAVEDEFAULT false", self.engine_installer)
-        self.assertIn("set_grub_setting GRUB_TIMEOUT_STYLE hidden", self.engine_installer)
+        self.assertIn(
+            "set_grub_setting GRUB_SAVEDEFAULT false", self.engine_installer
+        )
+        self.assertIn(
+            "set_grub_setting GRUB_TIMEOUT_STYLE hidden", self.engine_installer
+        )
         self.assertIn("set_grub_setting GRUB_TIMEOUT 1", self.engine_installer)
         self.assertNotIn("GRUB_DEFAULT=saved", self.engine_installer)
         self.assertIn(
