@@ -33,9 +33,13 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
 - PASS — two `SOURCE_DATE_EPOCH=0 bash packaging/build-installer.sh` builds
   produced an identical `CachyFreeze-Installer-1.0.0rc3.run`; its generated
   SHA-256 sidecar verified successfully.
-- BLOCKED — `deepfreeze/tests/boot-acceptance-vm.sh`:
-  `qemu-system-x86_64` is unavailable locally. GitHub Actions must provide the
-  disposable UEFI GRUB VM result for the pushed commit.
+- BLOCKED locally — `deepfreeze/tests/boot-acceptance-vm.sh`:
+  `qemu-system-x86_64` is unavailable on the workstation.
+- PASS — GitHub Actions run `32726332134` for commit `ff5d2e2` passed both
+  jobs. The static job executed ShellCheck, Ruff, all Python tests, and isolated
+  GRUB generation. The disposable QEMU/OVMF job denied an incorrect THAWED
+  password, accepted the correct THAWED password, and booted the FROZEN entry
+  without authentication.
 - NOT RUN — a full installer, reboot, FROZEN reset, THAWED persistence, and
   re-FREEZE lifecycle in a disposable CachyOS VM. No live installation,
   baseline publication, host GRUB write, host root replacement, or reboot was
