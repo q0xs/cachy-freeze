@@ -1,0 +1,28 @@
+[Unit]
+Description=CachyWorkstation KDE idle lock and system poweroff policy
+Documentation=https://github.com/q0xs/cachy-freeze/blob/main/docs/workstation-provisioning.md
+After=systemd-logind.service
+Wants=systemd-logind.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/systemd-inhibit --what=sleep --who=CachyWorkstation --why="Preserve the 60/120 minute idle timeline" --mode=block /usr/lib/cachy-workstation/idle-supervisor
+Restart=always
+RestartSec=5s
+TimeoutStopSec=15s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=read-only
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

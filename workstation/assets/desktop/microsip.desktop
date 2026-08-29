@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=MicroSIP
+Comment=MicroSIP softphone through Wine
+Exec=/usr/local/bin/cachy-workstation-microsip
+TryExec=/usr/local/bin/cachy-workstation-microsip
+Icon=call-start
+Terminal=false
+StartupNotify=true
+Categories=Network;Telephony;
+X-CachyWorkstation-Managed=true

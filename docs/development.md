@@ -14,8 +14,17 @@ SHELLCHECK_OPTS=--severity=error bash deepfreeze/tests/static.sh
 QT_QPA_PLATFORM=offscreen bash deepfreeze/tests/ui-smoke.sh
 bash deepfreeze/tests/grub-generation.sh
 bash packaging/build-installer.sh
+bash workstation/tests/static.sh
+bash packaging/build-workstation-installer.sh
 bash deepfreeze/tests/boot-acceptance-vm.sh
 ```
+
+The workstation tests compile the KF6 KIdleTime agent, validate its root
+supervisor with mocked lock/poweroff commands, check desktop/systemd files,
+verify every vendored PKGBUILD against its `.SRCINFO`, and build the separate
+portable payload. A live event-only test may run the compiled agent in a KDE
+session with short thresholds; never connect those short test events to the
+root supervisor.
 
 `integration-btrfs.sh` and `integration-engine.sh` use disposable loopback Btrfs
 filesystems and require root. `boot-acceptance-vm.sh` validates the generated

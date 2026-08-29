@@ -5,6 +5,12 @@ exact allow-listed action through PolicyKit. The privileged helper invokes the
 Python engine with structured arguments. Only the engine may mutate Btrfs or
 GRUB state.
 
+The optional `workstation/` tree is built into a separate administrator CLI
+payload. It is deliberately absent from the CachyFreeze GUI, PolicyKit helper,
+normal installer payload, and FROZEN/THAWED engine. Its application and idle
+policy reconciliation runs before a manual FREEZE; see
+`workstation-provisioning.md`.
+
 | Subvolume | Purpose |
 | --- | --- |
 | `@` | Persistent writable THAWED maintenance root |

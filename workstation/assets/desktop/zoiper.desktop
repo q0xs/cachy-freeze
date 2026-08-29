@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Zoiper
+Comment=SIP and IAX softphone
+Exec=/usr/bin/zoiper
+TryExec=/usr/bin/zoiper
+Icon=zoiper
+Terminal=false
+StartupNotify=true
+Categories=Network;Telephony;
+X-CachyWorkstation-Managed=true

@@ -78,3 +78,7 @@ bash packaging/build-installer.sh
 
 The command writes the `.run` artifact and checksum to `dist/`. Set
 `SOURCE_DATE_EPOCH` to the release timestamp for reproducible release builds.
+
+Employee applications and idle security are deployed by the separate portable
+provisioner before FREEZE, not by this graphical installer. See
+[CachyWorkstation provisioning](workstation-provisioning.md).

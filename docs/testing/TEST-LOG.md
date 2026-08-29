@@ -4,6 +4,64 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-08-29 — portable CachyWorkstation provisioner — local working tree
+
+- ADDED — a separate administrator CLI payload provisions an already-created
+  non-administrator employee without changing the normal CachyFreeze GUI,
+  installer, Btrfs engine, GRUB lifecycle, or FROZEN/THAWED product contract.
+  Install/repair is fail-closed outside persistent THAWED `@`; FREEZE remains a
+  later manual action after application tests and a passing health check.
+- PASS — `bash workstation/tests/static.sh`: ShellCheck, Bash syntax, Ruff
+  check/format, nine idle-supervisor unit tests, desktop-file and systemd unit
+  validation, the managed-user symlink/traversal guard, KF6 KIdleTime C++
+  compilation with release LTO, every vendored PKGBUILD/`.SRCINFO` pair, and
+  the AUR revision manifest passed.
+- PASS — current reviewed Google Chrome and AnyDesk recipes downloaded their
+  official archives and produced installable packages as an unprivileged
+  isolated build account. The official Zoiper endpoint was downloaded twice;
+  both responses were byte-identical but differed from the then-current AUR
+  checksum. The replacement archive structure and x86-64 executable were
+  inspected, the downstream change was documented with a package-release bump,
+  and the reviewed recipe produced an installable package. The vendored GTK 2
+  fallback Git source and all patches passed `makepkg --verifysource`; the
+  preferred signed CachyOS repository currently provides the same GTK 2
+  package version.
+- PASS — the official MicroSIP portable archive passed the pinned archive and
+  executable checksums, archive-size/type/path checks, and 32-bit Windows GUI
+  executable inspection. A one-byte-modified copy was rejected. This real-file
+  test exposed and fixed a portable `file(1)` architecture-label difference
+  before release.
+- PASS — a controlled event-only test in the physical KDE Plasma 6 Wayland
+  session emitted READY, LOCK, and POWER_OFF at short thresholds; simulated
+  input emitted RESUMED and began a new idle interval. The test agent emitted
+  text tokens only and was never connected to lock or shutdown commands. A
+  separate live supervisor test found the active local Wayland session and its
+  user-manager environment after a standard underscore-prefixed environment
+  variable parser regression was fixed.
+- PASS — two `SOURCE_DATE_EPOCH=0` workstation payload builds were identical
+  and the generated checksum sidecar passed. Root extraction verified the
+  embedded manifests and reached `--help`. A complete `--check` against the
+  existing administrator account correctly failed the no-admin check and all
+  absent managed components while still printing the complete summary. A normal
+  install invocation on the physical FROZEN `@active` root stopped before any
+  package or provisioning step.
+- PASS — the unchanged CachyFreeze product passed Ruff check/format,
+  ShellCheck/static contracts, Qt offscreen smoke, isolated GRUB generation,
+  all 53 Python tests, and two reproducible graphical-installer builds with a
+  valid checksum sidecar. The Python suite ran inside a temporary mount
+  namespace with an empty test kernel-command-line view because the physical
+  host's real FROZEN marker must not override its mocked THAWED fixtures.
+- BLOCKED locally — the two disposable Btrfs loopback integrations stopped at
+  `losetup` before creating a filesystem because this running FROZEN kernel has
+  no usable matching loop driver/module. The temporary directories and the
+  test-created device node were removed. The QEMU/OVMF test is also unavailable
+  locally because QEMU and Expect are not installed; both remain CI targets.
+- NOT RUN — live provisioning of an employee on this test PC, actual
+  application installation/launch, a real 60/120-minute lock and poweroff,
+  physical CachyFreeze mutation, FREEZE publication, or reboot. The portable
+  provisioner is intended for other THAWED target PCs; no physical shutdown was
+  connected to the short idle-agent test.
+
 ## 2026-08-24 — rc6 idempotent FROZEN reset and single-mode GRUB menu
 
 - DIAGNOSED — privileged read-only inspection after the rc5 FROZEN failure

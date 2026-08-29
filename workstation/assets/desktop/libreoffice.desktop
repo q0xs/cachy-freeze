@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=LibreOffice
+Comment=Create and edit office documents
+Exec=/usr/bin/libreoffice --nologo %U
+TryExec=/usr/bin/libreoffice
+Icon=libreoffice-startcenter
+Terminal=false
+StartupNotify=true
+Categories=Office;
+X-CachyWorkstation-Managed=true

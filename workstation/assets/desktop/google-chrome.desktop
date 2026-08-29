@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Google Chrome
+Comment=Browse the web
+Exec=/usr/bin/google-chrome-stable %U
+TryExec=/usr/bin/google-chrome-stable
+Icon=google-chrome
+Terminal=false
+StartupNotify=true
+Categories=Network;WebBrowser;
+X-CachyWorkstation-Managed=true

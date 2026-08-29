@@ -177,6 +177,37 @@ See [installation details](docs/installation.md),
 [architecture](docs/architecture.md), [recovery](docs/boot-recovery.md), and
 [development verification](docs/development.md).
 
+## Separate portable workstation provisioning
+
+The repository also contains an administrator-only, independently packaged
+CachyOS workstation provisioner. It is not part of the normal CachyFreeze GUI,
+installer payload, or Btrfs/GRUB lifecycle. It installs the approved employee
+applications and the 60-minute lock / 120-minute shutdown policy before the
+administrator creates the final Golden baseline.
+
+Build its single-file payload with:
+
+```bash
+bash packaging/build-workstation-installer.sh
+```
+
+Then copy the `.run` file and checksum to a THAWED target machine and run it for
+an already-created standard account:
+
+```bash
+sudo ./CachyWorkstation-Setup-1.0.0.run wrw1166
+sudo ./CachyWorkstation-Setup-1.0.0.run --check wrw1166
+```
+
+The small payload is an online provisioner, not an offline application bundle.
+Each target needs internet access to its configured CachyOS repositories and
+the pinned official application URLs; downloaded proprietary files are checked
+against the reviewed hashes embedded in the `.run` file.
+
+See the complete [portable provisioning and deployment
+guide](docs/workstation-provisioning.md). Freeze is always the last manual
+deployment step, after all health checks and application tests pass.
+
 ## Development checks
 
 Use only the commands established by this repository:
@@ -189,6 +220,8 @@ SHELLCHECK_OPTS=--severity=error bash deepfreeze/tests/static.sh
 QT_QPA_PLATFORM=offscreen bash deepfreeze/tests/ui-smoke.sh
 bash deepfreeze/tests/grub-generation.sh
 bash packaging/build-installer.sh
+bash packaging/build-workstation-installer.sh
+bash workstation/tests/static.sh
 bash deepfreeze/tests/boot-acceptance-vm.sh
 ```
 

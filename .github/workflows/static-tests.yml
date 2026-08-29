@@ -8,6 +8,39 @@ permissions:
   contents: read
 
 jobs:
+  workstation-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: archlinux:base-devel
+
+    steps:
+      - name: Depoyu indir
+        uses: actions/checkout@v6
+
+      - name: Workstation test bağımlılıklarını kur
+        run: |
+          pacman -Syu --noconfirm --needed \
+            cmake desktop-file-utils extra-cmake-modules git kidletime \
+            python qt6-base qt6-wayland ruff shellcheck systemd
+          useradd --create-home workstation-test
+          chown -R workstation-test:workstation-test "$GITHUB_WORKSPACE"
+
+      - name: Taşınabilir provisioner testlerini çalıştır
+        run: |
+          runuser -u workstation-test -- bash workstation/tests/static.sh
+
+      - name: Tek dosyalık artefact tekrarlanabilirliğini doğrula
+        run: |
+          runuser -u workstation-test -- \
+            env SOURCE_DATE_EPOCH=0 bash packaging/build-workstation-installer.sh
+          first_hash=$(sha256sum dist/CachyWorkstation-Setup-*.run | cut -d' ' -f1)
+          runuser -u workstation-test -- \
+            env SOURCE_DATE_EPOCH=0 bash packaging/build-workstation-installer.sh
+          second_hash=$(sha256sum dist/CachyWorkstation-Setup-*.run | cut -d' ' -f1)
+          test "$first_hash" = "$second_hash"
+          cd dist
+          sha256sum --check CachyWorkstation-Setup-*.run.sha256
+
   static-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15

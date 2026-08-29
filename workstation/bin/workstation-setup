@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+CWS_PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+readonly CWS_PROJECT_ROOT
+
+# shellcheck source=workstation/lib/common.sh
+source "$CWS_PROJECT_ROOT/workstation/lib/common.sh"
+# shellcheck source=workstation/lib/packages.sh
+source "$CWS_PROJECT_ROOT/workstation/lib/packages.sh"
+# shellcheck source=workstation/lib/user.sh
+source "$CWS_PROJECT_ROOT/workstation/lib/user.sh"
+# shellcheck source=workstation/lib/idle.sh
+source "$CWS_PROJECT_ROOT/workstation/lib/idle.sh"
+# shellcheck source=workstation/lib/health.sh
+source "$CWS_PROJECT_ROOT/workstation/lib/health.sh"
+
+declare -A STEP_RESULTS=()
+declare -a STEP_ORDER=()
+
+usage() {
+  cat <<'EOF'
+Usage:
+  sudo ./workstation-setup.sh USER
+  sudo ./workstation-setup.sh --repair USER
+  sudo ./workstation-setup.sh --check USER
+
+The USER account must already exist and must not have sudo/admin access.
+Install and repair are accepted only while booted from persistent THAWED @.
+Freeze the computer only after the final health check reports PASS.
+EOF
+}
+
+parse_arguments() {
+  case ${1:-} in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --check | --repair)
+      (( $# == 2 )) || {
+        usage >&2
+        exit 2
+      }
+      SETUP_MODE=${1#--}
+      TARGET_USER=$2
+      ;;
+    --*)
+      usage >&2
+      exit 2
+      ;;
+    '')
+      usage >&2
+      exit 2
+      ;;
+    *)
+      (( $# == 1 )) || {
+        usage >&2
+        exit 2
+      }
+      SETUP_MODE=install
+      TARGET_USER=$1
+      ;;
+  esac
+}
+
+run_step() {
+  local label=$1 function_name=$2 result
+  STEP_ORDER+=("$label")
+  printf '\n--- %s ---\n' "$label"
+  log_event INFO "step started: $label"
+
+  set +e
+  (
+    set -Eeuo pipefail
+    "$function_name"
+  )
+  result=$?
+  set -e
+
+  if (( result == 0 )); then
+    STEP_RESULTS["$label"]=OK
+    success "$label complete"
+  else
+    STEP_RESULTS["$label"]=FAIL
+    fail "$label failed (exit $result); continuing with independent sections" || true
+  fi
+}
+
+show_step_summary() {
+  local label failures=0
+  printf '\n========================================\n'
+  printf ' Workstation Setup Summary\n'
+  printf ' User: %s\n' "$TARGET_USER"
+  printf ' Mode: %s\n' "$SETUP_MODE"
+  printf '========================================\n'
+  for label in "${STEP_ORDER[@]}"; do
+    printf '  %-28s %s\n' "$label" "${STEP_RESULTS[$label]}"
+    [[ ${STEP_RESULTS[$label]} == OK ]] || (( failures += 1 ))
+  done
+  printf '%s\n' '----------------------------------------'
+  return "$failures"
+}
+
+main() {
+  local health_result summary_result
+  parse_arguments "$@"
+  require_root
+  init_log
+  acquire_setup_lock
+  require_supported_os
+  resolve_target_user
+  log_event INFO "setup invoked"
+
+  if [[ $SETUP_MODE == check ]]; then
+    run_health_check
+    return
+  fi
+
+  require_thawed_root
+  require_standard_user
+  info "Provisioning $TARGET_USER from portable payload version $(<"$CWS_PROJECT_ROOT/workstation/VERSION")"
+
+  run_step "Official dependencies" install_base_packages
+  run_step "Google Chrome" install_chrome
+  run_step "LibreOffice" install_libreoffice
+  run_step "AnyDesk" install_anydesk
+  run_step "Zoiper" install_zoiper
+  run_step "Wine and MicroSIP" install_microsip_for_target
+  run_step "Desktop shortcuts" install_user_launchers
+  run_step "Idle security policy" install_idle_policy
+
+  set +e
+  run_health_check
+  health_result=$?
+  show_step_summary
+  summary_result=$?
+  set -e
+
+  if (( health_result == 0 && summary_result == 0 )); then
+    printf ' READY FOR FREEZE\n'
+    printf ' Run CachyFreeze only after manually opening and testing all five applications.\n'
+    printf '========================================\n'
+    log_event PASS "provisioning complete; ready for manual app test and freeze"
+    return 0
+  fi
+
+  printf ' NOT READY FOR FREEZE\n'
+  printf ' Repair failures, then run: sudo ./workstation-setup.sh --repair %s\n' "$TARGET_USER"
+  printf '========================================\n'
+  log_event FAIL "provisioning incomplete; not ready for freeze"
+  return 1
+}
+
+main "$@"

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+(( EUID != 0 )) || {
+  printf 'MicroSIP must not be started as root.\n' >&2
+  exit 1
+}
+
+username=$(id -un)
+account=$(getent passwd "$username") || {
+  printf 'Cannot resolve the current user account.\n' >&2
+  exit 1
+}
+IFS=: read -r _ _ account_uid _ _ account_home _ <<<"$account"
+[[ $account_uid == "$EUID" && $account_home == /home/* && -d $account_home ]] || {
+  printf 'The current user home is not supported.\n' >&2
+  exit 1
+}
+
+prefix=$account_home/.local/share/wineprefixes/microsip
+app_dir=$prefix/drive_c/Program\ Files/MicroSIP
+executable=$app_dir/MicroSIP.exe
+[[ -d $prefix && ! -L $prefix && -f $executable ]] || {
+  printf 'MicroSIP is not provisioned for %s. Ask an administrator to run repair.\n' "$username" >&2
+  exit 1
+}
+[[ $(stat -c %u "$prefix") == "$EUID" && $(stat -c %u "$executable") == "$EUID" ]] || {
+  printf 'MicroSIP file ownership is invalid. Ask an administrator to run repair.\n' >&2
+  exit 1
+}
+
+cd "$app_dir"
+exec env \
+  HOME="$account_home" \
+  WINEPREFIX="$prefix" \
+  WINEDEBUG=-all \
+  /usr/bin/wine ./MicroSIP.exe

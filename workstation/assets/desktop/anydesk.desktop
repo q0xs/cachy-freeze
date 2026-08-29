@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=AnyDesk
+Comment=Remote desktop client
+Exec=/usr/bin/anydesk
+TryExec=/usr/bin/anydesk
+Icon=anydesk
+Terminal=false
+StartupNotify=true
+Categories=Network;RemoteAccess;
+X-CachyWorkstation-Managed=true

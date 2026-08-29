@@ -1,0 +1,6 @@
+# Reviewed AUR revisions embedded in CachyWorkstation Setup.
+# package        revision
+google-chrome    1cf56b57305f59919b74a559906d60002edd95a3
+anydesk-bin      1ab396f348300d9b0559abc962e4f2d67d793c87
+zoiper-bin       f0bcd999b937b3991d3f70cb24a0a50a2d0f38d4
+gtk2             19829b43450b1a7e838896f9b2dd391a227eabd1
