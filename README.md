@@ -6,6 +6,10 @@
 
 CachyFreeze is a Linux system-freeze utility for CachyOS.
 
+> **Türkçe kurulum:** GitHub deposunu klonlamadan iki paketi indirmek ve doğru
+> sırayla kurmak için [Türkçe adım adım kurulum rehberini](KURULUM-TR.md)
+> kullanın.
+
 **FROZEN:** Every reboot restores the computer to its approved baseline.
 
 **THAWED:** Changes persist and the administrator can update the system. Freeze

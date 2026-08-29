@@ -67,6 +67,11 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
   the sidecar verified and both downloaded files matched the locally tested
   release artifacts byte for byte. The prerelease note retains the required
   physical application-launch and full-duration idle-policy acceptance gate.
+- PASS — every Bash block in the Turkish copy/paste deployment guide passed
+  `bash -n`; its README link resolves to the tracked guide. The guide's four
+  version-pinned GitHub asset URLs were downloaded without a repository clone
+  or GitHub login, and both published checksum sidecars verified. No guide
+  command that provisions, freezes, powers off, or reboots a machine was run.
 - PASS — the unchanged CachyFreeze product passed Ruff check/format,
   ShellCheck/static contracts, Qt offscreen smoke, isolated GRUB generation,
   all 53 Python tests, and two reproducible graphical-installer builds with a
