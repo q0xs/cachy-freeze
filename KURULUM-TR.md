@@ -22,8 +22,6 @@ sırayla kurması içindir. Komutları sırayla Konsole'a kopyalayıp çalışt�
 
 - CachyOS, KDE Plasma, UEFI, GRUB ve Btrfs `@` düzeni kurulu olmalıdır.
 - Yönetici hesabı hazır olmalıdır.
-- Çalışan hesabı elle oluşturulmuş olmalıdır. Örnek: `wrw1166`.
-- Çalışan hesabında `sudo`, `wheel` veya başka yönetici yetkisi olmamalıdır.
 - Bilgisayar internete ve elektriğe bağlı olmalıdır.
 - Kurtarma medyası ve geri yüklenebilir yedek hazır tutulmalıdır. Yayımlanan iki
   paket de şu anda ön sürümdür.
@@ -50,7 +48,29 @@ sudo systemctl reboot
 CachyFreeze önceden kuruluysa yeniden açıldıktan sonra hâlâ **THAWED** durumda
 olduğunu kontrol edin.
 
-## 2. İki kurulum paketini doğrudan indirin
+## 2. Çalışan hesabını oluşturun
+
+Bu adımı yönetici hesabında KDE **Sistem Ayarları > Kullanıcılar** bölümünden
+elle yapın:
+
+1. Yeni kullanıcı ekleyin. Örnek kullanıcı adı: `wrw1166`.
+2. Hesap türünü **Standart Kullanıcı** olarak seçin.
+3. Kullanıcıya `sudo`, `wheel` veya başka yönetici yetkisi vermeyin.
+4. Yönetici oturumundan çıkıp çalışan hesabına bir kez giriş yapın.
+5. KDE masaüstü tamamen açıldıktan sonra çalışan oturumundan çıkın ve yönetici
+   hesabına geri dönün.
+
+Bu ilk giriş, çalışanın KDE masaüstü dizinlerini hazırlar.
+
+> [!NOTE]
+> Kurulum komutları yönetici hesabından çalıştırılır; çünkü çalışan hesabında
+> bilerek `sudo` yetkisi yoktur. Komutta çalışan kullanıcı adını verdiğinizde
+> installer o hesabı hedefler. Google Chrome, LibreOffice, AnyDesk ve Zoiper
+> sistemde kullanılabilir olur; MicroSIP/Wine dosyaları, uygulama menüsü
+> girdileri ve beş masaüstü kısayolu çalışanın kendi ev dizinine, çalışanın
+> sahipliğiyle kurulur.
+
+## 3. İki kurulum paketini doğrudan indirin
 
 Yönetici hesabında tekrar Konsole açın. Aşağıdaki bloğun tamamını kopyalayıp
 çalıştırın:
@@ -71,7 +91,7 @@ curl --fail --location --retry 3 --remote-name \
 
 Bu işlem için GitHub hesabı, `git clone` veya kaynak kod deposu gerekmez.
 
-## 3. İndirilen dosyaları doğrulayın
+## 4. İndirilen dosyaları doğrulayın
 
 ```bash
 cd "$HOME/CachyKurulum"
@@ -97,7 +117,7 @@ chmod 0755 CachyWorkstation-Setup-1.0.0.run
 chmod 0755 CachyFreeze-Installer-1.0.0rc6.run
 ```
 
-## 4. Workstation uygulamalarını kurun
+## 5. Workstation uygulamalarını çalışan hesabı için kurun
 
 Aşağıdaki komut kullanıcı adını sorar. Örneğin `wrw1166` yazıp Enter'a basın:
 
@@ -126,7 +146,7 @@ read -r -p "Çalışan kullanıcı adı: " CALISAN_KULLANICI
 sudo ./CachyWorkstation-Setup-1.0.0.run --repair "$CALISAN_KULLANICI"
 ```
 
-## 5. Uygulamaları çalışan hesabında test edin
+## 6. Uygulamaları çalışan hesabında test edin
 
 Yönetici oturumundan çıkın ve çalışan hesabıyla giriş yapın. Masaüstünden veya
 uygulama menüsünden aşağıdakileri tek tek açın:
@@ -136,6 +156,9 @@ uygulama menüsünden aşağıdakileri tek tek açın:
 3. AnyDesk
 4. Zoiper
 5. MicroSIP
+
+Bu beş uygulamanın kısayolu çalışanın KDE masaüstünde bulunmalıdır. Aynı
+uygulamalar KDE uygulama menüsünde de görünmelidir.
 
 Her uygulamanın açıldığını kontrol edin. Chrome ile bir internet sayfası açın,
 LibreOffice'te boş bir belge oluşturun ve diğer üç uygulamanın ana ekranının
@@ -153,7 +176,7 @@ Bilgisayarı tekrar açın. Kullanıcı 60. dakikadan sonra geri dönüp kilidi 
 önceki süre iptal edilir; bir sonraki boşta kalma süresi yeniden sıfırdan
 başlar.
 
-## 6. Son sağlık kontrolünü çalıştırın
+## 7. Son sağlık kontrolünü çalıştırın
 
 Yönetici hesabıyla giriş yapın ve çalıştırın:
 
@@ -174,7 +197,7 @@ Tek bir `FAIL` bile varsa CachyFreeze ile dondurmayın. Önce `--repair`
 çalıştırın, uygulamaları tekrar test edin ve `--check` komutunu yeniden
 çalıştırın.
 
-## 7. CachyFreeze'i en son kurun
+## 8. CachyFreeze'i en son kurun
 
 Bu bölüm yeni, henüz CachyFreeze kurulmamış bilgisayar içindir. Yönetici
 hesabının grafik oturumunda çalıştırın:
@@ -204,7 +227,7 @@ sonra kurulu CachyFreeze uygulamasını açın:
 2. İşlem başarıyla tamamlanana kadar bekleyin.
 3. **REBOOT NOW** seçeneğine basın.
 
-## 8. FROZEN durumunu doğrulayın
+## 9. FROZEN durumunu doğrulayın
 
 Yeniden başlatmadan sonra CachyFreeze uygulamasının **FROZEN** gösterdiğini
 kontrol edin. Çalışan hesabıyla masaüstünde geçici bir dosya oluşturun, tekrar

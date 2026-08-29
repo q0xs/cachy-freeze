@@ -72,6 +72,9 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
   version-pinned GitHub asset URLs were downloaded without a repository clone
   or GitHub login, and both published checksum sidecars verified. No guide
   command that provisions, freezes, powers off, or reboots a machine was run.
+  After the employee-account step was made explicit, all nine numbered steps
+  remained sequential and the five documented desktop shortcuts matched the
+  installer launcher map; the complete workstation static suite passed again.
 - PASS — the unchanged CachyFreeze product passed Ruff check/format,
   ShellCheck/static contracts, Qt offscreen smoke, isolated GRUB generation,
   all 53 Python tests, and two reproducible graphical-installer builds with a
