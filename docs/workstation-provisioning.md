@@ -52,6 +52,10 @@ Copy both files to a target and verify them from their directory:
 sha256sum --check CachyWorkstation-Setup-1.0.0.run.sha256
 ```
 
+Published binaries and checksums are available from the dedicated
+[CachyWorkstation Setup v1.0.0
+release](https://github.com/q0xs/cachy-freeze/releases/tag/workstation-v1.0.0).
+
 ## CLI
 
 Initial reconcile:

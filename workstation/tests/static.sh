@@ -5,6 +5,9 @@ PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 readonly PROJECT_ROOT
 cd "$PROJECT_ROOT"
 
+grep -Eq '^[[:space:]]+LICENSE \\$' packaging/build-workstation-installer.sh
+grep -Eq '^[[:space:]]+NOTICE \\$' packaging/build-workstation-installer.sh
+
 mapfile -t shell_files < <(
   find workstation/lib workstation/tests -type f -name '*.sh' -print
   printf '%s\n' \

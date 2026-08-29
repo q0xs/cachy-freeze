@@ -63,7 +63,45 @@ the supported CachyOS root layout are not part of the reset guarantee.
 ext4, BIOS, systemd-boot, separate `/boot`, and custom Btrfs mount layouts are
 not supported.
 
-## Download and install
+## Two independent products and the required order
+
+This repository publishes two independent executables. Sharing a repository
+does not integrate their runtime behavior: neither executable contains, starts,
+or installs the other one.
+
+| Download | Purpose | Run when |
+| --- | --- | --- |
+| `CachyWorkstation-Setup-1.0.0.run` | Installs employee applications, user launchers, MicroSIP/Wine, health checks, and the 60/120-minute idle policy | Before the first Golden baseline, on persistent THAWED `@` |
+| `CachyFreeze-Installer-1.0.0rc6.run` | Installs only the CachyFreeze Btrfs/initramfs/GRUB product and publishes its initial Golden baseline | After workstation provisioning and manual application tests |
+
+### Fresh employee workstation
+
+Use this exact order:
+
+1. Install CachyOS with the supported Btrfs `@` layout.
+2. Create the administrator account.
+3. Manually create the employee account without `sudo`, `wheel`, or another
+   administrator-equivalent permission.
+4. Confirm that the machine is running from persistent writable `@`.
+5. Run `CachyWorkstation-Setup-1.0.0.run` as the administrator for that employee.
+6. Sign in as the employee and manually open Google Chrome, LibreOffice,
+   AnyDesk, Zoiper, and MicroSIP.
+7. Run the workstation `--check` command and require `OVERALL: PASS`.
+8. Install CachyFreeze with its separate graphical `.run` installer.
+9. Reboot into FROZEN and verify that disposable employee changes disappear.
+
+Do not create the first Golden baseline before provisioning is complete.
+CachyWorkstation Setup never invokes FREEZE, and CachyFreeze never invokes the
+workstation provisioner.
+
+### Machine that already has CachyFreeze
+
+Select **THAW COMPUTER**, reboot into persistent `@`, run workstation setup or
+`--repair`, test all applications, require a passing `--check`, then select
+**FREEZE COMPUTER** and reboot. Never provision from disposable FROZEN
+`@active`.
+
+## Download and install CachyFreeze
 
 > [!IMPORTANT]
 > The current published build is
@@ -177,26 +215,33 @@ See [installation details](docs/installation.md),
 [architecture](docs/architecture.md), [recovery](docs/boot-recovery.md), and
 [development verification](docs/development.md).
 
-## Separate portable workstation provisioning
+## Download the separate workstation provisioner
 
-The repository also contains an administrator-only, independently packaged
-CachyOS workstation provisioner. It is not part of the normal CachyFreeze GUI,
-installer payload, or Btrfs/GRUB lifecycle. It installs the approved employee
-applications and the 60-minute lock / 120-minute shutdown policy before the
-administrator creates the final Golden baseline.
+Download both workstation files from the independent
+[CachyWorkstation Setup v1.0.0
+release](https://github.com/q0xs/cachy-freeze/releases/tag/workstation-v1.0.0):
+
+- `CachyWorkstation-Setup-1.0.0.run`
+- `CachyWorkstation-Setup-1.0.0.run.sha256`
+
+Verify them in the download directory, then run the provisioner for the
+already-created standard account:
+
+```bash
+sha256sum --check CachyWorkstation-Setup-1.0.0.run.sha256
+sudo ./CachyWorkstation-Setup-1.0.0.run wrw1166
+sudo ./CachyWorkstation-Setup-1.0.0.run --check wrw1166
+```
+
+This provisioner is not part of the CachyFreeze GUI, graphical installer
+payload, PolicyKit helper, Btrfs engine, or GRUB lifecycle.
+
+### Build the workstation provisioner from source
 
 Build its single-file payload with:
 
 ```bash
 bash packaging/build-workstation-installer.sh
-```
-
-Then copy the `.run` file and checksum to a THAWED target machine and run it for
-an already-created standard account:
-
-```bash
-sudo ./CachyWorkstation-Setup-1.0.0.run wrw1166
-sudo ./CachyWorkstation-Setup-1.0.0.run --check wrw1166
 ```
 
 The small payload is an online provisioner, not an offline application bundle.
@@ -231,4 +276,6 @@ QEMU/OVMF guests.
 
 ## License
 
-Copyright 2026 Atilla Mert Akkaya. Licensed under the Apache License 2.0.
+Copyright 2026 Atilla Mert Akkaya. Licensed under the
+[Apache License 2.0](LICENSE); ownership attribution is recorded in
+[NOTICE](NOTICE). Third-party components retain their own licenses.

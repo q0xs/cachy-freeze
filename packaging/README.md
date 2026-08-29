@@ -40,3 +40,7 @@ Application binaries are intentionally not embedded. The target downloads the
 reviewed versions from signed CachyOS repositories or pinned upstream HTTPS
 locations and verifies the embedded hashes, so this artifact requires an
 internet connection during provisioning.
+
+The workstation payload embeds the repository `LICENSE` and `NOTICE` alongside
+the provisioner. Vendored package recipes keep their applicable upstream and
+third-party license files.

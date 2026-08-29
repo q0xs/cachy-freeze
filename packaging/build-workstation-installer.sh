@@ -32,6 +32,7 @@ tar \
   -C "$PROJECT_ROOT" \
   -cf - \
   LICENSE \
+  NOTICE \
   workstation/VERSION \
   workstation/assets \
   workstation/bin \

@@ -45,6 +45,13 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
   absent managed components while still printing the complete summary. A normal
   install invocation on the physical FROZEN `@active` root stopped before any
   package or provisioning step.
+- PASS — GitHub API reports the repository license as Apache-2.0;
+  `pyproject.toml`
+  identifies Atilla Mert Akkaya as author and the repository `NOTICE` records
+  the same copyright owner for CachyFreeze and CachyWorkstation Setup. The
+  reproducible workstation artifact contains byte-identical copies of both
+  `LICENSE` and `NOTICE`. README documents the two independent executables and
+  the mandatory fresh-machine and already-installed deployment sequences.
 - PASS — the unchanged CachyFreeze product passed Ruff check/format,
   ShellCheck/static contracts, Qt offscreen smoke, isolated GRUB generation,
   all 53 Python tests, and two reproducible graphical-installer builds with a
