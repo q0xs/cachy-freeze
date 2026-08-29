@@ -46,12 +46,27 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
   install invocation on the physical FROZEN `@active` root stopped before any
   package or provisioning step.
 - PASS — GitHub API reports the repository license as Apache-2.0;
-  `pyproject.toml`
-  identifies Atilla Mert Akkaya as author and the repository `NOTICE` records
+  `pyproject.toml` identifies Atilla Mert Akkaya as author and the repository
+  `NOTICE` records
   the same copyright owner for CachyFreeze and CachyWorkstation Setup. The
   reproducible workstation artifact contains byte-identical copies of both
   `LICENSE` and `NOTICE`. README documents the two independent executables and
   the mandatory fresh-machine and already-installed deployment sequences.
+- FIXED — the first GitHub workstation job exposed that the minimal Arch
+  container omitted `/run/systemd`; unprivileged `systemd-analyze verify`
+  could not create that system runtime directory. CI now creates the empty
+  runtime tree during its privileged dependency step without weakening the
+  unprivileged workstation build and test boundary.
+- PASS — [GitHub Actions run
+  33258122247](https://github.com/q0xs/cachy-freeze/actions/runs/33258122247)
+  passed all three jobs: workstation static/unit and reproducible payload
+  checks, CachyFreeze static/Python/Btrfs lifecycle checks, and the QEMU/OVMF
+  UEFI FROZEN/protected-THAWED acceptance test.
+- PUBLISHED — the independent `workstation-v1.0.0` prerelease contains the
+  executable and checksum sidecar. Both assets were downloaded from GitHub;
+  the sidecar verified and both downloaded files matched the locally tested
+  release artifacts byte for byte. The prerelease note retains the required
+  physical application-launch and full-duration idle-policy acceptance gate.
 - PASS — the unchanged CachyFreeze product passed Ruff check/format,
   ShellCheck/static contracts, Qt offscreen smoke, isolated GRUB generation,
   all 53 Python tests, and two reproducible graphical-installer builds with a
