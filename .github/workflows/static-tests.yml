@@ -22,6 +22,10 @@ jobs:
           pacman -Syu --noconfirm --needed \
             cmake desktop-file-utils extra-cmake-modules git kidletime \
             python qt6-base qt6-wayland ruff shellcheck systemd
+          # The minimal container has no systemd runtime tree. Its absence makes
+          # systemd-analyze try (and fail) to create /run/systemd as the
+          # unprivileged build user during unit verification.
+          install -d -m 0755 /run/systemd/system
           useradd --create-home workstation-test
           chown -R workstation-test:workstation-test "$GITHUB_WORKSPACE"
 
