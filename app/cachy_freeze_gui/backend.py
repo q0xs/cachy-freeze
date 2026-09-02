@@ -12,7 +12,18 @@ from PyQt6.QtCore import QObject, QProcess, pyqtSignal
 INSTALLED_HELPER = Path("/usr/lib/cachy-freeze/cachy-freeze-manager-helper")
 STATUS_CACHE = Path("/var/lib/cachy-freeze/status.json")
 MAX_ERROR_OUTPUT_BYTES = 64 * 1024
-ALLOWED_ACTIONS = frozenset({"status", "freeze", "thaw", "reboot", "setup-install"})
+ALLOWED_ACTIONS = frozenset(
+    {
+        "status",
+        "freeze",
+        "thaw",
+        "reboot",
+        "setup-install",
+        "setup-workstation-install",
+        "setup-workstation-repair",
+        "setup-workstation-check",
+    }
+)
 
 
 class BackendClient(QObject):
@@ -34,6 +45,14 @@ class BackendClient(QObject):
     @property
     def busy(self) -> bool:
         return self.process is not None
+
+    @property
+    def workstation_available(self) -> bool:
+        if self.setup_root is not None:
+            root = self.setup_root
+        else:
+            root = Path("/usr/lib/cachy-freeze/deployment")
+        return os.access(root / "workstation" / "bin" / "workstation-setup", os.X_OK)
 
     def refresh_local(self) -> None:
         try:
@@ -151,6 +170,9 @@ class BackendClient(QObject):
         messages = {
             "status": "System state verified.",
             "setup-install": "CachyFreeze was installed and FROZEN was prepared.",
+            "setup-workstation-install": "CachyWorkstation provisioning finished.",
+            "setup-workstation-repair": "CachyWorkstation repair finished.",
+            "setup-workstation-check": "CachyWorkstation health check passed.",
             "freeze": "The new Golden baseline is ready; FROZEN is scheduled.",
             "thaw": "THAWED is scheduled without retaining the disposable runtime.",
             "reboot": "The explicit reboot request was accepted.",

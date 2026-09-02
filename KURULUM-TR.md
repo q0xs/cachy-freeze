@@ -1,155 +1,126 @@
-# CachyOS iş bilgisayarı kurulumu
+# CachyFreeze Kurulum Rehberi
 
-Bu rehber, kurulumu yapacak kişinin GitHub deposunu klonlamadan ve GitHub
-hesabına giriş yapmadan CachyWorkstation Setup ile CachyFreeze'i indirip doğru
-sırayla kurması içindir. Komutları sırayla Konsole'a kopyalayıp çalıştırın.
+Bu rehber tek dosyalik grafik installer ile hem Workstation hazirligini hem de
+CachyFreeze kurulumunu yapar. Hedef bilgisayarda GitHub hesabi veya `git clone`
+gerekmez.
 
-## İki ayrı program
+## Kisa Ozet
 
-- **CachyWorkstation Setup:** Çalışan uygulamalarını, masaüstü kısayollarını,
-  MicroSIP/Wine kurulumunu ve 60/120 dakika boşta kalma politikasını hazırlar.
-- **CachyFreeze:** Test edilmiş sistemi en son dondurur. Workstation Setup'ı
-  kurmaz veya çalıştırmaz.
+Dogru sira sudur:
 
-> [!IMPORTANT]
-> Önce Workstation Setup, uygulama testleri ve sağlık kontrolü; en son
-> CachyFreeze kurulumu yapılmalıdır. Workstation kurulumu veya onarımı FROZEN
-> durumdayken kesinlikle çalıştırılmamalıdır.
+1. CachyOS kur.
+2. Calisan kullaniciyi standart kullanici olarak olustur.
+3. `CachyFreeze-Installer-1.0.0rc7.run` dosyasini indir.
+4. Installer icinden **INSTALL / REPAIR WORKSTATION** calistir.
+5. Calisan hesabinda uygulamalari elle test et.
+6. Installer icinden **CHECK WORKSTATION** calistir.
+7. Her sey PASS ise **INSTALL CACHYFREEZE** calistir.
+8. Yeniden baslat ve FROZEN durumunu kontrol et.
 
-## Başlamadan önce
+Workstation kurulumu veya onarimi FROZEN durumda yapilmaz. Gerekirse once
+**THAW COMPUTER** yapip yeniden baslatin.
 
-Şunların hazır olduğundan emin olun:
+## Gereken Sistem
 
-- CachyOS, KDE Plasma, UEFI, GRUB ve Btrfs `@` düzeni kurulu olmalıdır.
-- Yönetici hesabı hazır olmalıdır.
-- Bilgisayar internete ve elektriğe bağlı olmalıdır.
-- Kurtarma medyası ve geri yüklenebilir yedek hazır tutulmalıdır. Yayımlanan iki
-  paket de şu anda ön sürümdür.
+- CachyOS veya Arch Linux
+- KDE Plasma
+- UEFI + GRUB
+- Btrfs root subvolume `@`
+- EFI bolumu `/boot/efi` olarak bagli
+- `/boot` ayri bolum degil, Btrfs root icinde
+- internet baglantisi
+- kurtarma USB'si ve geri yuklenebilir yedek
 
-CachyFreeze bu bilgisayarda zaten kuruluysa önce CachyFreeze'i açın, **THAW
-COMPUTER** seçeneğine basın ve **REBOOT NOW** ile yeniden başlatın. Devam etmeden
-önce uygulamanın **THAWED** gösterdiğini kontrol edin.
+## 1. Sistemi Hazirla
 
-## 1. Sistemi güncelleyin ve indirme aracını kurun
-
-Konsole'u yönetici hesabında açın ve çalıştırın:
+Yonetici hesabinda Konsole acin:
 
 ```bash
 sudo pacman -Syu --needed curl
-```
-
-Komut tamamlandıktan sonra açık çalışmalarınızı kaydedin ve bilgisayarı yeniden
-başlatın:
-
-```bash
 sudo systemctl reboot
 ```
 
-CachyFreeze önceden kuruluysa yeniden açıldıktan sonra hâlâ **THAWED** durumda
-olduğunu kontrol edin.
+Bilgisayar acilinca yonetici hesabina tekrar girin.
 
-## 2. Çalışan hesabını oluşturun
+## 2. Calisan Hesabini Olustur
 
-Bu adımı yönetici hesabında KDE **Sistem Ayarları > Kullanıcılar** bölümünden
-elle yapın:
+KDE **Sistem Ayarlari > Kullanicilar** bolumunden calisan hesabini olusturun.
 
-1. Yeni kullanıcı ekleyin. Örnek kullanıcı adı: `wrw1166`.
-2. Hesap türünü **Standart Kullanıcı** olarak seçin.
-3. Kullanıcıya `sudo`, `wheel` veya başka yönetici yetkisi vermeyin.
-4. Yönetici oturumundan çıkıp çalışan hesabına bir kez giriş yapın.
-5. KDE masaüstü tamamen açıldıktan sonra çalışan oturumundan çıkın ve yönetici
-   hesabına geri dönün.
+Kurallar:
 
-Bu ilk giriş, çalışanın KDE masaüstü dizinlerini hazırlar.
+- hesap tipi standart kullanici olsun;
+- `sudo`, `wheel`, `docker`, `lxd` veya yonetici yetkisi vermeyin;
+- calisan hesabina bir kez giris yapin;
+- KDE masaustu acilinca cikis yapip yonetici hesabina geri donun.
 
-> [!NOTE]
-> Kurulum komutları yönetici hesabından çalıştırılır; çünkü çalışan hesabında
-> bilerek `sudo` yetkisi yoktur. Komutta çalışan kullanıcı adını verdiğinizde
-> installer o hesabı hedefler. Google Chrome, LibreOffice, AnyDesk ve Zoiper
-> sistemde kullanılabilir olur; MicroSIP/Wine dosyaları, uygulama menüsü
-> girdileri ve beş masaüstü kısayolu çalışanın kendi ev dizinine, çalışanın
-> sahipliğiyle kurulur.
+Ornek kullanici adi: `wrw1166`
 
-## 3. İki kurulum paketini doğrudan indirin
+## 3. Installer'i Indir
 
-Yönetici hesabında tekrar Konsole açın. Aşağıdaki bloğun tamamını kopyalayıp
-çalıştırın:
+Yonetici hesabinda Konsole acin:
 
 ```bash
 mkdir -p "$HOME/CachyKurulum"
 cd "$HOME/CachyKurulum"
 
 curl --fail --location --retry 3 --remote-name \
-  "https://github.com/q0xs/cachy-freeze/releases/download/workstation-v1.0.0/CachyWorkstation-Setup-1.0.0.run"
+  "https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc7/CachyFreeze-Installer-1.0.0rc7.run"
 curl --fail --location --retry 3 --remote-name \
-  "https://github.com/q0xs/cachy-freeze/releases/download/workstation-v1.0.0/CachyWorkstation-Setup-1.0.0.run.sha256"
-curl --fail --location --retry 3 --remote-name \
-  "https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc6/CachyFreeze-Installer-1.0.0rc6.run"
-curl --fail --location --retry 3 --remote-name \
-  "https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc6/CachyFreeze-Installer-1.0.0rc6.run.sha256"
+  "https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc7/CachyFreeze-Installer-1.0.0rc7.run.sha256"
 ```
 
-Bu işlem için GitHub hesabı, `git clone` veya kaynak kod deposu gerekmez.
-
-## 4. İndirilen dosyaları doğrulayın
+## 4. Dosyayi Dogrula
 
 ```bash
 cd "$HOME/CachyKurulum"
-sha256sum --check CachyWorkstation-Setup-1.0.0.run.sha256
-sha256sum --check CachyFreeze-Installer-1.0.0rc6.run.sha256
+sha256sum --check CachyFreeze-Installer-1.0.0rc7.run.sha256
 ```
 
-İki satır da `OK` ile bitmelidir:
+Sonuc su olmali:
 
 ```text
-CachyWorkstation-Setup-1.0.0.run: OK
-CachyFreeze-Installer-1.0.0rc6.run: OK
+CachyFreeze-Installer-1.0.0rc7.run: OK
 ```
 
-`FAILED` görürseniz hiçbir kurulum dosyasını çalıştırmayın. Dosyaları yeniden
-indirin ve doğrulamayı tekrarlayın.
+`FAILED` gorurseniz kurulum yapmayin. Dosyalari silip tekrar indirin.
 
-Doğrulama başarılıysa çalıştırma izni verin:
+Calistirma izni verin:
+
+```bash
+chmod 0755 CachyFreeze-Installer-1.0.0rc7.run
+```
+
+## 5. Workstation'i Kur
+
+Installer'i `sudo` ile baslatmayin:
 
 ```bash
 cd "$HOME/CachyKurulum"
-chmod 0755 CachyWorkstation-Setup-1.0.0.run
-chmod 0755 CachyFreeze-Installer-1.0.0rc6.run
+./CachyFreeze-Installer-1.0.0rc7.run
 ```
 
-## 5. Workstation uygulamalarını çalışan hesabı için kurun
+Acik pencerede:
 
-Aşağıdaki komut kullanıcı adını sorar. Örneğin `wrw1166` yazıp Enter'a basın:
+1. PolicyKit yonetici onayini verin.
+2. **Employee username** alanina calisan kullanici adini yazin.
+3. **INSTALL / REPAIR WORKSTATION** dugmesine basin.
+4. Islem bitene kadar pencereyi kapatmayin.
 
-```bash
-cd "$HOME/CachyKurulum"
-read -r -p "Çalışan kullanıcı adı: " CALISAN_KULLANICI
-sudo ./CachyWorkstation-Setup-1.0.0.run "$CALISAN_KULLANICI"
-```
+Bu adim Google Chrome, LibreOffice, AnyDesk, Zoiper, MicroSIP/Wine,
+masaustu kisayollari ve 60/120 dakika bosta kalma politikasini kurar.
 
-Kurulum internetten gerekli CachyOS paketlerini ve doğrulanan resmî uygulama
-dosyalarını indirir. İşlem tamamlanana kadar Konsole'u kapatmayın.
-
-Başarılı sonuçta şunları görmelisiniz:
+Basarili sonuc:
 
 ```text
 OVERALL: PASS
 READY FOR FREEZE
 ```
 
-Bir bölüm `FAIL` olursa henüz CachyFreeze kurmayın. İnternet bağlantısını ve
-ekrandaki hata nedenini kontrol ettikten sonra onarım çalıştırın:
+FAIL gorurseniz **INSTALL / REPAIR WORKSTATION** dugmesine tekrar basin.
 
-```bash
-cd "$HOME/CachyKurulum"
-read -r -p "Çalışan kullanıcı adı: " CALISAN_KULLANICI
-sudo ./CachyWorkstation-Setup-1.0.0.run --repair "$CALISAN_KULLANICI"
-```
+## 6. Uygulamalari Elle Test Et
 
-## 6. Uygulamaları çalışan hesabında test edin
-
-Yönetici oturumundan çıkın ve çalışan hesabıyla giriş yapın. Masaüstünden veya
-uygulama menüsünden aşağıdakileri tek tek açın:
+Calisan hesabina girin ve su uygulamalari tek tek acin:
 
 1. Google Chrome
 2. LibreOffice
@@ -157,93 +128,60 @@ uygulama menüsünden aşağıdakileri tek tek açın:
 4. Zoiper
 5. MicroSIP
 
-Bu beş uygulamanın kısayolu çalışanın KDE masaüstünde bulunmalıdır. Aynı
-uygulamalar KDE uygulama menüsünde de görünmelidir.
+Kisayollar hem masaustunde hem de uygulama menusunde gorunmelidir.
 
-Her uygulamanın açıldığını kontrol edin. Chrome ile bir internet sayfası açın,
-LibreOffice'te boş bir belge oluşturun ve diğer üç uygulamanın ana ekranının
-hatasız açıldığını doğrulayın.
+## 7. Son Kontrolu Yap
 
-### 60/120 dakika boşta kalma testi
-
-Önce tüm çalışmalarınızı kaydedin. Fareye ve klavyeye hiç dokunmayın:
-
-- Yaklaşık 60 dakika sonra oturum kilitlenmelidir.
-- Kilidi açmayın ve hiçbir tuşa basmayın.
-- İlk boşta kalma anından toplam 120 dakika sonra bilgisayar kapanmalıdır.
-
-Bilgisayarı tekrar açın. Kullanıcı 60. dakikadan sonra geri dönüp kilidi açarsa
-önceki süre iptal edilir; bir sonraki boşta kalma süresi yeniden sıfırdan
-başlar.
-
-## 7. Son sağlık kontrolünü çalıştırın
-
-Yönetici hesabıyla giriş yapın ve çalıştırın:
+Yonetici hesabina donun. Installer penceresi kapaliysa tekrar acin:
 
 ```bash
 cd "$HOME/CachyKurulum"
-read -r -p "Çalışan kullanıcı adı: " CALISAN_KULLANICI
-sudo ./CachyWorkstation-Setup-1.0.0.run --check "$CALISAN_KULLANICI"
+./CachyFreeze-Installer-1.0.0rc7.run
 ```
 
-Devam etmek için sonuç mutlaka şu olmalıdır:
+Sonra:
+
+1. **Employee username** alanina calisan kullanici adini yazin.
+2. **CHECK WORKSTATION** dugmesine basin.
+
+Devam etmek icin sonuc mutlaka su olmali:
 
 ```text
 OVERALL: PASS
 Ready for freeze: YES
 ```
 
-Tek bir `FAIL` bile varsa CachyFreeze ile dondurmayın. Önce `--repair`
-çalıştırın, uygulamaları tekrar test edin ve `--check` komutunu yeniden
-çalıştırın.
+FAIL varsa henuz dondurmayin. Once Workstation repair yapin, uygulamalari
+tekrar test edin, sonra check'i yeniden calistirin.
 
-## 8. CachyFreeze'i en son kurun
+## 8. CachyFreeze'i Kur
 
-Bu bölüm yeni, henüz CachyFreeze kurulmamış bilgisayar içindir. Yönetici
-hesabının grafik oturumunda çalıştırın:
+Ayni installer penceresinde:
 
-```bash
-cd "$HOME/CachyKurulum"
-./CachyFreeze-Installer-1.0.0rc6.run
-```
+1. GRUB bakim parolasini iki kez girin.
+2. **INSTALL CACHYFREEZE** dugmesine basin.
+3. Basari mesaji gelene kadar bekleyin.
+4. **REBOOT NOW** dugmesine basin.
 
-Bu dosyayı `sudo` ile başlatmayın. Açılan grafik kurulum ekranında:
+Kurulum otomatik yeniden baslatma yapmaz. Reboot dugmesine siz basarsiniz.
 
-1. İstenen PolicyKit yönetici onayını verin.
-2. 12-256 karakterlik GRUB bakım parolasını iki kez girin.
-3. **INSTALL CACHYFREEZE** seçeneğine basın.
-4. Başarı mesajı gelene kadar bilgisayarı kapatmayın.
-5. Açık çalışmalarınızı kaydedip **REBOOT NOW** seçeneğine basın.
+## 9. FROZEN Testi
 
-İlk kurulum test edilmiş sistemi Golden olarak kaydeder ve sonraki açılışı
-FROZEN olarak ayarlar.
+Yeniden basladiktan sonra:
 
-### CachyFreeze zaten kuruluysa
+1. CachyFreeze uygulamasini acin.
+2. Durumun **FROZEN** oldugunu kontrol edin.
+3. Calisan hesabinda gecici bir dosya olusturun.
+4. Bilgisayari yeniden baslatin.
+5. Gecici dosyanin silindigini kontrol edin.
 
-Kurulum dosyasını tekrar çalıştırmayın. Son sağlık kontrolü `PASS` olduktan
-sonra kurulu CachyFreeze uygulamasını açın:
+## Mevcut CachyFreeze Kuruluysa
 
-1. **FREEZE COMPUTER** seçeneğine basın.
-2. İşlem başarıyla tamamlanana kadar bekleyin.
-3. **REBOOT NOW** seçeneğine basın.
-
-## 9. FROZEN durumunu doğrulayın
-
-Yeniden başlatmadan sonra CachyFreeze uygulamasının **FROZEN** gösterdiğini
-kontrol edin. Çalışan hesabıyla masaüstünde geçici bir dosya oluşturun, tekrar
-yeniden başlatın ve dosyanın kaybolduğunu doğrulayın.
-
-Kurulum ancak aşağıdakilerin tamamı doğruysa bitmiştir:
-
-- Beş uygulama çalışan hesabında açılıyor.
-- Çalışan hesabında yönetici yetkisi yok.
-- Workstation sağlık kontrolü `OVERALL: PASS` gösteriyor.
-- 60 dakika sonra ekran kilitleniyor.
-- Toplam 120 dakika boşta kalınca bilgisayar kapanıyor.
-- Bilgisayar FROZEN açılıyor ve geçici değişiklikler yeniden başlatmada
-  siliniyor.
-
-> [!CAUTION]
-> Workstation kurulumu, `--repair` veya sistem güncellemesi gerekiyorsa önce
-> CachyFreeze içinden **THAW COMPUTER** seçin ve yeniden başlatın. Bu işlemleri
-> hiçbir zaman FROZEN `@active` üzerinde yapmayın.
+1. CachyFreeze'i acin.
+2. **THAW COMPUTER** dugmesine basin.
+3. **REBOOT NOW** ile yeniden baslatin.
+4. Uygulama **THAWED** gosterince Workstation kurulum/repair yapin.
+5. **CHECK WORKSTATION** PASS olsun.
+6. Calisan uygulamalarini elle test edin.
+7. **FREEZE COMPUTER** yapin.
+8. **REBOOT NOW** ile FROZEN moda donun.

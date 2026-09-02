@@ -93,9 +93,21 @@ class InstallerGuiTests(unittest.TestCase):
         window = MainWindow(backend)
         self.addCleanup(window.close)
         self.assertTrue(hasattr(window, "install_button"))
+        self.assertTrue(hasattr(window, "workstation_install_button"))
+        self.assertTrue(hasattr(window, "workstation_check_button"))
         self.assertFalse(hasattr(window, "freeze_button"))
         self.assertTrue(window._strong_password("Correct-Horse-42"))
         self.assertFalse(window._strong_password("short"))
+
+    def test_installer_can_launch_workstation_check_for_target_user(self) -> None:
+        backend = BackendClient(setup_root=__import__("pathlib").Path("."))
+        backend.refresh_local = Mock()
+        backend.run = Mock(return_value=True)
+        window = MainWindow(backend)
+        self.addCleanup(window.close)
+        window.workstation_user.setText("wrw1166")
+        window._check_workstation()
+        backend.run.assert_called_once_with("setup-workstation-check", secret="wrw1166")
 
 
 if __name__ == "__main__":

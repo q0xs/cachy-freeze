@@ -72,7 +72,8 @@ staged_root=$(
     [[ $(/usr/bin/sha256sum .cachyfreeze-payload.sha256 | /usr/bin/cut -d" " -f1) == "$expected_hash" ]]
     /usr/bin/sha256sum --strict -c .cachyfreeze-payload.sha256 >/dev/null
     [[ $(/usr/bin/find . -type f ! -name .cachyfreeze-payload.sha256 | /usr/bin/wc -l) -eq $(/usr/bin/wc -l <.cachyfreeze-payload.sha256) ]]
-    ! /usr/bin/find . ! -type d ! -type f -print -quit | /usr/bin/grep -q .
+    /usr/bin/find . -type l -printf "%P\t%l\n" | /usr/bin/sort | /usr/bin/cmp -s - .cachyfreeze-payload-symlinks
+    ! /usr/bin/find . ! -type d ! -type f ! -type l -print -quit | /usr/bin/grep -q .
     /usr/bin/chown -R root:root "$stage"
     /usr/bin/chmod -R go-w "$stage"
     /usr/bin/chmod 0755 "$stage"
@@ -107,6 +108,8 @@ tar \
   --exclude='*.py[co]' \
   -C "$PROJECT_ROOT" \
   -cf - \
+  LICENSE \
+  NOTICE \
   VERSION \
   src/cachy_freeze \
   app/cachy-freeze-manager \
@@ -122,13 +125,27 @@ tar \
   deepfreeze/etc \
   deepfreeze/grub \
   deepfreeze/initcpio \
-  deepfreeze/systemd |
+  deepfreeze/systemd \
+  workstation/VERSION \
+  workstation/assets \
+  workstation/bin \
+  workstation/idle \
+  workstation/lib \
+  workstation/systemd \
+  workstation/vendor |
   tar -xf - -C "$payload_root"
 (
   cd "$payload_root"
-  find . -type f ! -name .cachyfreeze-payload.sha256 -print0 |
+  find . -type l -printf '%P\t%l\n' |
+    sort >.cachyfreeze-payload-symlinks
+  find . -type f \
+    ! -name .cachyfreeze-payload.sha256 \
+    ! -name .cachyfreeze-payload-symlinks \
+    -print0 |
     sort -z |
-    xargs -0 sha256sum >.cachyfreeze-payload.sha256
+    xargs -0 sha256sum >"$work/payload-files.sha256"
+  sha256sum .cachyfreeze-payload-symlinks >>"$work/payload-files.sha256"
+  install -m 0644 "$work/payload-files.sha256" .cachyfreeze-payload.sha256
 )
 manifest_hash=$(sha256sum "$payload_root/.cachyfreeze-payload.sha256" | cut -d' ' -f1)
 sed -i "s/__CACHYFREEZE_MANIFEST_HASH__/$manifest_hash/" "$work/header"

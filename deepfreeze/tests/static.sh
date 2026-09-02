@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016,SC2251 # Static assertions intentionally use literal patterns and negated greps.
 set -Eeuo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
@@ -68,8 +69,16 @@ grep -q 'class OperationJournal' "$PROJECT_ROOT/src/cachy_freeze/catalog.py"
 grep -q 'def freeze' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'def thaw' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
 grep -q 'Refusing unmanaged Btrfs target' "$PROJECT_ROOT/src/cachy_freeze/engine.py"
-grep -q 'ALLOWED_ACTIONS.*status.*freeze.*thaw.*reboot' \
-  "$PROJECT_ROOT/app/cachy_freeze_gui/backend.py"
+for action in \
+  status \
+  freeze \
+  thaw \
+  reboot \
+  setup-install \
+  setup-workstation-install \
+  setup-workstation-check; do
+  grep -q "\"$action\"" "$PROJECT_ROOT/app/cachy_freeze_gui/backend.py"
+done
 ! grep -Eq 'snapshot-(list|create|delete)|user-create|applications-install|diagnostics' \
   "$PROJECT_ROOT/app/cachy-freeze-manager-helper"
 grep -q 'auth_admin_keep' "$PROJECT_ROOT/app/org.cachyos.cachy-freeze.policy"

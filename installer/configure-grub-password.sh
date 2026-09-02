@@ -87,6 +87,7 @@ grep -q '^[[:space:]]*if authenticate; then$' /boot/grub/grub.cfg ||
   die "THAWED password enforcement was not added to GRUB."
 grep -q 'set cachy_boot_authorized="false"' /boot/grub/grub.cfg ||
   die "The fail-closed GRUB authorization guard was not added."
+# shellcheck disable=SC2016 # This is a literal GRUB variable pattern.
 grep -q 'if \[ "\${cachy_boot_authorized}" = "true" \]; then' /boot/grub/grub.cfg ||
   die "GRUB boot commands are not protected by the authorization result."
 [[ $(grep -c -- "--id 'cachyos-current'" /boot/grub/grub.cfg) -eq 1 ]] ||

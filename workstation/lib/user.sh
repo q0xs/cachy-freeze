@@ -175,10 +175,13 @@ install_microsip_wrapper() {
 }
 
 install_user_launchers() {
-  local asset_dir app_menu desktop slug friendly source_file menu_file desktop_file
+  local asset_dir app_menu desktop launcher_stage slug friendly source_file staged_source menu_file desktop_file
   asset_dir=$CWS_PROJECT_ROOT/workstation/assets/desktop
   app_menu=$TARGET_HOME/.local/share/applications
   desktop=$TARGET_DESKTOP
+  launcher_stage=$(mktemp -d /run/cachy-workstation-launchers.XXXXXXXX) || return 1
+  chmod 0755 "$launcher_stage"
+  trap 'rm -rf --one-file-system "$launcher_stage"' RETURN
 
   install_microsip_wrapper || return 1
   ensure_target_directory "$TARGET_HOME/.config" 0755 || return 1
@@ -189,17 +192,22 @@ install_user_launchers() {
 
   while IFS='|' read -r slug friendly; do
     source_file=$asset_dir/$slug.desktop
+    staged_source=$launcher_stage/$slug.desktop
     menu_file=$app_menu/cachy-workstation-$slug.desktop
     desktop_file=$desktop/$friendly.desktop
     [[ -f $source_file ]] || {
       fail "Launcher template is missing: $slug"
       return 1
     }
-    run_as_target install -m 0755 "$source_file" "$menu_file" || {
+    install -o root -g root -m 0644 "$source_file" "$staged_source" || {
+      fail "Launcher template could not be staged: $friendly"
+      return 1
+    }
+    run_as_target install -m 0755 "$staged_source" "$menu_file" || {
       fail "Application-menu launcher could not be installed: $friendly"
       return 1
     }
-    run_as_target install -m 0755 "$source_file" "$desktop_file" || {
+    run_as_target install -m 0755 "$staged_source" "$desktop_file" || {
       fail "Desktop launcher could not be installed: $friendly"
       return 1
     }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from PyQt6.QtCore import Qt
@@ -30,9 +31,10 @@ class MainWindow(QMainWindow):
         self.reboot_required = False
         self.verified = False
         self.installer_mode = backend.setup_root is not None
+        self.workstation_available = backend.workstation_available
         self.setWindowTitle("CachyFreeze Installer" if self.installer_mode else "CachyFreeze")
-        self.setMinimumSize(560, 520 if self.installer_mode else 460)
-        self.resize(620, 560 if self.installer_mode else 500)
+        self.setMinimumSize(560, 620 if self.installer_mode else 560)
+        self.resize(620, 700 if self.installer_mode else 620)
         self.setStyleSheet(DARK_STYLE)
         self._build_ui()
         self._connect()
@@ -99,6 +101,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.freeze_button)
         layout.addWidget(self.thaw_button)
         layout.addWidget(self.refresh_button)
+        if self.workstation_available:
+            self._build_workstation(layout)
 
     def _build_installer(self, layout: QVBoxLayout) -> None:
         layout.addWidget(
@@ -127,12 +131,34 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.password)
         layout.addWidget(self.password_confirm)
         layout.addWidget(self.install_button)
+        if self.workstation_available:
+            self._build_workstation(layout)
+
+    def _build_workstation(self, layout: QVBoxLayout) -> None:
+        layout.addWidget(
+            self._label(
+                "CachyWorkstation installs or repairs employee applications, launchers, "
+                "MicroSIP/Wine, and idle policy for an existing standard user.",
+                name="muted",
+            )
+        )
+        self.workstation_user = QLineEdit()
+        self.workstation_user.setPlaceholderText("Employee username")
+        self.workstation_install_button = QPushButton("INSTALL / REPAIR WORKSTATION")
+        self.workstation_install_button.setObjectName("primary")
+        self.workstation_check_button = QPushButton("CHECK WORKSTATION")
+        layout.addWidget(self.workstation_user)
+        layout.addWidget(self.workstation_install_button)
+        layout.addWidget(self.workstation_check_button)
 
     def _connect(self) -> None:
         self.backend.busy_changed.connect(self._busy_changed)
         self.backend.status_changed.connect(self._status_changed)
         self.backend.operation_finished.connect(self._operation_finished)
         self.reboot_button.clicked.connect(self._confirm_reboot)
+        if self.workstation_available:
+            self.workstation_install_button.clicked.connect(self._install_workstation)
+            self.workstation_check_button.clicked.connect(self._check_workstation)
         if self.installer_mode:
             self.install_button.clicked.connect(self._install)
         else:
@@ -179,6 +205,37 @@ class MainWindow(QMainWindow):
         self.password_confirm.clear()
         self.backend.run("setup-install", secret=secret)
 
+    def _workstation_user(self) -> str | None:
+        target_user = self.workstation_user.text().strip()
+        if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,30}", target_user):
+            QMessageBox.warning(
+                self,
+                "Invalid employee username",
+                "Enter an existing standard Linux username, for example wrw1166.",
+            )
+            return None
+        return target_user
+
+    def _install_workstation(self) -> None:
+        target_user = self._workstation_user()
+        if target_user is None:
+            return
+        answer = QMessageBox.warning(
+            self,
+            "Install CachyWorkstation",
+            "This will install or repair employee workstation applications, launchers, "
+            "MicroSIP/Wine, and the idle policy for the selected standard user. Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.backend.run("setup-workstation-install", secret=target_user)
+
+    def _check_workstation(self) -> None:
+        target_user = self._workstation_user()
+        if target_user is not None:
+            self.backend.run("setup-workstation-check", secret=target_user)
+
     def _freeze(self) -> None:
         answer = QMessageBox.warning(
             self,
@@ -221,6 +278,7 @@ class MainWindow(QMainWindow):
             self.install_button.setEnabled(not busy and not self.verified)
             self.password.setEnabled(not busy)
             self.password_confirm.setEnabled(not busy)
+            self._apply_workstation_controls(busy=busy)
         else:
             self._apply_mode_controls(busy=busy)
 
@@ -231,6 +289,7 @@ class MainWindow(QMainWindow):
                 "Ready to validate and install or safely reconcile CachyFreeze."
             )
             self.install_button.setEnabled(not self.backend.busy)
+            self._apply_workstation_controls(busy=self.backend.busy)
             return
         self.running_mode = str(status.get("running_mode", "unknown"))
         self.scheduled_mode = str(status.get("scheduled_mode", "unknown"))
@@ -262,6 +321,21 @@ class MainWindow(QMainWindow):
         self.freeze_button.setEnabled(valid and self.running_mode == "thawed")
         self.thaw_button.setEnabled(valid and self.running_mode == "frozen")
         self.refresh_button.setEnabled(not busy)
+        self._apply_workstation_controls(busy=busy)
+
+    def _apply_workstation_controls(self, *, busy: bool) -> None:
+        if not self.workstation_available:
+            return
+        self.workstation_user.setEnabled(not busy)
+        if self.installer_mode:
+            can_install = not busy
+            can_check = not busy
+        else:
+            verified = self.verified and not self.reboot_required
+            can_install = verified and not busy and self.running_mode == "thawed"
+            can_check = verified and not busy
+        self.workstation_install_button.setEnabled(can_install)
+        self.workstation_check_button.setEnabled(can_check)
 
     def _operation_finished(self, action: str, success: bool, message: str) -> None:
         self.message_label.setText(message)
@@ -278,3 +352,5 @@ class MainWindow(QMainWindow):
                 "Reboot required",
                 message + " Save all work, then use REBOOT NOW when ready.",
             )
+        elif action.startswith("setup-workstation-"):
+            QMessageBox.information(self, "CachyWorkstation", message)

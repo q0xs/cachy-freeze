@@ -45,6 +45,36 @@ read_boot_secret() {
   (( classes >= 3 )) || die "Use at least three character classes."
 }
 
+read_target_user() {
+  IFS= read -r TARGET_USER || die "The employee username was not received."
+  [[ $TARGET_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] ||
+    die "Invalid employee username."
+}
+
+run_workstation_setup() {
+  local mode=$1 result
+  [[ -x $PROJECT_ROOT/workstation/bin/workstation-setup ]] ||
+    die "The verified CachyWorkstation payload was not found."
+  read_target_user
+  case $mode in
+    install)
+      bash "$PROJECT_ROOT/workstation/bin/workstation-setup" "$TARGET_USER" >&2
+      ;;
+    repair)
+      bash "$PROJECT_ROOT/workstation/bin/workstation-setup" --repair "$TARGET_USER" >&2
+      ;;
+    check)
+      bash "$PROJECT_ROOT/workstation/bin/workstation-setup" --check "$TARGET_USER" >&2
+      ;;
+    *)
+      die "Unsupported CachyWorkstation mode."
+      ;;
+  esac
+  result=$?
+  unset TARGET_USER
+  return "$result"
+}
+
 case ${1:-} in
   setup-install)
     require_count 1 "$@"
@@ -61,6 +91,21 @@ case ${1:-} in
       rm -rf --one-file-system "$PROJECT_ROOT"
     fi
     printf '%s\n' "$status_payload"
+    ;;
+  setup-workstation-install)
+    require_count 1 "$@"
+    run_workstation_setup install
+    printf '{"ok":true,"result":{"workstation":"install"}}\n'
+    ;;
+  setup-workstation-repair)
+    require_count 1 "$@"
+    run_workstation_setup repair
+    printf '{"ok":true,"result":{"workstation":"repair"}}\n'
+    ;;
+  setup-workstation-check)
+    require_count 1 "$@"
+    run_workstation_setup check
+    printf '{"ok":true,"result":{"workstation":"check"}}\n'
     ;;
   status | freeze | thaw | reboot)
     require_count 1 "$@"

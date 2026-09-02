@@ -12,7 +12,15 @@ class HelperContractTests(unittest.TestCase):
         cls.backend = (root / "app/cachy_freeze_gui/backend.py").read_text()
 
     def test_helper_allow_list_contains_only_product_actions(self) -> None:
-        for action in ("setup-install", "status", "freeze", "thaw", "reboot"):
+        for action in (
+            "setup-install",
+            "setup-workstation-install",
+            "setup-workstation-check",
+            "status",
+            "freeze",
+            "thaw",
+            "reboot",
+        ):
             self.assertIn(action, self.source)
         self.assertNotIn("setup-status", self.source)
         for removed in ("snapshot-list", "user-create", "applications-install", "diagnostics"):
@@ -23,6 +31,12 @@ class HelperContractTests(unittest.TestCase):
         self.assertIn("printf '%s\\n' \"$BOOT_SECRET\" |", self.source)
         self.assertNotIn("export BOOT_SECRET", self.source)
         self.assertIn("self.process.write", self.backend)
+
+    def test_workstation_user_uses_stdin_and_embedded_payload(self) -> None:
+        self.assertIn("read_target_user", self.source)
+        self.assertIn('"$PROJECT_ROOT/workstation/bin/workstation-setup"', self.source)
+        self.assertIn('"setup-workstation-install"', self.backend)
+        self.assertIn('"setup-workstation-check"', self.backend)
 
     def test_reboot_uses_backend_json_contract(self) -> None:
         self.assertIn('exec "$BACKEND" "$1"', self.source)

@@ -177,11 +177,25 @@ class LifecycleTests(unittest.TestCase):
         root_patch = patch.object(self.engine, "require_root")
         root_patch.start()
         self.addCleanup(root_patch.stop)
+        self._path_read_text = Path.read_text
+        cmdline_patch = patch(
+            "cachy_freeze.engine.Path.read_text",
+            new=lambda path, *args, **kwargs: self._read_text(path, *args, **kwargs),
+        )
+        cmdline_patch.start()
+        self.addCleanup(cmdline_patch.stop)
         self._root("@", "maintained")
         self._root("@golden", "old", readonly=True)
         self._root("@active", "runtime")
         os.environ["CACHY_FREEZE_ROOT_SUBVOLUME"] = "@"
         self.addCleanup(os.environ.pop, "CACHY_FREEZE_ROOT_SUBVOLUME", None)
+
+    def _read_text(self, path: Path, *args: object, **kwargs: object) -> str:
+        if str(path) == "/proc/cmdline":
+            root = os.environ.get("CACHY_FREEZE_ROOT_SUBVOLUME", "@")
+            marker = "1" if root == "@active" else "0"
+            return f"cachy.freeze={marker}"
+        return self._path_read_text(path, *args, **kwargs)
 
     def _root(self, name: str, marker: str, *, readonly: bool = False) -> Path:
         root = self.top / name

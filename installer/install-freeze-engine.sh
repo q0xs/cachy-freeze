@@ -214,6 +214,9 @@ rm -rf --one-file-system "$deployment_next"
 install -d -m 0755 "$deployment_next"
 cp -a "$PROJECT_ROOT/installer" "$deployment_next/"
 cp -a "$PROJECT_ROOT/deepfreeze" "$deployment_next/"
+cp -a "$PROJECT_ROOT/workstation" "$deployment_next/"
+cp -a "$PROJECT_ROOT/LICENSE" "$deployment_next/"
+cp -a "$PROJECT_ROOT/NOTICE" "$deployment_next/"
 chown -R root:root "$deployment_next"
 rm -rf --one-file-system "$deployment_previous"
 if [[ -d $deployment ]]; then
@@ -382,6 +385,8 @@ done
   die "The privileged helper was not installed."
 [[ -r /usr/share/applications/cachy-freeze-manager.desktop ]] ||
   die "The KDE application entry was not installed."
+[[ -x /usr/lib/cachy-freeze/deployment/workstation/bin/workstation-setup ]] ||
+  die "The CachyWorkstation payload was not installed."
 cmp -s "$PROJECT_ROOT/VERSION" /usr/lib/cachy-freeze/VERSION ||
   die "The installed version does not match the payload."
 

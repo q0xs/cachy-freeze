@@ -18,11 +18,14 @@ class InstallEntryTests(unittest.TestCase):
     def test_single_file_builder_embeds_the_required_payload(self) -> None:
         self.assertIn("CachyFreeze-Installer-$version.run", self.builder)
         self.assertIn("src/cachy_freeze", self.builder)
+        self.assertIn("workstation/bin", self.builder)
+        self.assertIn(".cachyfreeze-payload-symlinks", self.builder)
         self.assertIn("installer/install-cachyfreeze.sh", self.builder)
         self.assertIn("SOURCE_DATE_EPOCH", self.builder)
         self.assertIn(".cachyfreeze-payload.sha256", self.builder)
         self.assertIn("/run/cachyfreeze-installer.", self.builder)
         self.assertIn("sha256sum --strict -c", self.builder)
+        self.assertIn("cmp -s - .cachyfreeze-payload-symlinks", self.builder)
 
     def test_graphical_bootstrap_uses_policykit_and_installs_pyqt(self) -> None:
         self.assertIn("pkexec", self.setup)
@@ -31,6 +34,16 @@ class InstallEntryTests(unittest.TestCase):
         self.assertIn("--setup-source", self.setup)
         self.assertIn(".cachyfreeze-root-staged", self.setup)
         self.assertIn("installer staging directory is not root-owned and verified", self.gui_main)
+
+    def test_installed_app_retains_workstation_payload(self) -> None:
+        self.assertIn(
+            'cp -a "$PROJECT_ROOT/workstation" "$deployment_next/"',
+            self.engine_installer,
+        )
+        self.assertIn(
+            "/usr/lib/cachy-freeze/deployment/workstation/bin/workstation-setup",
+            self.engine_installer,
+        )
 
     def test_unprivileged_bootstrap_does_not_traverse_root_only_esp(self) -> None:
         self.assertNotIn("-d /boot/efi/EFI", self.setup)
