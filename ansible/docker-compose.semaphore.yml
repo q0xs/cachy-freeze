@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16
+    hostname: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${SEMAPHORE_DB_USER:-semaphore}
+      POSTGRES_PASSWORD: ${SEMAPHORE_DB_PASS:?Set SEMAPHORE_DB_PASS in ansible/.semaphore.env}
+      POSTGRES_DB: ${SEMAPHORE_DB_NAME:-semaphore}
+    volumes:
+      - semaphore-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - semaphore
+
+  semaphore:
+    image: semaphoreui/semaphore:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${SEMAPHORE_HTTP_PORT:-3000}:3000"
+    environment:
+      SEMAPHORE_DB_DIALECT: postgres
+      SEMAPHORE_DB_HOST: postgres
+      SEMAPHORE_DB_PORT: "5432"
+      SEMAPHORE_DB_NAME: ${SEMAPHORE_DB_NAME:-semaphore}
+      SEMAPHORE_DB: ${SEMAPHORE_DB_NAME:-semaphore}
+      SEMAPHORE_DB_USER: ${SEMAPHORE_DB_USER:-semaphore}
+      SEMAPHORE_DB_PASS: ${SEMAPHORE_DB_PASS:?Set SEMAPHORE_DB_PASS in ansible/.semaphore.env}
+      SEMAPHORE_PLAYBOOK_PATH: /tmp/semaphore
+      SEMAPHORE_ADMIN: ${SEMAPHORE_ADMIN:-admin}
+      SEMAPHORE_ADMIN_PASSWORD: ${SEMAPHORE_ADMIN_PASSWORD:?Set SEMAPHORE_ADMIN_PASSWORD in ansible/.semaphore.env}
+      SEMAPHORE_ADMIN_NAME: ${SEMAPHORE_ADMIN_NAME:-CachyFreeze Admin}
+      SEMAPHORE_ADMIN_EMAIL: ${SEMAPHORE_ADMIN_EMAIL:-admin@localhost}
+      SEMAPHORE_ACCESS_KEY_ENCRYPTION: ${SEMAPHORE_ACCESS_KEY_ENCRYPTION:?Set SEMAPHORE_ACCESS_KEY_ENCRYPTION in ansible/.semaphore.env}
+      SEMAPHORE_SCHEDULE_TIMEZONE: ${TZ:-Europe/Warsaw}
+      TZ: ${TZ:-Europe/Warsaw}
+      ANSIBLE_HOST_KEY_CHECKING: "True"
+    volumes:
+      - semaphore-config:/etc/semaphore
+      - semaphore-data:/var/lib/semaphore
+      - semaphore-tmp:/tmp/semaphore
+    networks:
+      - semaphore
+
+volumes:
+  semaphore-postgres:
+  semaphore-config:
+  semaphore-data:
+  semaphore-tmp:
+
+networks:
+  semaphore:

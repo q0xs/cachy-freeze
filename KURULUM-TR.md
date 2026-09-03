@@ -229,6 +229,19 @@ Bu betik Ansible, OpenSSH, sshpass ve Python paketlerini kurar; kontrol
 makinesinde SSH anahtari yoksa olusturur. Sonra hedef PC'lere anahtari
 gondermek icin `ssh-copy-id LocalAdm@IP` orneklerini gosterir.
 
+Web arayuzu isteniyorsa Master PC'de su komut kullanilir:
+
+```bash
+cd cachy-freeze/ansible
+./setup-controller.sh --with-semaphore
+```
+
+Bu secenek Docker ve Docker Compose'u da kurar, PostgreSQL 16 ile Semaphore UI
+servisini baslatir ve arayuzu `http://localhost:3000` adresinde acar.
+Semaphore Web Arayuzu ayni Ansible playbook'larini tek tikla calistirmak, canli
+loglari izlemek ve gece bakimini cron ile zamanlamak icin kullanilir. Ayrintili
+adimlar `ansible/SEMAPHORE-REHBERI.md` icindedir.
+
 Envanter dosyasi:
 
 ```ini
@@ -260,6 +273,10 @@ Rutin bakim:
 ```bash
 ansible-playbook playbooks/maintenance.yml --limit production
 ```
+
+Semaphore uzerinden ayni playbook hafta sonu 03:00 icin `0 3 * * 6,0` cron
+ifadesiyle zamanlanabilir. Production grubunda varsayilan `batch_size: "20%"`
+oldugu icin 200-300 PC kontrollu dalgalar halinde islenir.
 
 Makine FROZEN ise playbook once su komutu calistirir:
 

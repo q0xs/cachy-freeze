@@ -27,6 +27,9 @@ class AnsibleContractTests(unittest.TestCase):
             "playbooks/status.yml",
             "playbooks/thaw.yml",
             "playbooks/freeze.yml",
+            "docker-compose.semaphore.yml",
+            "test-syntax.sh",
+            "SEMAPHORE-REHBERI.md",
             "roles/localadm_bootstrap/tasks/main.yml",
             "roles/localadm_bootstrap/templates/sudoers.j2",
             "roles/cachy_workstation/tasks/main.yml",
@@ -60,6 +63,26 @@ class AnsibleContractTests(unittest.TestCase):
         self.assertIn("cachy_freeze_status.running_mode", status_role)
         self.assertIn("cachy_freeze_status.reboot_required is boolean", status_role)
 
+    def test_authorized_thaw_consumes_remote_boot_before_status_read(self) -> None:
+        thaw_role = self.read("roles/cachy_freeze/tasks/thaw.yml")
+        reboot_index = thaw_role.index("Reboot into THAWED")
+        boot_success_index = thaw_role.index("Consume authorized THAWED boot after reconnect")
+        status_index = thaw_role.index("Verify THAWED mode after authorized reboot")
+        self.assertLess(reboot_index, boot_success_index)
+        self.assertLess(boot_success_index, status_index)
+        self.assertIn("- boot-success", thaw_role)
+
+    def test_provision_stages_payload_once_with_allowlist(self) -> None:
+        defaults = self.read("inventory/group_vars/all.yml")
+        provision = self.read("playbooks/provision.yml")
+        install = self.read("roles/cachy_freeze/tasks/install.yml")
+        for payload_path in ("app", "deepfreeze", "installer", "src", "workstation", "VERSION"):
+            self.assertIn(f"  - {payload_path}", defaults)
+        self.assertIn('loop: "{{ cachy_freeze_payload_paths }}"', provision)
+        self.assertIn("cachy_freeze_payload_staged: true", provision)
+        self.assertIn('loop: "{{ cachy_freeze_payload_paths }}"', install)
+        self.assertIn("cachy_freeze_payload_staged | default(false)", install)
+
     def test_ansible_tasks_use_fqcn_modules(self) -> None:
         bare_modules = re.compile(
             r"^\s*-?\s*(assert|command|copy|debug|fail|file|getent|include_role|"
@@ -79,9 +102,19 @@ class AnsibleContractTests(unittest.TestCase):
 
     def test_controller_bootstrap_is_self_documenting(self) -> None:
         script = self.read("setup-controller.sh")
-        self.assertIn("pacman -Syu --needed --noconfirm ansible openssh sshpass python", script)
+        self.assertIn("controller_packages=(ansible openssh sshpass python)", script)
+        self.assertIn("controller_packages+=(docker docker-compose)", script)
+        self.assertIn("docker compose", script)
         self.assertIn("ssh-keygen -t ed25519", script)
         self.assertIn("ssh-copy-id LocalAdm@", script)
+
+    def test_semaphore_compose_uses_postgres_and_secure_env(self) -> None:
+        compose = self.read("docker-compose.semaphore.yml")
+        self.assertIn("image: postgres:16", compose)
+        self.assertIn("image: semaphoreui/semaphore:latest", compose)
+        self.assertIn('"${SEMAPHORE_HTTP_PORT:-3000}:3000"', compose)
+        self.assertIn("SEMAPHORE_DB_DIALECT: postgres", compose)
+        self.assertIn("SEMAPHORE_ACCESS_KEY_ENCRYPTION", compose)
 
     def test_documentation_mentions_fleet_workflows(self) -> None:
         ansible_readme = self.read("README.md")
@@ -89,6 +122,9 @@ class AnsibleContractTests(unittest.TestCase):
         turkish_install = (self.root / "KURULUM-TR.md").read_text(encoding="utf-8")
         self.assertIn("Remote Fleet Management with Ansible", project_readme)
         self.assertIn("Ansible ile Uzaktan Toplu Yonetim", turkish_install)
+        self.assertIn("Semaphore UI", project_readme)
+        self.assertIn("Semaphore Web Arayuzu", turkish_install)
+        self.assertIn("SEMAPHORE-REHBERI.md", ansible_readme)
         self.assertIn("maintenance.yml", ansible_readme)
         self.assertIn("cachy-freeze thaw --authorized", ansible_readme)
 

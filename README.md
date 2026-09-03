@@ -130,6 +130,19 @@ ansible-playbook playbooks/maintenance.yml --limit production
 ansible-playbook playbooks/status.yml --limit all
 ```
 
+For browser-based operation, the controller can also start Semaphore UI with
+PostgreSQL-backed history:
+
+```bash
+cd ansible
+./setup-controller.sh --with-semaphore
+```
+
+The Compose stack in `ansible/docker-compose.semaphore.yml` runs
+`semaphoreui/semaphore:latest` on port `3000` and PostgreSQL 16 for durable task
+logs. Use it for scheduled weekend maintenance, live log review, and one-click
+provision/status templates backed by the same playbooks.
+
 Remote maintenance uses `cachy-freeze thaw --authorized` to schedule one
 passwordless THAWED boot by setting `cachy_remote_auth=1` in GRUB. The THAWED
 boot verification service immediately consumes the flag by writing
@@ -137,8 +150,9 @@ boot verification service immediately consumes the flag by writing
 Workstation validation fails, the maintenance playbook does not freeze the
 machine; it leaves the host THAWED and writes a failure marker for admin review.
 
-See [ansible/README.md](ansible/README.md) for inventory, role, emergency thaw,
-freeze, and lab-to-production rollout details.
+See [ansible/README.md](ansible/README.md) and
+[ansible/SEMAPHORE-REHBERI.md](ansible/SEMAPHORE-REHBERI.md) for inventory,
+role, emergency thaw, freeze, web UI, and lab-to-production rollout details.
 
 ## Installed App
 

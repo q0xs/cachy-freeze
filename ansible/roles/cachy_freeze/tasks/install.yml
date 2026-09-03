@@ -15,13 +15,15 @@
     group: root
     mode: "0755"
 
-- name: Copy monorepo payload to target
+- name: Copy runtime payload to target
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../../"
+    src: "{{ playbook_dir }}/../../{{ item }}"
     dest: "{{ cachy_freeze_remote_repo }}/"
     owner: root
     group: root
     mode: preserve
+  loop: "{{ cachy_freeze_payload_paths }}"
+  when: not (cachy_freeze_payload_staged | default(false) | bool)
 
 - name: Run CachyFreeze installer
   ansible.builtin.command:

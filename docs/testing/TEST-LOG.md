@@ -4,6 +4,40 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-09-03 — Ansible syntax and Semaphore UI integration — local working tree
+
+- FIXED — `ansible/roles/cachy_freeze/tasks/thaw.yml` now runs
+  `cachy-freeze boot-success` immediately after the authorized reboot reconnects
+  and before reading status, so Ansible consumes the one-time
+  `cachy_remote_auth` flag deterministically instead of racing
+  `cachy-freeze-boot-health.service`.
+- UPDATED — provisioning copies only the runtime/install payload allowlist to
+  `/opt/cachy-freeze` and sets `cachy_freeze_payload_staged`; the install role
+  skips its own transfer when the provision play already staged the payload.
+- ADDED — `ansible/test-syntax.sh`, GitHub Actions Ansible syntax checking,
+  `ansible/docker-compose.semaphore.yml`, and the Turkish Semaphore operating
+  guide.
+- PASS — `PATH=/tmp/cachy-freeze-ansible-venv/bin:$PATH bash
+  ansible/test-syntax.sh`: all five playbooks passed `ansible-playbook
+  --syntax-check`. Ansible reported the expected warning that the sample
+  inventory contains only commented hosts.
+- PASS — `PYTHONPATH=src:app QT_QPA_PLATFORM=offscreen python -m unittest
+  discover -s tests -v`: 72 tests passed, including the new thaw, payload, and
+  Semaphore contracts.
+- PASS — `ruff check .` and `ruff format --check src app/cachy_freeze_gui
+  tests`.
+- PASS — `SHELLCHECK_OPTS=--severity=error bash deepfreeze/tests/static.sh`,
+  `shellcheck ansible/setup-controller.sh ansible/test-syntax.sh`, and
+  `bash workstation/tests/static.sh`.
+- PASS — `QT_QPA_PLATFORM=offscreen bash deepfreeze/tests/ui-smoke.sh`,
+  `bash deepfreeze/tests/grub-generation.sh`, `git diff --check`, and a YAML
+  parse of `ansible/docker-compose.semaphore.yml`.
+- NOT RUN — `docker compose -f ansible/docker-compose.semaphore.yml config` or
+  `up`; Docker is not installed on this local workstation. The controller setup
+  script installs Docker/Compose only when invoked with `--with-semaphore`.
+- NOT RUN — root-only Btrfs loopback integration, QEMU/OVMF boot acceptance,
+  physical install/reboot/FROZEN reset, or live Semaphore task execution.
+
 ## 2026-09-03 — Ansible fleet management and authorized remote thaw — local working tree
 
 - ADDED — the monorepo `ansible/` control plane with controller bootstrap,

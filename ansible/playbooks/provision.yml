@@ -1,6 +1,21 @@
 ---
+- name: Build optional Semaphore survey target
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Add surveyed target to runtime inventory
+      ansible.builtin.add_host:
+        name: "{{ target_name | default('semaphore-survey-target') }}"
+        groups: semaphore_survey_targets
+        ansible_host: "{{ target_ip }}"
+        employee_user: "{{ employee_user }}"
+      when:
+        - target_ip is defined
+        - employee_user is defined
+
 - name: Provision CachyFreeze workstation from persistent THAWED root
-  hosts: all
+  hosts: "{{ cachy_freeze_target_hosts | default('all') }}"
   become: true
   gather_facts: true
   serial: "{{ batch_size | default('100%') }}"
@@ -29,13 +44,18 @@
         group: root
         mode: "0755"
 
-    - name: Copy monorepo payload before workstation setup
+    - name: Copy runtime payload before workstation setup
       ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../../"
+        src: "{{ playbook_dir }}/../../{{ item }}"
         dest: "{{ cachy_freeze_remote_repo }}/"
         owner: root
         group: root
         mode: preserve
+      loop: "{{ cachy_freeze_payload_paths }}"
+
+    - name: Mark CachyFreeze payload as already staged
+      ansible.builtin.set_fact:
+        cachy_freeze_payload_staged: true
 
     - name: Prepare employee workstation
       ansible.builtin.include_role:

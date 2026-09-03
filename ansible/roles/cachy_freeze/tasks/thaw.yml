@@ -32,6 +32,15 @@
     post_reboot_delay: "{{ cachy_freeze_post_reboot_delay }}"
   when: cachy_freeze_status.running_mode == 'frozen'
 
+- name: Consume authorized THAWED boot after reconnect
+  ansible.builtin.command:
+    argv:
+      - "{{ cachy_freeze_cli }}"
+      - boot-success
+  register: cachy_freeze_boot_success_command
+  changed_when: false
+  when: cachy_freeze_status.running_mode == 'frozen'
+
 - name: Verify THAWED mode after authorized reboot
   ansible.builtin.include_tasks: get_status.yml
 

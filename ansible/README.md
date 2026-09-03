@@ -18,6 +18,19 @@ creates an SSH key if the controller does not already have one, then prints the
 `ssh-copy-id LocalAdm@HOST` commands needed to trust the controller on target
 workstations.
 
+To run the optional web UI on the controller:
+
+```bash
+./setup-controller.sh --with-semaphore
+```
+
+This also installs Docker and Docker Compose, creates a local
+`ansible/.semaphore.env` file with generated secrets, and starts PostgreSQL 16
+plus Semaphore UI from `docker-compose.semaphore.yml`. Semaphore listens on
+`http://localhost:3000` by default. Change `SEMAPHORE_HTTP_PORT` in
+`.semaphore.env` before restarting the Compose stack if the controller already
+uses port 3000.
+
 ## Inventory
 
 Edit `inventory/hosts.ini`:
@@ -69,6 +82,11 @@ The playbook:
 The current CachyFreeze installer creates the initial Golden baseline as part
 of installation, so Workstation validation must happen before the install role.
 
+Semaphore surveys can provision one new machine without pre-editing
+`hosts.ini`. Pass `target_ip`, `employee_user`, and
+`cachy_freeze_target_hosts=semaphore_survey_targets`; `provision.yml` will add
+that target to an in-memory inventory group for the run.
+
 ## Maintenance
 
 Run routine maintenance with:
@@ -98,6 +116,31 @@ If any update, repair, or health check fails, the rescue path writes
 `/var/log/cachy-freeze-ansible-failure.log`, does not run freeze, and leaves the
 host THAWED for administrator review.
 
+## Semaphore UI
+
+Semaphore UI is the supported web front end for non-terminal fleet operation.
+Use it to run the same playbooks from a browser, watch live logs, and schedule
+weekend maintenance.
+
+The included Compose stack:
+
+- runs `postgres:16` with a persistent `semaphore-postgres` volume;
+- runs `semaphoreui/semaphore:latest` on port `3000`;
+- persists Semaphore config, task data, and temporary working files in Docker
+  volumes;
+- reads generated admin, database, and access-key-encryption secrets from
+  `.semaphore.env`.
+
+Create these templates in Semaphore:
+
+- `maintenance.yml` as **Gece Bakimi**, scheduled with cron `0 3 * * 6,0`;
+- `provision.yml` as **Sifir Kurulum**, with survey fields for `target_ip`,
+  `target_name`, and `employee_user` such as `WRW21166`;
+- `status.yml` as **Filo Durumu** for an on-demand dashboard-style report.
+
+Detailed Turkish operating steps are in
+[SEMAPHORE-REHBERI.md](SEMAPHORE-REHBERI.md).
+
 ## Status and Emergency Commands
 
 Fleet status:
@@ -126,11 +169,7 @@ The status role parses `cachy-freeze status` with `from_json` and checks
 Controller-side syntax checks:
 
 ```bash
-ansible-playbook playbooks/status.yml --syntax-check
-ansible-playbook playbooks/thaw.yml --syntax-check
-ansible-playbook playbooks/freeze.yml --syntax-check
-ansible-playbook playbooks/maintenance.yml --syntax-check
-ansible-playbook playbooks/provision.yml --syntax-check
+./test-syntax.sh
 ```
 
 Always validate in the lab group before production. Use `--limit lab` for the

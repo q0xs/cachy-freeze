@@ -3,3 +3,12 @@ cachy_freeze_install: false
 cachy_freeze_install_runs_initial_freeze: true
 cachy_freeze_expected_mode: frozen
 cachy_freeze_update_packages: true
+cachy_freeze_payload_paths:
+  - app
+  - deepfreeze
+  - installer
+  - src
+  - workstation
+  - LICENSE
+  - NOTICE
+  - VERSION

@@ -53,10 +53,10 @@ jobs:
       - name: Depoyu indir
         uses: actions/checkout@v6
 
-      - name: ShellCheck kur
+      - name: Test bağımlılıklarını kur
         run: |
           sudo apt-get update
-          sudo apt-get install --yes btrfs-progs desktop-file-utils grub-common libegl1 shellcheck
+          sudo apt-get install --yes ansible btrfs-progs desktop-file-utils grub-common libegl1 shellcheck
           python -m pip install --disable-pip-version-check ruff==0.12.4 PyQt6==6.9.1
 
       - name: Çekirdek hedeflerini test ortamına yerleştir
@@ -80,6 +80,9 @@ jobs:
           ruff format --check src app/cachy_freeze_gui tests
           python -m unittest discover -s tests -v
           bash ./deepfreeze/tests/ui-smoke.sh
+
+      - name: Ansible playbook sözdizimi
+        run: bash ./ansible/test-syntax.sh
 
       - name: İzole GRUB üretim testi
         run: bash ./deepfreeze/tests/grub-generation.sh

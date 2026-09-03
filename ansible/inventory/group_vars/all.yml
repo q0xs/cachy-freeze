@@ -13,6 +13,15 @@ cachy_freeze_failure_log: /var/log/cachy-freeze-ansible-failure.log
 cachy_freeze_reboot_timeout: 300
 cachy_freeze_connect_timeout: 20
 cachy_freeze_post_reboot_delay: 10
+cachy_freeze_payload_paths:
+  - app
+  - deepfreeze
+  - installer
+  - src
+  - workstation
+  - LICENSE
+  - NOTICE
+  - VERSION
 
 cachy_workstation_setup_candidates:
   - /usr/lib/cachy-freeze/deployment/workstation/bin/workstation-setup

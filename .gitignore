@@ -2,3 +2,4 @@ __pycache__/
 *.py[cod]
 dist/*.run
 dist/*.run.sha256
+ansible/.semaphore.env
