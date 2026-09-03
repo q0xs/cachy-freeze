@@ -33,5 +33,8 @@ These rules apply to the entire repository. A nested `AGENTS.md` adds rules for 
 - Run Ruff, all Python tests, Bash/ShellCheck, systemd/desktop validation, and Qt smoke.
 - Run boot-stack integration only on a disposable VM or approved pilot.
 - Record actual results in `docs/testing/TEST-LOG.md`; never claim an unrun test passed.
+- When a meaningful product or installer change needs user-facing downloads,
+  bump the version, publish a new release candidate, and update every download
+  reference instead of replacing an older release asset in place.
 - Stage only relevant files, review diffs, use focused commits, push directly to `main`
   unless the user requests a PR, and watch GitHub Actions to completion.

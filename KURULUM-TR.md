@@ -10,7 +10,7 @@ Dogru sira sudur:
 
 1. CachyOS kur.
 2. Calisan kullaniciyi standart kullanici olarak olustur.
-3. `CachyFreeze-Installer-1.0.0rc7.run` dosyasini indir.
+3. `CachyFreeze-Installer-1.0.0rc8.run` dosyasini indir.
 4. Installer icinden **INSTALL / REPAIR WORKSTATION** calistir.
 5. Calisan hesabinda uygulamalari elle test et.
 6. Installer icinden **CHECK WORKSTATION** calistir.
@@ -69,22 +69,22 @@ mkdir -p "$HOME/CachyKurulum"
 cd "$HOME/CachyKurulum"
 
 curl --fail --location --retry 3 --remote-name \
-  "https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc7/CachyFreeze-Installer-1.0.0rc7.run"
+  "https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc8/CachyFreeze-Installer-1.0.0rc8.run"
 curl --fail --location --retry 3 --remote-name \
-  "https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc7/CachyFreeze-Installer-1.0.0rc7.run.sha256"
+  "https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc8/CachyFreeze-Installer-1.0.0rc8.run.sha256"
 ```
 
 ## 4. Dosyayi Dogrula
 
 ```bash
 cd "$HOME/CachyKurulum"
-sha256sum --check CachyFreeze-Installer-1.0.0rc7.run.sha256
+sha256sum --check CachyFreeze-Installer-1.0.0rc8.run.sha256
 ```
 
 Sonuc su olmali:
 
 ```text
-CachyFreeze-Installer-1.0.0rc7.run: OK
+CachyFreeze-Installer-1.0.0rc8.run: OK
 ```
 
 `FAILED` gorurseniz kurulum yapmayin. Dosyalari silip tekrar indirin.
@@ -92,7 +92,7 @@ CachyFreeze-Installer-1.0.0rc7.run: OK
 Calistirma izni verin:
 
 ```bash
-chmod 0755 CachyFreeze-Installer-1.0.0rc7.run
+chmod 0755 CachyFreeze-Installer-1.0.0rc8.run
 ```
 
 ## 5. Workstation'i Kur
@@ -101,7 +101,7 @@ Installer'i `sudo` ile baslatmayin:
 
 ```bash
 cd "$HOME/CachyKurulum"
-./CachyFreeze-Installer-1.0.0rc7.run
+./CachyFreeze-Installer-1.0.0rc8.run
 ```
 
 Acik pencerede:
@@ -142,7 +142,7 @@ Yonetici hesabina donun. Installer penceresi kapaliysa tekrar acin:
 
 ```bash
 cd "$HOME/CachyKurulum"
-./CachyFreeze-Installer-1.0.0rc7.run
+./CachyFreeze-Installer-1.0.0rc8.run
 ```
 
 Sonra:

@@ -40,21 +40,21 @@ Unsupported layouts stop before CachyFreeze changes Btrfs or GRUB.
 
 Download both files from the latest release:
 
-- `CachyFreeze-Installer-1.0.0rc7.run`
-- `CachyFreeze-Installer-1.0.0rc7.run.sha256`
+- `CachyFreeze-Installer-1.0.0rc8.run`
+- `CachyFreeze-Installer-1.0.0rc8.run.sha256`
 
 Verify them:
 
 ```bash
 cd "$(xdg-user-dir DOWNLOAD)"
-sha256sum --check CachyFreeze-Installer-1.0.0rc7.run.sha256
-chmod 0755 CachyFreeze-Installer-1.0.0rc7.run
+sha256sum --check CachyFreeze-Installer-1.0.0rc8.run.sha256
+chmod 0755 CachyFreeze-Installer-1.0.0rc8.run
 ```
 
 Continue only if the checksum prints:
 
 ```text
-CachyFreeze-Installer-1.0.0rc7.run: OK
+CachyFreeze-Installer-1.0.0rc8.run: OK
 ```
 
 ## Fresh Employee Workstation
@@ -68,7 +68,7 @@ CachyFreeze-Installer-1.0.0rc7.run: OK
 5. Run the installer without `sudo`:
 
 ```bash
-./CachyFreeze-Installer-1.0.0rc7.run
+./CachyFreeze-Installer-1.0.0rc8.run
 ```
 
 6. Approve the PolicyKit prompt.

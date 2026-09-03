@@ -38,8 +38,8 @@ bash packaging/build-workstation-installer.sh
 The reproducible outputs are:
 
 ```text
-dist/CachyWorkstation-Setup-1.0.0.run
-dist/CachyWorkstation-Setup-1.0.0.run.sha256
+dist/CachyWorkstation-Setup-1.0.1.run
+dist/CachyWorkstation-Setup-1.0.1.run.sha256
 ```
 
 The `.run` file contains the complete provisioner, reviewed AUR recipes,
@@ -50,32 +50,33 @@ for CachyOS packages and hash-pinned upstream application files.
 Copy both files to a target and verify them from their directory:
 
 ```bash
-sha256sum --check CachyWorkstation-Setup-1.0.0.run.sha256
+sha256sum --check CachyWorkstation-Setup-1.0.1.run.sha256
 ```
 
-Published binaries and checksums are available from the dedicated
-[CachyWorkstation Setup v1.0.0
-release](https://github.com/q0xs/cachy-freeze/releases/tag/workstation-v1.0.0).
+Published binaries and checksums for the current Workstation payload are
+attached to the latest
+[CachyFreeze v1.0.0rc8
+release](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc8).
 
 ## CLI
 
 Initial reconcile:
 
 ```bash
-sudo ./CachyWorkstation-Setup-1.0.0.run wrw1166
+sudo ./CachyWorkstation-Setup-1.0.1.run wrw1166
 ```
 
 Read-only system/application health logic (apart from appending the audit log):
 
 ```bash
-sudo ./CachyWorkstation-Setup-1.0.0.run --check wrw1166
+sudo ./CachyWorkstation-Setup-1.0.1.run --check wrw1166
 ```
 
 Reconcile missing or changed managed files without deleting a valid Wine
 prefix:
 
 ```bash
-sudo ./CachyWorkstation-Setup-1.0.0.run --repair wrw1166
+sudo ./CachyWorkstation-Setup-1.0.1.run --repair wrw1166
 ```
 
 For development from a checkout, the equivalent entry point is:

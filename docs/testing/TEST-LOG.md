@@ -4,6 +4,36 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-09-03 — CachyFreeze v1.0.0rc8 release candidate — local working tree
+
+- UPDATED — release metadata is synchronized across `VERSION`,
+  `pyproject.toml`, and the Python package version as `1.0.0rc8`. Public
+  download instructions in `README.md`, `KURULUM-TR.md`, and
+  `docs/installation.md` point to the `v1.0.0rc8` GitHub release assets.
+- UPDATED — the standalone Workstation payload version is `1.0.1`; CLI-only
+  download instructions in `docs/workstation-provisioning.md` point to the
+  Workstation asset attached to the `v1.0.0rc8` release.
+- FIXED — the first Python unit-test run failed because `VERSION` had been
+  bumped to `1.0.0rc8` while `src/cachy_freeze/__init__.py` still reported
+  `1.0.0rc7`. The package version was corrected before release.
+- PASS — `ruff check .`.
+- PASS — `PYTHONPATH=src:app QT_QPA_PLATFORM=offscreen python -m unittest
+  discover -s tests -v`: 59 tests passed after the version fix.
+- PASS — `bash workstation/tests/static.sh`, `bash deepfreeze/tests/static.sh`,
+  `bash deepfreeze/tests/ui-smoke.sh`, and
+  `bash deepfreeze/tests/grub-generation.sh`.
+- PASS — two consecutive `bash packaging/build-installer.sh` runs produced
+  identical `dist/CachyFreeze-Installer-1.0.0rc8.run` files; the checksum
+  sidecar verified with `sha256sum --check`.
+- PASS — two consecutive `bash packaging/build-workstation-installer.sh` runs
+  produced identical `dist/CachyWorkstation-Setup-1.0.1.run` files; the
+  checksum sidecar verified with `sha256sum --check`.
+- PASS — the embedded payload inventory for both `.run` files includes the
+  updated Workstation login and health modules.
+- NOT RUN — destructive physical installation, real GRUB/initramfs mutation,
+  reboot, real 60/120-minute idle duration, and pilot-machine FROZEN reset.
+  These remain approved-target tests, not local host tests.
+
 ## 2026-09-03 — KDE Workstation freeze gate, login preselection, and status display — local working tree
 
 - FIXED — the graphical installer now presents Workstation preparation before

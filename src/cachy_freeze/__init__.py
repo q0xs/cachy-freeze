@@ -1,4 +1,4 @@
 """CachyFreeze FROZEN/THAWED backend."""
 
 __all__: list[str] = []
-__version__ = "1.0.0rc7"
+__version__ = "1.0.0rc8"
