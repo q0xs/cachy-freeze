@@ -17,6 +17,8 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
 - ADDED — `ansible/test-syntax.sh`, GitHub Actions Ansible syntax checking,
   `ansible/docker-compose.semaphore.yml`, and the Turkish Semaphore operating
   guide.
+- ADDED — GitHub Actions validates `docker-compose.semaphore.yml` with
+  `docker compose config` and dummy CI-only environment values.
 - PASS — `PATH=/tmp/cachy-freeze-ansible-venv/bin:$PATH bash
   ansible/test-syntax.sh`: all five playbooks passed `ansible-playbook
   --syntax-check`. Ansible reported the expected warning that the sample

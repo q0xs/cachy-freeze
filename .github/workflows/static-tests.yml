@@ -84,6 +84,13 @@ jobs:
       - name: Ansible playbook sözdizimi
         run: bash ./ansible/test-syntax.sh
 
+      - name: Semaphore Compose yapılandırması
+        env:
+          SEMAPHORE_DB_PASS: ci-db-pass
+          SEMAPHORE_ADMIN_PASSWORD: ci-admin-pass
+          SEMAPHORE_ACCESS_KEY_ENCRYPTION: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+        run: docker compose -f ansible/docker-compose.semaphore.yml config >/dev/null
+
       - name: İzole GRUB üretim testi
         run: bash ./deepfreeze/tests/grub-generation.sh
 
