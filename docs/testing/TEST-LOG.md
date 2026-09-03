@@ -4,6 +4,52 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-09-03 — KDE Workstation freeze gate, login preselection, and status display — local working tree
+
+- FIXED — the graphical installer now presents Workstation preparation before
+  the GRUB maintenance password and **INSTALL CACHYFREEZE** action. First
+  CachyFreeze installation remains disabled until **CHECK WORKSTATION** passes
+  for the selected employee username, so the initial Golden baseline cannot be
+  created before application and workstation health validation.
+- ADDED — Workstation provisioning configures the active KDE display manager to
+  preselect the employee account without enabling automatic login. Plasma Login
+  Manager writes the `[Greeter] PreselectedUser` and `PreselectedSession`
+  settings in `/etc/plasmalogin.conf`; SDDM writes an owned local config
+  drop-in and the state file's `[Last] User` and `Session` values.
+- ADDED — Workstation health checks now verify the login-screen preselection
+  and disabled autologin state. The graphical installer shows the detailed
+  Workstation PASS/FAIL output in a visible report area.
+- FIXED — the installed GUI mode badge now displays a known cached or kernel
+  command-line mode as **FROZEN** or **THAWED** even before privileged status
+  verification finishes. Mode-changing buttons remain disabled until verified
+  state is available.
+- VERIFIED — the idle policy remains 60 minutes to `loginctl lock-session` and
+  120 minutes total idle to `systemctl --no-block poweroff`. The root supervisor
+  still uses a sleep inhibitor so suspend cannot pause the 120-minute cleanup
+  path; no suspend command is issued by the policy.
+- PASS — `ruff check .`.
+- PASS — `PYTHONPATH=src:app QT_QPA_PLATFORM=offscreen python -m unittest
+  discover -s tests -v`: 59 tests passed, including new GUI order, freeze-gate,
+  Workstation report, and unverified-mode display coverage.
+- PASS — `bash workstation/tests/static.sh`: Bash syntax, ShellCheck, Ruff,
+  idle-supervisor tests, desktop/systemd validation, KF6 KIdleTime agent build,
+  path-safety checks, and vendored PKGBUILD/`.SRCINFO` checks passed.
+- PASS — `bash deepfreeze/tests/static.sh`,
+  `bash deepfreeze/tests/ui-smoke.sh`, and
+  `bash deepfreeze/tests/grub-generation.sh`.
+- PASS — `bash packaging/build-installer.sh` produced
+  `dist/CachyFreeze-Installer-1.0.0rc7.run`; the generated checksum sidecar
+  verified with `sha256sum --check`, and the embedded payload contains
+  `workstation/lib/login.sh`.
+- PASS — `bash packaging/build-workstation-installer.sh` produced
+  `dist/CachyWorkstation-Setup-1.0.0.run`; its generated checksum sidecar
+  verified with `sha256sum --check`.
+- NOT RUN — root-only initramfs, Btrfs loopback, full QEMU/OVMF boot
+  acceptance, physical Workstation provisioning, real 60/120-minute idle
+  duration, CachyFreeze installation, GRUB/initramfs mutation, reboot, and
+  FROZEN runtime reset. These remain disposable VM or approved pilot-machine
+  tests.
+
 ## 2026-08-29 — portable CachyWorkstation provisioner — local working tree
 
 - ADDED — a separate administrator CLI payload provisions an already-created

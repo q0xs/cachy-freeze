@@ -19,6 +19,7 @@ QPushButton#primary:hover { background: #4752c4; }
 QPushButton#danger { background: #da373c; color: #ffffff; }
 QLineEdit { background: #1e1f22; border: 1px solid #3f4147; border-radius: 8px; padding: 11px; selection-background-color: #5865f2; }
 QLineEdit:focus { border: 1px solid #5865f2; }
+QPlainTextEdit { background: #1e1f22; border: 1px solid #3f4147; border-radius: 8px; padding: 10px; color: #dbdee1; font-family: "JetBrains Mono", "Noto Sans Mono", monospace; font-size: 10px; selection-background-color: #5865f2; }
 QProgressBar { background: #1e1f22; border: 0; border-radius: 3px; max-height: 6px; }
 QProgressBar::chunk { background: #5865f2; border-radius: 3px; }
 """

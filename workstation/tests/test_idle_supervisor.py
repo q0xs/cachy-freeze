@@ -127,6 +127,7 @@ class SupervisorEventTests(unittest.TestCase):
         result = self.supervisor.handle_event(self.session, "CWS_EVENT POWER_OFF")
         self.assertEqual(result, "poweroff")
         self.assertIn([SUPERVISOR.SYSTEMCTL, "--no-block", "poweroff"], self.calls)
+        self.assertNotIn([SUPERVISOR.SYSTEMCTL, "--no-block", "suspend"], self.calls)
 
     def test_agent_command_has_both_timeouts_and_clean_environment(self) -> None:
         command = self.supervisor.agent_command(

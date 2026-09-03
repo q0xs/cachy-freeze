@@ -6,12 +6,14 @@ import re
 from typing import Any
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import (
     QFrame,
     QLabel,
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QPlainTextEdit,
     QProgressBar,
     QPushButton,
     QVBoxLayout,
@@ -30,6 +32,7 @@ class MainWindow(QMainWindow):
         self.scheduled_mode = "unknown"
         self.reboot_required = False
         self.verified = False
+        self.workstation_ready_user = ""
         self.installer_mode = backend.setup_root is not None
         self.workstation_available = backend.workstation_available
         self.setWindowTitle("CachyFreeze Installer" if self.installer_mode else "CachyFreeze")
@@ -51,6 +54,10 @@ class MainWindow(QMainWindow):
         if centered:
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         return label
+
+    @staticmethod
+    def _mode_text(mode: str) -> str:
+        return {"frozen": "FROZEN", "thawed": "THAWED"}.get(mode, "VERIFYING")
 
     def _build_ui(self) -> None:
         container = QWidget()
@@ -115,11 +122,13 @@ class MainWindow(QMainWindow):
         )
         layout.addWidget(
             self._label(
-                "Set a boot-maintenance password. It protects THAWED access in GRUB and is "
-                "sent only through the installer process input channel.",
+                "Finish Workstation preparation first. CachyFreeze installation will create "
+                "the initial Golden baseline from the checked system.",
                 name="muted",
             )
         )
+        if self.workstation_available:
+            self._build_workstation(layout)
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
         self.password.setPlaceholderText("Boot-maintenance password")
@@ -132,7 +141,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.password_confirm)
         layout.addWidget(self.install_button)
         if self.workstation_available:
-            self._build_workstation(layout)
+            self.install_button.setEnabled(False)
 
     def _build_workstation(self, layout: QVBoxLayout) -> None:
         layout.addWidget(
@@ -147,18 +156,25 @@ class MainWindow(QMainWindow):
         self.workstation_install_button = QPushButton("INSTALL / REPAIR WORKSTATION")
         self.workstation_install_button.setObjectName("primary")
         self.workstation_check_button = QPushButton("CHECK WORKSTATION")
+        self.workstation_report = QPlainTextEdit()
+        self.workstation_report.setReadOnly(True)
+        self.workstation_report.setMinimumHeight(150)
+        self.workstation_report.setPlaceholderText("Workstation check output")
         layout.addWidget(self.workstation_user)
         layout.addWidget(self.workstation_install_button)
         layout.addWidget(self.workstation_check_button)
+        layout.addWidget(self.workstation_report)
 
     def _connect(self) -> None:
         self.backend.busy_changed.connect(self._busy_changed)
         self.backend.status_changed.connect(self._status_changed)
         self.backend.operation_finished.connect(self._operation_finished)
+        self.backend.operation_output.connect(self._operation_output)
         self.reboot_button.clicked.connect(self._confirm_reboot)
         if self.workstation_available:
             self.workstation_install_button.clicked.connect(self._install_workstation)
             self.workstation_check_button.clicked.connect(self._check_workstation)
+            self.workstation_user.textChanged.connect(self._workstation_user_changed)
         if self.installer_mode:
             self.install_button.clicked.connect(self._install)
         else:
@@ -191,6 +207,18 @@ class MainWindow(QMainWindow):
                 "least three character classes.",
             )
             return
+        if self.installer_mode and self.workstation_available:
+            target_user = self._workstation_user()
+            if target_user is None:
+                return
+            if self.workstation_ready_user != target_user:
+                QMessageBox.warning(
+                    self,
+                    "Workstation check required",
+                    "Run CHECK WORKSTATION successfully for this employee before installing "
+                    "CachyFreeze.",
+                )
+                return
         answer = QMessageBox.warning(
             self,
             "Install CachyFreeze",
@@ -229,11 +257,18 @@ class MainWindow(QMainWindow):
             QMessageBox.StandardButton.Cancel,
         )
         if answer == QMessageBox.StandardButton.Yes:
+            self.workstation_ready_user = ""
+            self._set_workstation_report(
+                "Installing or repairing CachyWorkstation. Run CHECK WORKSTATION after manual "
+                "application testing."
+            )
             self.backend.run("setup-workstation-install", secret=target_user)
 
     def _check_workstation(self) -> None:
         target_user = self._workstation_user()
         if target_user is not None:
+            self.workstation_ready_user = ""
+            self._set_workstation_report(f"Checking CachyWorkstation for {target_user}...\n")
             self.backend.run("setup-workstation-check", secret=target_user)
 
     def _freeze(self) -> None:
@@ -275,7 +310,7 @@ class MainWindow(QMainWindow):
         self.progress.setVisible(busy)
         self.reboot_button.setEnabled(not busy)
         if self.installer_mode:
-            self.install_button.setEnabled(not busy and not self.verified)
+            self.install_button.setEnabled(self._can_install_cachyfreeze())
             self.password.setEnabled(not busy)
             self.password_confirm.setEnabled(not busy)
             self._apply_workstation_controls(busy=busy)
@@ -288,15 +323,15 @@ class MainWindow(QMainWindow):
             self.message_label.setText(
                 "Ready to validate and install or safely reconcile CachyFreeze."
             )
-            self.install_button.setEnabled(not self.backend.busy)
+            self.install_button.setEnabled(self._can_install_cachyfreeze())
             self._apply_workstation_controls(busy=self.backend.busy)
             return
         self.running_mode = str(status.get("running_mode", "unknown"))
         self.scheduled_mode = str(status.get("scheduled_mode", "unknown"))
         self.reboot_required = bool(status.get("reboot_required"))
-        self.mode_label.setText(self.running_mode.upper() if self.verified else "VERIFYING")
+        self.mode_label.setText(self._mode_text(self.running_mode))
         if self.verified and self.scheduled_mode != self.running_mode:
-            self.next_mode_label.setText(f"Next Boot: {self.scheduled_mode.upper()}")
+            self.next_mode_label.setText(f"Next Boot: {self._mode_text(self.scheduled_mode)}")
         else:
             self.next_mode_label.setText("")
         if not self.verified:
@@ -336,10 +371,41 @@ class MainWindow(QMainWindow):
             can_check = verified and not busy
         self.workstation_install_button.setEnabled(can_install)
         self.workstation_check_button.setEnabled(can_check)
+        if self.installer_mode:
+            self.install_button.setEnabled(self._can_install_cachyfreeze())
+
+    def _can_install_cachyfreeze(self) -> bool:
+        if not self.installer_mode or self.backend.busy:
+            return False
+        if not self.workstation_available:
+            return True
+        target_user = self.workstation_user.text().strip()
+        return bool(target_user) and self.workstation_ready_user == target_user
+
+    def _workstation_user_changed(self) -> None:
+        if self.workstation_ready_user != self.workstation_user.text().strip():
+            self.workstation_ready_user = ""
+        self._apply_workstation_controls(busy=self.backend.busy)
+
+    def _set_workstation_report(self, text: str) -> None:
+        if self.workstation_available:
+            self.workstation_report.setPlainText(text)
+
+    def _operation_output(self, action: str, output: str) -> None:
+        if not action.startswith("setup-workstation-") or not self.workstation_available:
+            return
+        cursor = self.workstation_report.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        self.workstation_report.setTextCursor(cursor)
+        self.workstation_report.insertPlainText(output)
+        self.workstation_report.ensureCursorVisible()
 
     def _operation_finished(self, action: str, success: bool, message: str) -> None:
         self.message_label.setText(message)
         if not success:
+            if action.startswith("setup-workstation-") and self.workstation_available:
+                self.workstation_ready_user = ""
+                self._apply_workstation_controls(busy=self.backend.busy)
             QMessageBox.critical(self, "CachyFreeze operation failed", message)
             return
         if action in {"freeze", "thaw", "setup-install"}:
@@ -353,4 +419,9 @@ class MainWindow(QMainWindow):
                 message + " Save all work, then use REBOOT NOW when ready.",
             )
         elif action.startswith("setup-workstation-"):
+            if action == "setup-workstation-check":
+                self.workstation_ready_user = self.workstation_user.text().strip()
+            else:
+                self.workstation_ready_user = ""
+            self._apply_workstation_controls(busy=self.backend.busy)
             QMessageBox.information(self, "CachyWorkstation", message)

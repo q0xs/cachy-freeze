@@ -21,7 +21,8 @@ administrator manually tests the applications and runs CachyFreeze last.
 7. Open and test Google Chrome, LibreOffice, AnyDesk, Zoiper, and MicroSIP as
    the employee.
 8. Run `--check` and require every check to report `PASS`.
-9. Freeze the computer and reboot into FROZEN.
+9. Freeze the computer and reboot into FROZEN. The login screen should
+   preselect the employee account, not the administrator account.
 
 Never provision or repair from disposable FROZEN `@active`. The installer
 checks the root subvolume and fails before package or configuration changes.
@@ -145,6 +146,11 @@ input stops
     +-- 120 minutes total idle -> systemctl poweroff
 ```
 
+The policy intentionally blocks real system suspend while it is supervising the
+employee session. Suspend can pause ordinary timers; guaranteed data cleanup
+comes from the 120-minute poweroff and the next FROZEN boot rebuilding
+`@active` from Golden.
+
 Both timeouts are registered at the start of the same idle interval. Locking at
 60 minutes therefore does not start a new two-hour timer. Real keyboard or
 mouse input resets KDE's idle time; if the employee returns at 75 minutes, both
@@ -179,7 +185,19 @@ Checks cover:
 - KDE lock configuration;
 - root-owned idle policy configuration and installed binaries;
 - idle service enabled/active and its sleep inhibitor present;
+- KDE login manager preselects the employee account without automatic login;
 - secure setup log ownership/mode.
+
+## Login screen default
+
+Provisioning configures the active KDE display manager to preselect the
+employee account on the login screen. It does not enable automatic login.
+
+On Plasma Login Manager, `/etc/plasmalogin.conf` is reconciled with
+`[Greeter] PreselectedUser` and `PreselectedSession`. On SDDM,
+`/etc/sddm.conf.d/90-cachy-workstation-login.conf` keeps last-user/session
+memory enabled and `/var/lib/sddm/state.conf` records the employee as the last
+login user with the Plasma session.
 
 The audit log is `/var/log/cachy-workstation-setup.log`, mode `0640`, owned by
 `root:root`. It records timestamps, target user, mode, package/step results,

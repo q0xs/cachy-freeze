@@ -193,6 +193,46 @@ check_sleep_inhibitor() {
   systemd-inhibit --list --no-pager --no-legend | grep -Fq CachyWorkstation
 }
 
+check_sddm_login_default() {
+  local session_path
+  session_path=$(login_session_path) || return 1
+  [[ -f $CWS_LOGIN_SDDM_CONFIG && ! -L $CWS_LOGIN_SDDM_CONFIG ]] || return 1
+  [[ $(stat -c '%u:%g:%a' "$CWS_LOGIN_SDDM_CONFIG") == 0:0:644 ]] || return 1
+  [[ $(ini_value "$CWS_LOGIN_SDDM_CONFIG" Users RememberLastUser) == true ]] || return 1
+  [[ $(ini_value "$CWS_LOGIN_SDDM_CONFIG" Users RememberLastSession) == true ]] || return 1
+  [[ $(ini_value "$CWS_LOGIN_SDDM_CONFIG" Autologin User) == "" ]] || return 1
+  [[ $(ini_value "$CWS_LOGIN_SDDM_CONFIG" Autologin Session) == "" ]] || return 1
+  [[ -f $CWS_LOGIN_SDDM_STATE && ! -L $CWS_LOGIN_SDDM_STATE ]] || return 1
+  [[ $(ini_value "$CWS_LOGIN_SDDM_STATE" Last User) == "$TARGET_USER" ]] || return 1
+  [[ $(ini_value "$CWS_LOGIN_SDDM_STATE" Last Session) == "$session_path" ]]
+}
+
+check_plasmalogin_default() {
+  [[ -f $CWS_LOGIN_PLASMA_CONFIG && ! -L $CWS_LOGIN_PLASMA_CONFIG ]] || return 1
+  [[ $(stat -c '%u:%g:%a' "$CWS_LOGIN_PLASMA_CONFIG") == 0:0:644 ]] || return 1
+  [[ $(ini_value "$CWS_LOGIN_PLASMA_CONFIG" Greeter PreselectedUser) == "$TARGET_USER" ]] ||
+    return 1
+  [[ $(ini_value "$CWS_LOGIN_PLASMA_CONFIG" Greeter PreselectedSession) == \
+    "$CWS_LOGIN_SESSION_FILE" ]] || return 1
+  [[ $(ini_value "$CWS_LOGIN_PLASMA_CONFIG" Autologin User) == "" ]]
+}
+
+check_login_screen_default() {
+  local display_manager
+  display_manager=$(active_display_manager_unit) || return 1
+  case $display_manager in
+    plasmalogin)
+      check_plasmalogin_default
+      ;;
+    sddm)
+      check_sddm_login_default
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 check_setup_log() {
   [[ -f $CWS_LOG_FILE && ! -L $CWS_LOG_FILE ]] || return 1
   [[ $(stat -c '%u:%g:%a' "$CWS_LOG_FILE") == 0:0:640 ]]
@@ -222,6 +262,7 @@ run_health_check() {
   health_assert "Root-owned KDE idle agent and supervisor" check_idle_binaries
   health_assert "Idle shutdown service enabled and running" check_idle_service
   health_assert "System sleep inhibitor preserves idle timeline" check_sleep_inhibitor
+  health_assert "Login screen preselects employee without autologin" check_login_screen_default
   health_assert "Secure provisioning log" check_setup_log
 
   printf '%s\n' '----------------------------------------'

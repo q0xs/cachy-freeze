@@ -42,6 +42,8 @@ chmod 0755 CachyFreeze-Installer-1.0.0rc7.run
     MicroSIP once.
 11. Return to the administrator account and click **CHECK WORKSTATION**.
 12. Continue only if it reports `OVERALL: PASS` and `Ready for freeze: YES`.
+    The graphical installer keeps **INSTALL CACHYFREEZE** disabled until this
+    final check passes for the selected employee.
 13. Enter the GRUB maintenance password twice.
 14. Click **INSTALL CACHYFREEZE**.
 15. Click **REBOOT NOW** after setup succeeds.
@@ -74,6 +76,8 @@ The maintenance user is always `cachyadmin`.
 - CachyFreeze never reboots automatically.
 - FROZEN reboots create a fresh disposable `@active` from `@golden`.
 - THAWED is the only mode for updates, repairs, and Workstation changes.
+- Workstation health includes the employee account, applications, idle policy,
+  and KDE login-screen preselection without automatic login.
 - The standalone `CachyWorkstation-Setup-1.0.0.run` remains available only for
   CLI-only deployments.
 

@@ -12,6 +12,8 @@ source "$CWS_PROJECT_ROOT/workstation/lib/packages.sh"
 source "$CWS_PROJECT_ROOT/workstation/lib/user.sh"
 # shellcheck source=workstation/lib/idle.sh
 source "$CWS_PROJECT_ROOT/workstation/lib/idle.sh"
+# shellcheck source=workstation/lib/login.sh
+source "$CWS_PROJECT_ROOT/workstation/lib/login.sh"
 # shellcheck source=workstation/lib/health.sh
 source "$CWS_PROJECT_ROOT/workstation/lib/health.sh"
 
@@ -129,6 +131,7 @@ main() {
   run_step "Wine and MicroSIP" install_microsip_for_target
   run_step "Desktop shortcuts" install_user_launchers
   run_step "Idle security policy" install_idle_policy
+  run_step "Login screen default" configure_login_screen_default_user
 
   set +e
   run_health_check

@@ -14,11 +14,16 @@ Dogru sira sudur:
 4. Installer icinden **INSTALL / REPAIR WORKSTATION** calistir.
 5. Calisan hesabinda uygulamalari elle test et.
 6. Installer icinden **CHECK WORKSTATION** calistir.
-7. Her sey PASS ise **INSTALL CACHYFREEZE** calistir.
-8. Yeniden baslat ve FROZEN durumunu kontrol et.
+7. Her sey PASS ise **INSTALL CACHYFREEZE** calistir. PASS olmadan bu adim
+   uygulama icinde kapali kalir.
+8. Yeniden baslat ve status bolumunde **FROZEN** durumunu kontrol et.
 
 Workstation kurulumu veya onarimi FROZEN durumda yapilmaz. Gerekirse once
 **THAW COMPUTER** yapip yeniden baslatin.
+
+CachyFreeze uygulamasinin status bolumu mevcut modu **FROZEN** veya **THAWED**
+olarak gosterir. Bilinen mod hemen gorunur; yetkili dogrulama bitene kadar
+islem dugmeleri guvenli sekilde kapali kalir.
 
 ## Gereken Sistem
 
@@ -107,7 +112,8 @@ Acik pencerede:
 4. Islem bitene kadar pencereyi kapatmayin.
 
 Bu adim Google Chrome, LibreOffice, AnyDesk, Zoiper, MicroSIP/Wine,
-masaustu kisayollari ve 60/120 dakika bosta kalma politikasini kurar.
+masaustu kisayollari, login ekraninda calisan hesabinin secili gelmesini ve
+60/120 dakika bosta kalma politikasini kurar.
 
 Basarili sonuc:
 
@@ -151,6 +157,11 @@ OVERALL: PASS
 Ready for freeze: YES
 ```
 
+Bu kontrol uygulama icinde detayli PASS/FAIL raporu olarak gorunur. Login
+ekraninda calisan hesabi secili gelmiyorsa veya autologin aciksa kontrol FAIL
+verir. 60 dakikada kilit ve toplam 120 dakikada poweroff politikasi da bu
+kontrole dahildir.
+
 FAIL varsa henuz dondurmayin. Once Workstation repair yapin, uygulamalari
 tekrar test edin, sonra check'i yeniden calistirin.
 
@@ -171,9 +182,26 @@ Yeniden basladiktan sonra:
 
 1. CachyFreeze uygulamasini acin.
 2. Durumun **FROZEN** oldugunu kontrol edin.
-3. Calisan hesabinda gecici bir dosya olusturun.
-4. Bilgisayari yeniden baslatin.
-5. Gecici dosyanin silindigini kontrol edin.
+3. Login ekraninda calisan hesabinin secili geldigini kontrol edin.
+4. Calisan hesabinda gecici bir dosya olusturun.
+5. Bilgisayari yeniden baslatin.
+6. Gecici dosyanin silindigini kontrol edin.
+
+## Bosta Kalma Politikasi
+
+Workstation kurulumu calisan oturumunda su kurali zorlar:
+
+```text
+60 dakika bosta     -> KDE oturumu kilitlenir
+120 dakika toplamda -> sistem poweroff yapar
+```
+
+Sistem sleep inhibitor ile gercek suspend'i engeller. Bunun sebebi 120 dakikalik
+poweroff zamaninin uyku sirasinda durup aktif FROZEN verilerinin makinede
+kalmasini onlemektir.
+
+Aktif verileri temizleyen guvenli adim poweroff/reboot sonrasi FROZEN `@active`
+subvolume'unun Golden'dan yeniden olusturulmasidir.
 
 ## Mevcut CachyFreeze Kuruluysa
 

@@ -14,8 +14,12 @@ approved baseline.
 - **FROZEN:** each reboot starts from the saved Golden baseline.
 - **THAWED:** changes persist, so the administrator can update or repair the
   workstation.
+- **Status:** the app shows the current mode as **FROZEN** or **THAWED**.
 - **Workstation buttons:** the installer can prepare employee apps before the
   first freeze.
+- **Workstation health report:** PASS/FAIL output is visible in the app, and
+  the first CachyFreeze install is blocked until the selected employee passes
+  the final check.
 
 The current single-file installer includes CachyWorkstation. Target computers
 do not need a Git checkout.
@@ -75,12 +79,15 @@ CachyFreeze-Installer-1.0.0rc7.run: OK
 10. Return to the administrator account.
 11. Enter the employee username again and click **CHECK WORKSTATION**.
 12. Continue only if the check reports `OVERALL: PASS` and
-    `Ready for freeze: YES`.
+    `Ready for freeze: YES`. The check includes the KDE login screen
+    preselecting the employee account without automatic login, plus the
+    60-minute lock and 120-minute poweroff policy.
 13. Enter the GRUB maintenance password twice.
 14. Click **INSTALL CACHYFREEZE**.
 15. When setup succeeds, click **REBOOT NOW**.
 
-After reboot, CachyFreeze should show **FROZEN**.
+After reboot, CachyFreeze should show **FROZEN**, and the login screen should
+preselect the employee account.
 
 ## Existing CachyFreeze Machine
 
@@ -101,12 +108,27 @@ Never install, repair, or update Workstation while booted from FROZEN
 
 The normal CachyFreeze app keeps the workflow small:
 
+- **Status:** displays the current verified mode as **FROZEN** or **THAWED**.
 - **FREEZE COMPUTER:** save the current THAWED system as the new Golden and
   schedule FROZEN.
 - **THAW COMPUTER:** schedule the persistent THAWED system for the next boot.
 - **REBOOT NOW:** shown only after a mode change.
 
 CachyFreeze never reboots automatically.
+
+## Idle Data Cleanup
+
+CachyWorkstation enforces the employee idle policy from a root-owned service:
+
+```text
+60 minutes idle  -> lock the KDE session
+120 minutes idle -> system poweroff
+```
+
+The policy intentionally blocks real suspend while supervising the employee
+session. Suspend can pause timers and leave the current FROZEN runtime in
+memory. The reliable cleanup point is the 120-minute poweroff, followed by the
+next FROZEN boot recreating disposable `@active` from Golden.
 
 ## Developer Build
 
