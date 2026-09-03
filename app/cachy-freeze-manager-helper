@@ -47,7 +47,7 @@ read_boot_secret() {
 
 read_target_user() {
   IFS= read -r TARGET_USER || die "The employee username was not received."
-  [[ $TARGET_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] ||
+  [[ $TARGET_USER =~ ^[a-zA-Z_][a-zA-Z0-9_-]{0,30}$ ]] ||
     die "Invalid employee username."
 }
 

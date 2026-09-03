@@ -19,6 +19,14 @@ class CliParserTests(unittest.TestCase):
         ):
             self.assertEqual(parser().parse_args([command]).command, command)
 
+    def test_thaw_accepts_one_time_remote_authorization_flags(self) -> None:
+        authorized = parser().parse_args(["thaw", "--authorized"])
+        remote = parser().parse_args(["thaw", "--remote"])
+
+        self.assertEqual(authorized.command, "thaw")
+        self.assertTrue(authorized.authorized)
+        self.assertTrue(remote.authorized)
+
     def test_removed_management_commands_are_rejected(self) -> None:
         for command in ("snapshot", "user", "applications", "settings", "diagnostics"):
             with self.subTest(command=command), self.assertRaises(SystemExit):

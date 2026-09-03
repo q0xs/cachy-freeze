@@ -1,0 +1,34 @@
+---
+- name: Require boot secret for CachyFreeze installation
+  ansible.builtin.assert:
+    that:
+      - cachy_freeze_boot_secret is defined
+      - cachy_freeze_boot_secret | length >= 12
+    fail_msg: "Provide cachy_freeze_boot_secret with Ansible Vault, vars_prompt, or --extra-vars."
+  no_log: true
+
+- name: Create remote CachyFreeze repository directory
+  ansible.builtin.file:
+    path: "{{ cachy_freeze_remote_repo }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Copy monorepo payload to target
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../"
+    dest: "{{ cachy_freeze_remote_repo }}/"
+    owner: root
+    group: root
+    mode: preserve
+
+- name: Run CachyFreeze installer
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/bash
+      - "{{ cachy_freeze_remote_repo }}/installer/install-cachyfreeze.sh"
+    stdin: "{{ cachy_freeze_boot_secret }}"
+  register: cachy_freeze_install_command
+  changed_when: true
+  no_log: true

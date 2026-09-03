@@ -44,8 +44,12 @@ fi
 menuentry "\${cachy_title}" --class cachyos --class gnu-linux --class os --id 'cachyos-current' --unrestricted {
     set cachy_boot_authorized="false"
     if [ "\${cachy_effective_mode}" = "thawed" ]; then
-        if authenticate; then
+        if [ "\${cachy_remote_auth}" = "1" ]; then
             set cachy_boot_authorized="true"
+        else
+            if authenticate; then
+                set cachy_boot_authorized="true"
+            fi
         fi
     else
         set cachy_boot_authorized="true"

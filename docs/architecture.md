@@ -11,6 +11,13 @@ behind explicit PolicyKit helper allow-list entries and remain outside the
 FROZEN/THAWED engine. Its application, login-screen, and idle-policy
 reconciliation runs before a manual FREEZE; see `workstation-provisioning.md`.
 
+The optional `ansible/` tree is a monorepo control-plane layer for fleet
+operations. It calls the same privileged CLI and Workstation payload instead of
+adding a third runtime mode. Remote maintenance uses a one-time
+`cachy_remote_auth=1` GRUB environment flag to allow the next THAWED boot
+without physical keyboard authentication. The real-root boot verification path
+consumes that flag on the THAWED boot by resetting it to `0`.
+
 | Subvolume | Purpose |
 | --- | --- |
 | `@` | Persistent writable THAWED maintenance root |
@@ -74,18 +81,21 @@ the reset proof matches that same kernel boot.
 
 While verified FROZEN, the engine verifies persistent `@`, writes and verifies
 the managed GRUB environment, and schedules THAWED. It never snapshots or copies
-`@active`. Once a THAWED graphical boot is verified, the boot-verification
-service recursively deletes stale CachyFreeze runtime objects and removes the
-old reset proof.
+`@active`. Normal THAWED boots still require the fixed `cachyadmin` GRUB
+authentication. `cachy-freeze thaw --authorized` additionally writes the
+one-time `cachy_remote_auth=1` flag for remote fleet maintenance. Once a THAWED
+graphical boot is verified, the boot-verification service recursively deletes
+stale CachyFreeze runtime objects, removes the old reset proof, and consumes the
+remote authorization flag.
 
 ## GRUB boundary
 
 The normal five-second GRUB menu contains one dynamic managed entry. Its title
 is FROZEN or THAWED, never both. FROZEN is unrestricted for passwordless boot;
 THAWED gates every kernel and initramfs load behind successful `cachyadmin`
-authentication. Vendor, firmware, snapshot, and custom generators are preserved
-inside a `cachy_recovery=1` conditional and therefore remain absent from the
-normal menu.
+authentication unless the one-time remote authorization flag is present. Vendor,
+firmware, snapshot, and custom generators are preserved inside a
+`cachy_recovery=1` conditional and therefore remain absent from the normal menu.
 
 ## Existing installations
 

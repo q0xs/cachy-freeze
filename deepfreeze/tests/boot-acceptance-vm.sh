@@ -54,7 +54,7 @@ password_hash=$(LC_ALL=C printf '%s\n%s\n' "$TEST_PASSWORD" "$TEST_PASSWORD" |
 [[ $password_hash == grub.pbkdf2.* ]] || fail "The test-only GRUB hash was not generated."
 
 build_case() {
-  local mode=$1 case_root=$2
+  local mode=$1 case_root=$2 remote_auth=${3:-0}
   local boot_dir=$case_root/boot-files fake_bin=$case_root/bin
   local generated=$case_root/generated.cfg config=$case_root/grub.cfg
   install -d -m 0755 "$boot_dir" "$fake_bin" "$case_root/esp/EFI/BOOT"
@@ -80,6 +80,7 @@ set pager=0
 set superusers="$TEST_USER"
 password_pbkdf2 $TEST_USER $password_hash
 set cachy_mode="$mode"
+set cachy_remote_auth="$remote_auth"
 set cachy_recovery="0"
 echo CACHY_GRUB_READY
 EOF
@@ -169,10 +170,10 @@ EOF
 }
 
 run_case() {
-  local name=$1 mode=$2 password=$3 expected=$4
+  local name=$1 mode=$2 password=$3 expected=$4 remote_auth=${5:-0}
   local case_root=$WORK/$name transcript=
   local attempt=1 max_attempts=1 vm_status=0
-  build_case "$mode" "$case_root"
+  build_case "$mode" "$case_root" "$remote_auth"
 
   # OVMF's emulated serial receiver can very rarely drop an input character
   # even with deliberately slow input. Retry only the observed transport
@@ -224,6 +225,7 @@ run_case() {
 
 run_case thawed-wrong-password thawed 'definitely-wrong' denied
 run_case thawed-correct-password thawed "$TEST_PASSWORD" allowed
+run_case thawed-remote-authorized thawed '' allowed 1
 run_case frozen-passwordless frozen '' allowed
 
 printf '%s\n' "UEFI GRUB authentication acceptance tests passed in disposable QEMU VMs."

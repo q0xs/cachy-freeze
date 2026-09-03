@@ -4,6 +4,53 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-09-03 — Ansible fleet management and authorized remote thaw — local working tree
+
+- ADDED — the monorepo `ansible/` control plane with controller bootstrap,
+  fleet-tuned `ansible.cfg`, lab/production inventory groups, LocalAdm sudo
+  bootstrap, Workstation provisioning/check roles, CachyFreeze status/thaw/
+  freeze/install/verify roles, and provision/maintenance/status/thaw/freeze
+  playbooks.
+- ADDED — `cachy-freeze thaw --authorized` with `--remote` as an alias. The
+  command writes a one-time `cachy_remote_auth=1` GRUB environment flag while
+  scheduling THAWED and reports `remote_authorized_boot` in JSON.
+- ADDED — THAWED boot verification consumes remote authorization by writing
+  `cachy_remote_auth=0`. Recovery scheduling and normal freeze/thaw writes also
+  reset the flag to fail closed.
+- UPDATED — the managed GRUB entry permits THAWED boot without interactive
+  `authenticate` only when `cachy_remote_auth=1`; otherwise THAWED still
+  requires `cachyadmin` authentication.
+- UPDATED — Workstation and graphical helper username validation accepts
+  corporate uppercase usernames such as `WRW21166`.
+- UPDATED — `VERSION`, `pyproject.toml`, and package metadata are prepared as
+  `1.0.0rc9`; `workstation/VERSION` is prepared as `1.0.2`.
+- PASS — `ruff check .` and `ruff format --check src app/cachy_freeze_gui
+  tests`.
+- PASS — `PYTHONPATH=src:app QT_QPA_PLATFORM=offscreen python -m unittest
+  discover -s tests -v`: 69 tests passed, including the new Ansible contract,
+  CLI authorized-thaw, remote GRUB flag, and boot-time consumption coverage.
+- PASS — `SHELLCHECK_OPTS=--severity=error bash deepfreeze/tests/static.sh`,
+  including ShellCheck for `ansible/setup-controller.sh`.
+- PASS — `bash workstation/tests/static.sh`.
+- PASS — `QT_QPA_PLATFORM=offscreen bash deepfreeze/tests/ui-smoke.sh` and
+  `bash deepfreeze/tests/grub-generation.sh`.
+- PASS — two consecutive installer builds produced identical
+  `dist/CachyFreeze-Installer-1.0.0rc9.run` and
+  `dist/CachyWorkstation-Setup-1.0.2.run` outputs; both checksum sidecars
+  verified with `sha256sum --check`.
+- PASS — payload inventory checks confirmed the rc9 installer embeds the
+  authorized-thaw CLI/engine/GRUB changes and the Workstation 1.0.2 payload.
+- NOT RUN — `ansible-playbook --syntax-check` and `ansible-lint`; this local
+  host does not have Ansible installed. The repository contract tests validate
+  FQCN module use, file layout, batch settings, JSON parsing, and fail-safe
+  maintenance behavior without external Ansible tooling.
+- NOT RUN — local QEMU/OVMF GRUB boot acceptance; this host is missing
+  `expect`. The GitHub workflow installs the required VM tools before running
+  the acceptance test.
+- NOT RUN — destructive physical install/reboot/FROZEN reset and real fleet
+  maintenance against lab or production hosts. These require an approved
+  disposable VM, pilot machine, or lab inventory.
+
 ## 2026-09-03 — GitHub release audit and GRUB VM retry hardening — local working tree
 
 - AUDITED — GitHub `main` and `v1.0.0rc8` now both show successful

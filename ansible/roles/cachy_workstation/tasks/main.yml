@@ -1,0 +1,43 @@
+---
+- name: Require employee_user host variable
+  ansible.builtin.assert:
+    that:
+      - employee_user is defined
+      - employee_user is match('^[A-Za-z_][A-Za-z0-9_-]{0,30}$')
+    fail_msg: "Set a valid employee_user such as WRW21166 for every host."
+
+- name: Ensure employee account and XDG directories
+  ansible.builtin.include_tasks: ensure_employee.yml
+
+- name: Locate workstation setup payload
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ cachy_workstation_setup_candidates }}"
+  register: cachy_workstation_setup_stats
+
+- name: Select workstation setup payload
+  ansible.builtin.set_fact:
+    cachy_workstation_setup_path: >-
+      {{ (cachy_workstation_setup_stats.results
+      | selectattr('stat.exists')
+      | map(attribute='item')
+      | list
+      | first) | default('') }}
+
+- name: Require workstation setup payload
+  ansible.builtin.assert:
+    that:
+      - cachy_workstation_setup_path | length > 0
+    fail_msg: "No workstation-setup payload was found on the target."
+
+- name: Install employee applications and workstation policy
+  ansible.builtin.include_tasks: install_apps.yml
+  when: cachy_workstation_install | bool
+
+- name: Repair employee applications and workstation policy
+  ansible.builtin.include_tasks: repair_apps.yml
+  when: cachy_workstation_repair | bool
+
+- name: Check workstation readiness
+  ansible.builtin.include_tasks: health_check.yml
+  when: cachy_workstation_check | bool

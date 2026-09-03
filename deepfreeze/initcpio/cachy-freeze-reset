@@ -26,7 +26,8 @@ schedule_protected_thawed() {
   grub-editenv "$grub_environment" set \
     cachy_mode=thawed \
     saved_entry=cachyos-current \
-    cachy_recovery=0 || return 1
+    cachy_recovery=0 \
+    cachy_remote_auth=0 || return 1
   sync
   log "FROZEN reset failed; the next boot is protected THAWED"
 }

@@ -1,0 +1,53 @@
+---
+- name: Maintain CachyFreeze fleet safely
+  hosts: all
+  become: true
+  gather_facts: false
+  serial: "{{ batch_size | default('100%') }}"
+
+  tasks:
+    - name: Enter THAWED mode with one-time remote authorization
+      ansible.builtin.include_role:
+        name: cachy_freeze
+        tasks_from: thaw.yml
+
+    - name: Update and validate workstation while THAWED
+      block:
+        - name: Upgrade system packages
+          ansible.builtin.command:
+            argv:
+              - /usr/bin/pacman
+              - -Syu
+              - --noconfirm
+          register: cachy_freeze_pacman_upgrade
+          changed_when: "'there is nothing to do' not in cachy_freeze_pacman_upgrade.stdout"
+          when: cachy_freeze_update_packages | bool
+
+        - name: Repair workstation payload
+          ansible.builtin.include_role:
+            name: cachy_workstation
+          vars:
+            cachy_workstation_install: false
+            cachy_workstation_repair: true
+            cachy_workstation_check: true
+
+        - name: Freeze validated workstation
+          ansible.builtin.include_role:
+            name: cachy_freeze
+            tasks_from: freeze.yml
+
+      rescue:
+        - name: Write fail-safe marker on target
+          ansible.builtin.copy:
+            dest: "{{ cachy_freeze_failure_log }}"
+            owner: root
+            group: root
+            mode: "0640"
+            content: |
+              CachyFreeze Ansible maintenance failed.
+              Host was intentionally left THAWED for administrator review.
+              Playbook: maintenance.yml
+
+        - name: Stop without freezing failed host
+          ansible.builtin.fail:
+            msg: "Maintenance failed; host was left THAWED and was not frozen."

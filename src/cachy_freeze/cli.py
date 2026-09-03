@@ -18,8 +18,16 @@ from .errors import CachyFreezeError
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="cachy-freeze")
     commands = result.add_subparsers(dest="command", required=True)
-    for command in ("preflight", "version", "migrate", "status", "freeze", "thaw"):
+    for command in ("preflight", "version", "migrate", "status", "freeze"):
         commands.add_parser(command)
+    thaw = commands.add_parser("thaw")
+    thaw.add_argument(
+        "--authorized",
+        "--remote",
+        action="store_true",
+        dest="authorized",
+        help="schedule one passwordless remote THAWED boot and consume it after boot verification",
+    )
     commands.add_parser("boot-success")
     commands.add_parser("reboot")
     return result
@@ -37,10 +45,11 @@ def dispatch(engine: FreezeEngine, arguments: argparse.Namespace) -> Any:
         "migrate": engine.migrate_state,
         "status": engine.status,
         "freeze": engine.freeze,
-        "thaw": engine.thaw,
         "boot-success": engine.mark_boot_successful,
         "reboot": engine.request_reboot,
     }
+    if arguments.command == "thaw":
+        return engine.thaw(authorized=arguments.authorized)
     return operations[arguments.command]()
 
 

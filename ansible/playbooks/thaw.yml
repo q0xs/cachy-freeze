@@ -1,0 +1,12 @@
+---
+- name: Remotely thaw CachyFreeze hosts once
+  hosts: all
+  become: true
+  gather_facts: false
+  serial: "{{ batch_size | default('100%') }}"
+
+  tasks:
+    - name: Enter THAWED mode with one-time remote authorization
+      ansible.builtin.include_role:
+        name: cachy_freeze
+        tasks_from: thaw.yml

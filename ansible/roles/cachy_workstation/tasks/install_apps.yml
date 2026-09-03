@@ -1,0 +1,9 @@
+---
+- name: Run workstation install for employee
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/bash
+      - "{{ cachy_workstation_setup_path }}"
+      - "{{ employee_user }}"
+  register: cachy_workstation_install_result
+  changed_when: true

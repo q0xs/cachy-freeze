@@ -658,9 +658,11 @@ class FreezeEngine:
                 environment[key] = value
         return grub_env, environment
 
-    def _set_boot_mode_locked(self, mode: str) -> None:
+    def _set_boot_mode_locked(self, mode: str, *, remote_authorized: bool = False) -> None:
         if mode not in {"frozen", "thawed"}:
             raise CachyFreezeError(f"Invalid boot mode: {mode}")
+        if remote_authorized and mode != "thawed":
+            raise CachyFreezeError("Remote authorization is valid only for THAWED boot.")
         maintenance = self._managed_path(self.config.MAINTENANCE_SUBVOL)
         grub_cfg = maintenance / "boot/grub/grub.cfg"
         if not grub_cfg.is_file():
@@ -672,6 +674,7 @@ class FreezeEngine:
             f"cachy_mode={mode}",
             "saved_entry=cachyos-current",
             "cachy_recovery=0",
+            f"cachy_remote_auth={1 if remote_authorized else 0}",
         ]
         self.runner.run(["grub-editenv", str(grub_env), "set", *assignments])
         _path, environment = self._grub_environment()
@@ -679,8 +682,19 @@ class FreezeEngine:
             environment.get("cachy_mode") != mode
             or environment.get("saved_entry") != "cachyos-current"
             or environment.get("cachy_recovery") != "0"
+            or environment.get("cachy_remote_auth", "0") != ("1" if remote_authorized else "0")
         ):
             raise IntegrityError("GRUB boot mode could not be verified after writing")
+
+    def _set_remote_authorization_locked(self, enabled: bool) -> None:
+        grub_env, _environment = self._grub_environment()
+        expected = "1" if enabled else "0"
+        self.runner.run(["grub-editenv", str(grub_env), "set", f"cachy_remote_auth={expected}"])
+        _path, environment = self._grub_environment()
+        if environment.get("cachy_remote_auth", "0") != expected:
+            raise IntegrityError(
+                "GRUB remote authorization flag could not be verified after writing"
+            )
 
     def preflight(self) -> dict[str, Any]:
         self.require_root()
@@ -738,6 +752,7 @@ class FreezeEngine:
                 raise IntegrityError("The managed CachyFreeze GRUB entry is not scheduled")
             if environment.get("cachy_recovery") != "0":
                 raise IntegrityError("The normal single-entry GRUB menu is not scheduled")
+            remote_authorized_boot = environment.get("cachy_remote_auth", "0") == "1"
             running_mode = self._current_mode()
             if running_mode not in {"frozen", "thawed"}:
                 raise IntegrityError("The running boot mode cannot be verified")
@@ -762,6 +777,7 @@ class FreezeEngine:
                 "active_present": active_present,
                 "transaction_pending": self.journal.load() is not None,
                 "reboot_required": scheduled_mode != running_mode,
+                "remote_authorized_boot": remote_authorized_boot,
             }
 
     def freeze(self) -> dict[str, Any]:
@@ -828,7 +844,7 @@ class FreezeEngine:
         self.logger.write("INFO", "freeze", "Golden replaced and FROZEN scheduled", **result)
         return result
 
-    def thaw(self) -> dict[str, Any]:
+    def thaw(self, *, authorized: bool = False) -> dict[str, Any]:
         self.require_root()
         if self._current_mode() != "frozen" or self._root_subvolume() != self.config.ACTIVE_SUBVOL:
             raise CachyFreezeError("THAW is allowed only from verified FROZEN mode.")
@@ -836,9 +852,18 @@ class FreezeEngine:
             self._recover_transaction_locked()
             if not self._subvolume_exists(self.config.MAINTENANCE_SUBVOL):
                 raise IntegrityError("The persistent THAWED environment is missing")
-            self._set_boot_mode_locked("thawed")
-        result = {"mode": "thawed", "reboot_required": True}
-        self.logger.write("INFO", "thaw", "THAWED scheduled without runtime promotion")
+            self._set_boot_mode_locked("thawed", remote_authorized=authorized)
+        result = {
+            "mode": "thawed",
+            "reboot_required": True,
+            "remote_authorized_boot": authorized,
+        }
+        self.logger.write(
+            "INFO",
+            "thaw",
+            "THAWED scheduled without runtime promotion",
+            remote_authorized_boot=authorized,
+        )
         return result
 
     def mark_boot_successful(self) -> dict[str, Any]:
@@ -855,6 +880,7 @@ class FreezeEngine:
                 self._delete_subvolume(self.config.ACTIVE_NEXT_SUBVOL)
                 self._delete_subvolume(self.config.ACTIVE_PENDING_SUBVOL)
                 (Path(self.config.STATE_DIR) / "active-reset-boot-id").unlink(missing_ok=True)
+                self._set_remote_authorization_locked(False)
             else:
                 raise IntegrityError("The running boot mode cannot be verified")
         result = {"mode": mode, "verified_at": datetime.now(UTC).isoformat()}

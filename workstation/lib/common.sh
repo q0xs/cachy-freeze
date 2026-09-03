@@ -107,7 +107,7 @@ require_thawed_root() {
 resolve_target_user() {
   local account
   local -a account_fields=()
-  [[ $TARGET_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] ||
+  [[ $TARGET_USER =~ ^[a-zA-Z_][a-zA-Z0-9_-]{0,30}$ ]] ||
     die "Invalid target username: $TARGET_USER"
 
   account=$(getent passwd "$TARGET_USER") || die "User does not exist: $TARGET_USER"

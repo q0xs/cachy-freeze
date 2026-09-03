@@ -1,0 +1,17 @@
+---
+- name: Ensure LocalAdm account exists
+  ansible.builtin.user:
+    name: "{{ localadm_user }}"
+    shell: /bin/bash
+    create_home: true
+    groups: wheel
+    append: true
+
+- name: Install LocalAdm passwordless sudo rule for Ansible
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: /etc/sudoers.d/localadm-ansible
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/bin/visudo -cf %s

@@ -1,0 +1,43 @@
+---
+- name: Read current mode before thaw
+  ansible.builtin.include_tasks: get_status.yml
+
+- name: Schedule one-time authorized THAWED boot
+  ansible.builtin.command:
+    argv:
+      - "{{ cachy_freeze_cli }}"
+      - thaw
+      - --authorized
+  register: cachy_freeze_thaw_command
+  changed_when: true
+  when: cachy_freeze_status.running_mode == 'frozen'
+
+- name: Parse authorized thaw result
+  ansible.builtin.set_fact:
+    cachy_freeze_thaw_result: "{{ (cachy_freeze_thaw_command.stdout | from_json).result }}"
+  when: cachy_freeze_status.running_mode == 'frozen'
+
+- name: Require authorized thaw result
+  ansible.builtin.assert:
+    that:
+      - cachy_freeze_thaw_result.mode == 'thawed'
+      - cachy_freeze_thaw_result.reboot_required | bool
+      - cachy_freeze_thaw_result.remote_authorized_boot | bool
+  when: cachy_freeze_status.running_mode == 'frozen'
+
+- name: Reboot into THAWED
+  ansible.builtin.reboot:
+    reboot_timeout: "{{ cachy_freeze_reboot_timeout }}"
+    connect_timeout: "{{ cachy_freeze_connect_timeout }}"
+    post_reboot_delay: "{{ cachy_freeze_post_reboot_delay }}"
+  when: cachy_freeze_status.running_mode == 'frozen'
+
+- name: Verify THAWED mode after authorized reboot
+  ansible.builtin.include_tasks: get_status.yml
+
+- name: Require THAWED mode
+  ansible.builtin.assert:
+    that:
+      - cachy_freeze_status.running_mode == 'thawed'
+      - not (cachy_freeze_status.remote_authorized_boot | default(false) | bool)
+    fail_msg: "Host did not return to verified THAWED mode or remote authorization was not consumed."

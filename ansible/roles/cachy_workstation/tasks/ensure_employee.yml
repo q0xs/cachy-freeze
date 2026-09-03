@@ -1,0 +1,43 @@
+---
+- name: Ensure employee account exists as a standard user
+  ansible.builtin.user:
+    name: "{{ employee_user }}"
+    shell: "{{ employee_shell }}"
+    create_home: true
+
+- name: Read employee groups
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/id
+      - -nG
+      - "{{ employee_user }}"
+  register: employee_groups
+  changed_when: false
+
+- name: Refuse administrative employee groups
+  ansible.builtin.assert:
+    that:
+      - "' wheel ' not in (' ' ~ employee_groups.stdout ~ ' ')"
+      - "' sudo ' not in (' ' ~ employee_groups.stdout ~ ' ')"
+      - "' root ' not in (' ' ~ employee_groups.stdout ~ ' ')"
+      - "' admin ' not in (' ' ~ employee_groups.stdout ~ ' ')"
+      - "' docker ' not in (' ' ~ employee_groups.stdout ~ ' ')"
+      - "' lxd ' not in (' ' ~ employee_groups.stdout ~ ' ')"
+    fail_msg: "Employee account must not have sudo, wheel, docker, lxd, or equivalent admin access."
+
+- name: Read employee passwd record
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ employee_user }}"
+
+- name: Set employee home path
+  ansible.builtin.set_fact:
+    employee_home: "{{ ansible_facts.getent_passwd[employee_user][4] }}"
+
+- name: Create employee XDG directories
+  ansible.builtin.file:
+    path: "{{ employee_home }}/{{ item }}"
+    state: directory
+    owner: "{{ employee_user }}"
+    mode: "0755"
+  loop: "{{ cachy_workstation_xdg_dirs }}"

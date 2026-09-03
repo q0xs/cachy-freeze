@@ -1,0 +1,17 @@
+---
+- name: Run workstation readiness check
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/bash
+      - "{{ cachy_workstation_setup_path }}"
+      - --check
+      - "{{ employee_user }}"
+  register: cachy_workstation_check_result
+  changed_when: false
+
+- name: Require workstation readiness PASS
+  ansible.builtin.assert:
+    that:
+      - cachy_workstation_required_result in cachy_workstation_check_result.stdout
+      - cachy_workstation_ready_result in cachy_workstation_check_result.stdout
+    fail_msg: "{{ cachy_workstation_check_result.stdout | default(cachy_workstation_check_result.stderr, true) }}"

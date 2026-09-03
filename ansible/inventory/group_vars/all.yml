@@ -1,0 +1,21 @@
+---
+ansible_user: LocalAdm
+ansible_port: 22
+ansible_become: true
+ansible_become_method: sudo
+
+localadm_user: LocalAdm
+employee_shell: /bin/bash
+
+cachy_freeze_remote_repo: /opt/cachy-freeze
+cachy_freeze_cli: /usr/local/sbin/cachy-freeze
+cachy_freeze_failure_log: /var/log/cachy-freeze-ansible-failure.log
+cachy_freeze_reboot_timeout: 300
+cachy_freeze_connect_timeout: 20
+cachy_freeze_post_reboot_delay: 10
+
+cachy_workstation_setup_candidates:
+  - /usr/lib/cachy-freeze/deployment/workstation/bin/workstation-setup
+  - /opt/cachy-freeze/workstation/bin/workstation-setup
+
+batch_size: "100%"

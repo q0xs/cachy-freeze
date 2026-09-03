@@ -16,6 +16,7 @@ bash deepfreeze/tests/grub-generation.sh
 bash packaging/build-installer.sh
 bash workstation/tests/static.sh
 bash packaging/build-workstation-installer.sh
+PYTHONPATH=src:app python -m unittest tests.test_ansible_contract -v
 bash deepfreeze/tests/boot-acceptance-vm.sh
 ```
 

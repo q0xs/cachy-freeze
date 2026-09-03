@@ -88,6 +88,8 @@ grep -Fq 'initrd /$cachy_boot_subvol/boot/intel-ucode.img /$cachy_boot_subvol/bo
   fail "The initramfs and microcode are not loaded from the verified boot subvolume."
 grep -Fq 'if [ "${cachy_effective_mode}" = "thawed" ]; then' "$OUTPUT" ||
   fail "The THAWED authorization condition is missing."
+grep -Fq 'if [ "${cachy_remote_auth}" = "1" ]; then' "$OUTPUT" ||
+  fail "The one-time remote THAWED authorization condition is missing."
 grep -q '^[[:space:]]*if authenticate; then$' "$OUTPUT" ||
   fail "The THAWED GRUB password check is missing."
 grep -q 'set cachy_boot_authorized="false"' "$OUTPUT" ||

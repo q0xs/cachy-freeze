@@ -21,6 +21,7 @@ class FakeBtrfsRunner:
         self.commands: list[list[str]] = []
         self.mode = "thawed"
         self.recovery = "0"
+        self.remote_auth = "0"
         self.fail_snapshot_destination: str | None = None
         self.mounted_sources: dict[str, str] = {}
         self.nested_sources: list[str] = []
@@ -95,6 +96,8 @@ class FakeBtrfsRunner:
                     self.mode = assignment.split("=", 1)[1]
                 if assignment.startswith("cachy_recovery="):
                     self.recovery = assignment.split("=", 1)[1]
+                if assignment.startswith("cachy_remote_auth="):
+                    self.remote_auth = assignment.split("=", 1)[1]
             return self._completed(command)
         if command == ["systemctl", "reboot", "--no-block"] or command == ["sync"]:
             return self._completed(command)
@@ -151,7 +154,8 @@ class FakeBtrfsRunner:
             return (
                 f"cachy_mode={self.mode}\n"
                 "saved_entry=cachyos-current\n"
-                f"cachy_recovery={self.recovery}"
+                f"cachy_recovery={self.recovery}\n"
+                f"cachy_remote_auth={self.remote_auth}"
             )
         completed = self.run(command, check=check)
         return (completed.stdout or b"").decode().strip()
@@ -337,11 +341,37 @@ class LifecycleTests(unittest.TestCase):
         os.environ["CACHY_FREEZE_ROOT_SUBVOLUME"] = "@active"
         self.runner.mode = "frozen"
         self.engine.thaw()
+        self.assertEqual(self.runner.remote_auth, "0")
         self.assertFalse((self.top / "@/unique-frozen-marker").exists())
         self.assertFalse((self.top / "@golden/unique-frozen-marker").exists())
         os.environ["CACHY_FREEZE_ROOT_SUBVOLUME"] = "@"
         self.engine.mark_boot_successful()
         self.assertFalse((self.top / "@active").exists())
+
+    def test_authorized_thaw_sets_one_time_remote_boot_flag(self) -> None:
+        os.environ["CACHY_FREEZE_ROOT_SUBVOLUME"] = "@active"
+        self.runner.mode = "frozen"
+
+        result = self.engine.thaw(authorized=True)
+
+        self.assertEqual(result["mode"], "thawed")
+        self.assertTrue(result["remote_authorized_boot"])
+        self.assertEqual(self.runner.mode, "thawed")
+        self.assertEqual(self.runner.remote_auth, "1")
+        self.assertIn(
+            "cachy_remote_auth=1",
+            next(command for command in self.runner.commands if command[0] == "grub-editenv"),
+        )
+
+    def test_thawed_boot_consumes_remote_authorization(self) -> None:
+        self.runner.remote_auth = "1"
+
+        status = self.engine.status()
+        self.assertTrue(status["remote_authorized_boot"])
+
+        self.engine.mark_boot_successful()
+
+        self.assertEqual(self.runner.remote_auth, "0")
 
     def test_interrupted_freeze_recovers_old_pair(self) -> None:
         self.runner.fail_snapshot_destination = "@active.next"

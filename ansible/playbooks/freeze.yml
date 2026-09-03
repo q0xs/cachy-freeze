@@ -1,0 +1,12 @@
+---
+- name: Freeze validated CachyFreeze hosts
+  hosts: all
+  become: true
+  gather_facts: false
+  serial: "{{ batch_size | default('100%') }}"
+
+  tasks:
+    - name: Schedule FROZEN and reboot
+      ansible.builtin.include_role:
+        name: cachy_freeze
+        tasks_from: freeze.yml

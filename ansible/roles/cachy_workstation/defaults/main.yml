@@ -1,0 +1,15 @@
+---
+cachy_workstation_install: true
+cachy_workstation_repair: false
+cachy_workstation_check: true
+cachy_workstation_required_result: "OVERALL: PASS"
+cachy_workstation_ready_result: "Ready for freeze: YES"
+cachy_workstation_xdg_dirs:
+  - Desktop
+  - Documents
+  - Downloads
+  - Music
+  - Pictures
+  - Public
+  - Templates
+  - Videos

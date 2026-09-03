@@ -30,6 +30,7 @@ if command -v shellcheck >/dev/null; then
       -type f -name '*.sh' -print0
   )
   shellcheck -x \
+    "$PROJECT_ROOT/ansible/setup-controller.sh" \
     "$ROOT/bin/cachy-freeze" \
     "$ROOT/initcpio/cachy-freeze-reset" \
     "$ROOT/initcpio/install-hook" \
@@ -63,6 +64,8 @@ grep -q 'subvolume delete -i' "$ROOT/initcpio/cachy-freeze-reset"
 ! grep -q -- '--recursive' "$ROOT/initcpio/cachy-freeze-reset"
 ! grep -q '@active.previous' "$ROOT/initcpio/cachy-freeze-reset"
 grep -q 'cachy.freeze=1 fstab=no' "$ROOT/grub/99_cachy_freeze"
+grep -q 'cachy_remote_auth=0' "$ROOT/initcpio/cachy-freeze-reset"
+grep -q 'cachy_remote_auth' "$ROOT/grub/99_cachy_freeze"
 grep -q 'CACHYFREEZE_RECOVERY_MENU_BEGIN' "$ROOT/grub/09_cachy_recovery_begin"
 grep -q 'CACHYFREEZE_RECOVERY_MENU_END' "$ROOT/grub/98_cachy_recovery_end"
 grep -q 'class OperationJournal' "$PROJECT_ROOT/src/cachy_freeze/catalog.py"

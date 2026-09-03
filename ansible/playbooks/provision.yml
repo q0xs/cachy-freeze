@@ -1,0 +1,60 @@
+---
+- name: Provision CachyFreeze workstation from persistent THAWED root
+  hosts: all
+  become: true
+  gather_facts: true
+  serial: "{{ batch_size | default('100%') }}"
+
+  vars_prompt:
+    - name: cachy_freeze_boot_secret
+      prompt: "CachyFreeze GRUB maintenance password"
+      private: true
+
+  pre_tasks:
+    - name: Require Arch or CachyOS target
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution in ['Archlinux', 'CachyOS'] or ansible_facts.os_family == 'Archlinux'
+        fail_msg: "CachyFreeze fleet provisioning supports only Arch/CachyOS targets."
+
+  roles:
+    - role: localadm_bootstrap
+
+  tasks:
+    - name: Create remote CachyFreeze repository directory
+      ansible.builtin.file:
+        path: "{{ cachy_freeze_remote_repo }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Copy monorepo payload before workstation setup
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../"
+        dest: "{{ cachy_freeze_remote_repo }}/"
+        owner: root
+        group: root
+        mode: preserve
+
+    - name: Prepare employee workstation
+      ansible.builtin.include_role:
+        name: cachy_workstation
+
+    - name: Install CachyFreeze and create initial Golden baseline
+      ansible.builtin.include_role:
+        name: cachy_freeze
+        tasks_from: install.yml
+
+    - name: Reboot into initial FROZEN runtime
+      ansible.builtin.reboot:
+        reboot_timeout: "{{ cachy_freeze_reboot_timeout }}"
+        connect_timeout: "{{ cachy_freeze_connect_timeout }}"
+        post_reboot_delay: "{{ cachy_freeze_post_reboot_delay }}"
+
+    - name: Verify initial FROZEN boot
+      ansible.builtin.include_role:
+        name: cachy_freeze
+        tasks_from: verify.yml
+      vars:
+        cachy_freeze_expected_mode: frozen

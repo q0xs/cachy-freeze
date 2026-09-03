@@ -1,0 +1,10 @@
+---
+- name: Run workstation repair for employee
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/bash
+      - "{{ cachy_workstation_setup_path }}"
+      - --repair
+      - "{{ employee_user }}"
+  register: cachy_workstation_repair_result
+  changed_when: true

@@ -1,0 +1,21 @@
+---
+- name: Read CachyFreeze status JSON
+  ansible.builtin.command:
+    argv:
+      - "{{ cachy_freeze_cli }}"
+      - status
+  register: cachy_freeze_status_command
+  changed_when: false
+
+- name: Parse CachyFreeze status JSON
+  ansible.builtin.set_fact:
+    cachy_freeze_status_payload: "{{ cachy_freeze_status_command.stdout | from_json }}"
+    cachy_freeze_status: "{{ (cachy_freeze_status_command.stdout | from_json).result }}"
+
+- name: Require valid CachyFreeze status payload
+  ansible.builtin.assert:
+    that:
+      - cachy_freeze_status_payload.ok | bool
+      - cachy_freeze_status.running_mode in ['frozen', 'thawed']
+      - cachy_freeze_status.reboot_required is boolean
+    fail_msg: "CachyFreeze status did not return the expected JSON contract."

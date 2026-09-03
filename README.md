@@ -39,23 +39,23 @@ Unsupported layouts stop before CachyFreeze changes Btrfs or GRUB.
 ## Download
 
 Download both files from the
-[v1.0.0rc8 release candidate](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc8):
+[v1.0.0rc9 release candidate](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc9):
 
-- `CachyFreeze-Installer-1.0.0rc8.run`
-- `CachyFreeze-Installer-1.0.0rc8.run.sha256`
+- `CachyFreeze-Installer-1.0.0rc9.run`
+- `CachyFreeze-Installer-1.0.0rc9.run.sha256`
 
 Verify them:
 
 ```bash
 cd "$(xdg-user-dir DOWNLOAD)"
-sha256sum --check CachyFreeze-Installer-1.0.0rc8.run.sha256
-chmod 0755 CachyFreeze-Installer-1.0.0rc8.run
+sha256sum --check CachyFreeze-Installer-1.0.0rc9.run.sha256
+chmod 0755 CachyFreeze-Installer-1.0.0rc9.run
 ```
 
 Continue only if the checksum prints:
 
 ```text
-CachyFreeze-Installer-1.0.0rc8.run: OK
+CachyFreeze-Installer-1.0.0rc9.run: OK
 ```
 
 ## Fresh Employee Workstation
@@ -69,7 +69,7 @@ CachyFreeze-Installer-1.0.0rc8.run: OK
 5. Run the installer without `sudo`:
 
 ```bash
-./CachyFreeze-Installer-1.0.0rc8.run
+./CachyFreeze-Installer-1.0.0rc9.run
 ```
 
 6. Approve the PolicyKit prompt.
@@ -104,6 +104,41 @@ preselect the employee account.
 
 Never install, repair, or update Workstation while booted from FROZEN
 `@active`.
+
+## Remote Fleet Management with Ansible
+
+CachyFreeze includes a monorepo-managed Ansible control plane in `ansible/` for
+lab and production workstation fleets. A dedicated Arch/CachyOS controller can
+clone this repository and run:
+
+```bash
+cd ansible
+./setup-controller.sh
+```
+
+The controller uses `LocalAdm` over SSH, reads per-host employee identities such
+as `WRW21166` from `inventory/hosts.ini`, and runs playbooks with fleet tuning
+from `ansible.cfg` (`forks = 50`, SSH pipelining enabled). Lab defaults to
+`batch_size: "100%"`; production defaults to `batch_size: "20%"` for rolling
+updates across 200+ workstations.
+
+Common operations:
+
+```bash
+ansible-playbook playbooks/provision.yml --limit lab --ask-become-pass
+ansible-playbook playbooks/maintenance.yml --limit production
+ansible-playbook playbooks/status.yml --limit all
+```
+
+Remote maintenance uses `cachy-freeze thaw --authorized` to schedule one
+passwordless THAWED boot by setting `cachy_remote_auth=1` in GRUB. The THAWED
+boot verification service immediately consumes the flag by writing
+`cachy_remote_auth=0`, so the exception is one-time only. If update or
+Workstation validation fails, the maintenance playbook does not freeze the
+machine; it leaves the host THAWED and writes a failure marker for admin review.
+
+See [ansible/README.md](ansible/README.md) for inventory, role, emergency thaw,
+freeze, and lab-to-production rollout details.
 
 ## Installed App
 

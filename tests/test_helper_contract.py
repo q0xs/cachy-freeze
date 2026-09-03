@@ -33,7 +33,10 @@ class HelperContractTests(unittest.TestCase):
         self.assertIn("self.process.write", self.backend)
 
     def test_workstation_user_uses_stdin_and_embedded_payload(self) -> None:
+        workstation_common = (Path(__file__).parents[1] / "workstation/lib/common.sh").read_text()
         self.assertIn("read_target_user", self.source)
+        self.assertIn("^[a-zA-Z_][a-zA-Z0-9_-]{0,30}$", self.source)
+        self.assertIn("^[a-zA-Z_][a-zA-Z0-9_-]{0,30}$", workstation_common)
         self.assertIn('"$PROJECT_ROOT/workstation/bin/workstation-setup"', self.source)
         self.assertIn('"setup-workstation-install"', self.backend)
         self.assertIn('"setup-workstation-check"', self.backend)

@@ -1,0 +1,36 @@
+---
+- name: Read current mode before freeze
+  ansible.builtin.include_tasks: get_status.yml
+
+- name: Require THAWED before freeze
+  ansible.builtin.assert:
+    that:
+      - cachy_freeze_status.running_mode == 'thawed'
+    fail_msg: "Freeze is allowed only from verified THAWED mode."
+
+- name: Schedule FROZEN boot
+  ansible.builtin.command:
+    argv:
+      - "{{ cachy_freeze_cli }}"
+      - freeze
+  register: cachy_freeze_freeze_command
+  changed_when: true
+
+- name: Parse freeze result
+  ansible.builtin.set_fact:
+    cachy_freeze_freeze_result: "{{ (cachy_freeze_freeze_command.stdout | from_json).result }}"
+
+- name: Require freeze result
+  ansible.builtin.assert:
+    that:
+      - cachy_freeze_freeze_result.mode == 'frozen'
+      - cachy_freeze_freeze_result.reboot_required | bool
+
+- name: Reboot into FROZEN
+  ansible.builtin.reboot:
+    reboot_timeout: "{{ cachy_freeze_reboot_timeout }}"
+    connect_timeout: "{{ cachy_freeze_connect_timeout }}"
+    post_reboot_delay: "{{ cachy_freeze_post_reboot_delay }}"
+
+- name: Verify FROZEN boot
+  ansible.builtin.include_tasks: verify.yml

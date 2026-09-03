@@ -22,18 +22,18 @@ initramfs, or GRUB state.
 2. Create the administrator account.
 3. Create the employee account as a standard user.
 4. Log in once as the employee, then return to the administrator account.
-5. Download `CachyFreeze-Installer-1.0.0rc8.run` and its `.sha256` file.
+5. Download `CachyFreeze-Installer-1.0.0rc9.run` and its `.sha256` file.
 6. Verify the download:
 
 ```bash
-sha256sum --check CachyFreeze-Installer-1.0.0rc8.run.sha256
-chmod 0755 CachyFreeze-Installer-1.0.0rc8.run
+sha256sum --check CachyFreeze-Installer-1.0.0rc9.run.sha256
+chmod 0755 CachyFreeze-Installer-1.0.0rc9.run
 ```
 
 7. Start the installer without `sudo`:
 
 ```bash
-./CachyFreeze-Installer-1.0.0rc8.run
+./CachyFreeze-Installer-1.0.0rc9.run
 ```
 
 8. Approve the PolicyKit prompt.
@@ -78,7 +78,7 @@ The maintenance user is always `cachyadmin`.
 - THAWED is the only mode for updates, repairs, and Workstation changes.
 - Workstation health includes the employee account, applications, idle policy,
   and KDE login-screen preselection without automatic login.
-- The standalone `CachyWorkstation-Setup-1.0.1.run` remains available only for
+- The standalone `CachyWorkstation-Setup-1.0.2.run` remains available only for
   CLI-only deployments.
 
 ## Build

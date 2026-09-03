@@ -1,0 +1,23 @@
+---
+- name: Mark current boot successful
+  ansible.builtin.command:
+    argv:
+      - "{{ cachy_freeze_cli }}"
+      - boot-success
+  register: cachy_freeze_boot_success_command
+  changed_when: false
+
+- name: Parse boot-success result
+  ansible.builtin.set_fact:
+    cachy_freeze_boot_success: "{{ (cachy_freeze_boot_success_command.stdout | from_json).result }}"
+
+- name: Read status after boot-success
+  ansible.builtin.include_tasks: get_status.yml
+
+- name: Require expected mode and no pending reboot
+  ansible.builtin.assert:
+    that:
+      - cachy_freeze_status.running_mode == cachy_freeze_expected_mode
+      - cachy_freeze_status.scheduled_mode == cachy_freeze_expected_mode
+      - not cachy_freeze_status.reboot_required
+    fail_msg: "CachyFreeze did not verify the expected post-reboot mode."
