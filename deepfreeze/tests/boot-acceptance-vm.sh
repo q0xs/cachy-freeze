@@ -175,10 +175,11 @@ run_case() {
   build_case "$mode" "$case_root"
 
   # OVMF's emulated serial receiver can very rarely drop an input character
-  # even with deliberately slow input. Retry only the two observable transport
-  # symptoms: an incompletely echoed username, or an allowed-case denial. A
-  # real authentication regression still fails all three fresh-firmware
-  # attempts, while the passwordless case never retries.
+  # even with deliberately slow input. Retry only the observed transport
+  # symptoms: prompts timing out after partial input, an incompletely echoed
+  # username, or an allowed-case denial. A real authentication regression still
+  # fails all three fresh-firmware attempts, while the passwordless case never
+  # retries.
   if [[ -n $password ]]; then
     max_attempts=3
   fi
@@ -196,7 +197,8 @@ run_case() {
     if ((vm_status == 0)); then
       break
     fi
-    if (((vm_status != 47 && vm_status != 53) || attempt == max_attempts)); then
+    if (((vm_status != 42 && vm_status != 44 && vm_status != 47 && vm_status != 53) ||
+      attempt == max_attempts)); then
       return "$vm_status"
     fi
     printf 'RETRY: %s serial input attempt %d/%d was incomplete.\n' \

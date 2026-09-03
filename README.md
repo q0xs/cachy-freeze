@@ -38,7 +38,8 @@ Unsupported layouts stop before CachyFreeze changes Btrfs or GRUB.
 
 ## Download
 
-Download both files from the latest release:
+Download both files from the
+[v1.0.0rc8 release candidate](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc8):
 
 - `CachyFreeze-Installer-1.0.0rc8.run`
 - `CachyFreeze-Installer-1.0.0rc8.run.sha256`

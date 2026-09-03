@@ -4,6 +4,26 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-09-03 — GitHub release audit and GRUB VM retry hardening — local working tree
+
+- AUDITED — GitHub `main` and `v1.0.0rc8` now both show successful
+  `Statik kontroller` workflow runs after rerunning the transient tag failure.
+  The failed first tag attempt timed out while waiting for the GRUB password
+  prompt in the QEMU/OVMF serial console; the rerun passed on the same commit.
+- UPDATED — the GRUB UEFI VM test retry filter now treats timeout while waiting
+  for the password prompt as the same transient serial transport symptom as the
+  already-retried prompt/echo cases.
+- UPDATED — `README.md` names the `v1.0.0rc8` release candidate directly
+  instead of referring generically to the latest release, because GitHub's
+  latest-release endpoint does not resolve while all public releases are
+  pre-releases.
+- PASS — `bash -n deepfreeze/tests/boot-acceptance-vm.sh` and
+  `shellcheck deepfreeze/tests/boot-acceptance-vm.sh`.
+- PASS — `bash deepfreeze/tests/static.sh`.
+- NOT RUN — local `bash deepfreeze/tests/boot-acceptance-vm.sh`; this host is
+  missing `expect`. The GitHub workflow installs `expect`, OVMF, GRUB EFI
+  tools, and QEMU before running this acceptance test.
+
 ## 2026-09-03 — CachyFreeze v1.0.0rc8 release candidate — local working tree
 
 - UPDATED — release metadata is synchronized across `VERSION`,
