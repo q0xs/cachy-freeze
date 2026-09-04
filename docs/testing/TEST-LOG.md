@@ -4,6 +4,37 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-09-04 — CachyFreeze v1.0.0rc10 release candidate — local working tree
+
+- UPDATED — release metadata is prepared as `1.0.0rc10` so GitHub downloaders
+  receive the responsive PyQt6 UI layout fixes that landed after
+  `v1.0.0rc9`.
+- UPDATED — public download instructions in `README.md`, `KURULUM-TR.md`,
+  `docs/installation.md`, and `docs/workstation-provisioning.md` point to the
+  `v1.0.0rc10` release candidate assets.
+- PASS — `ruff check .` and `ruff format --check src app/cachy_freeze_gui
+  tests`.
+- PASS — `PYTHONPATH=src:app QT_QPA_PLATFORM=offscreen python -m unittest
+  discover -s tests -v`: 75 tests passed.
+- PASS — `SHELLCHECK_OPTS=--severity=error bash deepfreeze/tests/static.sh`,
+  `QT_QPA_PLATFORM=offscreen bash deepfreeze/tests/ui-smoke.sh`,
+  `bash deepfreeze/tests/grub-generation.sh`, and
+  `bash workstation/tests/static.sh`.
+- PASS — `PATH=/tmp/cachy-freeze-ansible-venv/bin:$PATH bash
+  ansible/test-syntax.sh`: all five playbooks passed syntax check. The sample
+  inventory still emits the expected empty-host warning because all example
+  hosts are commented.
+- PASS — two consecutive `bash packaging/build-installer.sh` runs produced the
+  same `dist/CachyFreeze-Installer-1.0.0rc10.run`; its checksum sidecar verified
+  with `sha256sum --check`.
+- PASS — two consecutive `bash packaging/build-workstation-installer.sh` runs
+  produced the same `dist/CachyWorkstation-Setup-1.0.2.run`; its checksum
+  sidecar verified with `sha256sum --check`.
+- PASS — extracted `dist/CachyFreeze-Installer-1.0.0rc10.run` payload contains
+  `VERSION` as `1.0.0rc10` and the responsive UI layout code.
+- NOT RUN — local Docker Compose config; Docker is not installed on this
+  workstation. The GitHub workflow validates the Compose file with Docker.
+
 ## 2026-09-04 — GUI responsive layout hardening — local working tree
 
 - FIXED — the PyQt6 manager and installer pages now use a scrollable viewport

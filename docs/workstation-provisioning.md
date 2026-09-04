@@ -55,8 +55,8 @@ sha256sum --check CachyWorkstation-Setup-1.0.2.run.sha256
 
 Published binaries and checksums for the current Workstation payload are
 attached to the latest
-[CachyFreeze v1.0.0rc9
-release](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc9).
+[CachyFreeze v1.0.0rc10
+release](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc10).
 
 ## CLI
 
