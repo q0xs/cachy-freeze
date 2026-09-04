@@ -14,12 +14,18 @@ python - <<'PY'
 from pathlib import Path
 from unittest.mock import Mock
 
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QPushButton, QScrollArea
 
 from cachy_freeze_gui.backend import BackendClient
 from cachy_freeze_gui.window import MainWindow
 
 application = QApplication([])
+
+
+def assert_button_content_fits(button):
+    assert button.height() >= button.sizeHint().height()
+    assert button.width() >= button.minimumWidth()
 
 backend = BackendClient()
 backend.refresh_local = Mock()
@@ -40,6 +46,15 @@ window._status_changed(
 assert window.mode_label.text() == "FROZEN"
 assert window.thaw_button.isEnabled()
 assert not window.freeze_button.isEnabled()
+window.resize(420, 420)
+window.show()
+application.processEvents()
+assert isinstance(window.centralWidget(), QScrollArea)
+assert window.centralWidget().widgetResizable()
+assert window.centralWidget().horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+for button in window.findChildren(QPushButton):
+    if button.isVisible():
+        assert_button_content_fits(button)
 window.close()
 
 installer_backend = BackendClient(setup_root=Path("."))
@@ -50,6 +65,15 @@ assert installer.install_button.text() == "INSTALL CACHYFREEZE"
 assert not hasattr(installer, "freeze_button")
 assert installer._strong_password("Correct-Horse-42")
 assert not installer._strong_password("short")
+installer.resize(420, 420)
+installer.show()
+application.processEvents()
+assert isinstance(installer.centralWidget(), QScrollArea)
+assert installer.centralWidget().widgetResizable()
+assert installer.centralWidget().horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+for button in installer.findChildren(QPushButton):
+    if button.isVisible():
+        assert_button_content_fits(button)
 installer.close()
 application.quit()
 PY

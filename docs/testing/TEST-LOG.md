@@ -4,6 +4,28 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-09-04 — GUI responsive layout hardening — local working tree
+
+- FIXED — the PyQt6 manager and installer pages now use a scrollable viewport
+  with horizontal scrolling disabled, compact margins, content-derived button
+  minimum sizes, and size policies that allow controls to grow with font/DPI
+  instead of clipping text vertically.
+- UPDATED — mode badge, password fields, employee field, Workstation controls,
+  and report area sizing now keep text readable in compact windows while
+  preserving the existing Current Mode behavior and the two-mode
+  FROZEN/THAWED product surface.
+- VERIFIED — generated offscreen screenshots at normal and compact sizes showed
+  readable button labels, no overlapping Current Mode text, and no horizontal
+  overflow.
+- PASS — `ruff check .`.
+- PASS — `ruff format --check src app/cachy_freeze_gui tests`.
+- PASS — `PYTHONPATH=src:app QT_QPA_PLATFORM=offscreen python -m unittest
+  discover -s tests -v`: 75 tests passed, including layout regression coverage
+  for compact manager and installer windows.
+- PASS — `QT_QPA_PLATFORM=offscreen bash deepfreeze/tests/ui-smoke.sh`.
+- NOT RUN — live installed GUI replacement, reboot, freeze, thaw, or physical
+  lifecycle testing. This pass changed and verified source/UI layout only.
+
 ## 2026-09-03 — Ansible syntax and Semaphore UI integration — local working tree
 
 - FIXED — `ansible/roles/cachy_freeze/tasks/thaw.yml` now runs
