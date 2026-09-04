@@ -74,11 +74,11 @@ CachyFreeze-Installer-1.0.0rc10.run: OK
 
 6. Approve the PolicyKit prompt.
 7. Enter the employee username.
-8. Click **INSTALL / REPAIR WORKSTATION**.
+8. Click **INSTALL / REPAIR**.
 9. Log in as the employee and open these apps once:
    Google Chrome, LibreOffice, AnyDesk, Zoiper, MicroSIP.
 10. Return to the administrator account.
-11. Enter the employee username again and click **CHECK WORKSTATION**.
+11. Enter the employee username again and click **CHECK**.
 12. Continue only if the check reports `OVERALL: PASS` and
     `Ready for freeze: YES`. The check includes the KDE login screen
     preselecting the employee account without automatic login, plus the
@@ -97,7 +97,7 @@ preselect the employee account.
 3. Click **REBOOT NOW**.
 4. Confirm the app shows **THAWED** after reboot.
 5. Install or repair Workstation from the app.
-6. Run **CHECK WORKSTATION**.
+6. Run **CHECK**.
 7. Test the five employee apps manually.
 8. Click **FREEZE COMPUTER**.
 9. Click **REBOOT NOW**.
@@ -202,3 +202,6 @@ bash workstation/tests/static.sh
 More detail is in [docs/installation.md](docs/installation.md),
 [docs/workstation-provisioning.md](docs/workstation-provisioning.md), and
 [docs/architecture.md](docs/architecture.md).
+
+For the next maintenance or AI-coder pass, start with
+[docs/ai-coder-handoff.md](docs/ai-coder-handoff.md).

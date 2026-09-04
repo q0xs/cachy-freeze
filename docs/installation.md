@@ -37,10 +37,10 @@ chmod 0755 CachyFreeze-Installer-1.0.0rc10.run
 ```
 
 8. Approve the PolicyKit prompt.
-9. Enter the employee username and click **INSTALL / REPAIR WORKSTATION**.
+9. Enter the employee username and click **INSTALL / REPAIR**.
 10. Log in as the employee and open Chrome, LibreOffice, AnyDesk, Zoiper, and
     MicroSIP once.
-11. Return to the administrator account and click **CHECK WORKSTATION**.
+11. Return to the administrator account and click **CHECK**.
 12. Continue only if it reports `OVERALL: PASS` and `Ready for freeze: YES`.
     The graphical installer keeps **INSTALL CACHYFREEZE** disabled until this
     final check passes for the selected employee.

@@ -11,9 +11,9 @@ Dogru sira sudur:
 1. CachyOS kur.
 2. Calisan kullaniciyi standart kullanici olarak olustur.
 3. `CachyFreeze-Installer-1.0.0rc10.run` dosyasini indir.
-4. Installer icinden **INSTALL / REPAIR WORKSTATION** calistir.
+4. Installer icinden **INSTALL / REPAIR** calistir.
 5. Calisan hesabinda uygulamalari elle test et.
-6. Installer icinden **CHECK WORKSTATION** calistir.
+6. Installer icinden **CHECK** calistir.
 7. Her sey PASS ise **INSTALL CACHYFREEZE** calistir. PASS olmadan bu adim
    uygulama icinde kapali kalir.
 8. Yeniden baslat ve status bolumunde **FROZEN** durumunu kontrol et.
@@ -108,7 +108,7 @@ Acik pencerede:
 
 1. PolicyKit yonetici onayini verin.
 2. **Employee username** alanina calisan kullanici adini yazin.
-3. **INSTALL / REPAIR WORKSTATION** dugmesine basin.
+3. **INSTALL / REPAIR** dugmesine basin.
 4. Islem bitene kadar pencereyi kapatmayin.
 
 Bu adim Google Chrome, LibreOffice, AnyDesk, Zoiper, MicroSIP/Wine,
@@ -122,7 +122,7 @@ OVERALL: PASS
 READY FOR FREEZE
 ```
 
-FAIL gorurseniz **INSTALL / REPAIR WORKSTATION** dugmesine tekrar basin.
+FAIL gorurseniz **INSTALL / REPAIR** dugmesine tekrar basin.
 
 ## 6. Uygulamalari Elle Test Et
 
@@ -148,7 +148,7 @@ cd "$HOME/CachyKurulum"
 Sonra:
 
 1. **Employee username** alanina calisan kullanici adini yazin.
-2. **CHECK WORKSTATION** dugmesine basin.
+2. **CHECK** dugmesine basin.
 
 Devam etmek icin sonuc mutlaka su olmali:
 
@@ -209,7 +209,7 @@ subvolume'unun Golden'dan yeniden olusturulmasidir.
 2. **THAW COMPUTER** dugmesine basin.
 3. **REBOOT NOW** ile yeniden baslatin.
 4. Uygulama **THAWED** gosterince Workstation kurulum/repair yapin.
-5. **CHECK WORKSTATION** PASS olsun.
+5. **CHECK** PASS olsun.
 6. Calisan uygulamalarini elle test edin.
 7. **FREEZE COMPUTER** yapin.
 8. **REBOOT NOW** ile FROZEN moda donun.

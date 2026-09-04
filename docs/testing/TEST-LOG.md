@@ -4,6 +4,25 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-09-04 — AI coder handoff and UI label documentation sync — local working tree
+
+- UPDATED — `README.md`, `KURULUM-TR.md`, and `docs/installation.md` now match
+  the compact UI button labels `INSTALL / REPAIR` and `CHECK`.
+- ADDED — `docs/ai-coder-handoff.md` with the current rc10/prerelease posture,
+  safe validation commands, Semaphore live-test plan, product boundaries, and
+  known intentional gaps for later Codex or AI-coder sessions.
+- PASS — `ruff check .` and `ruff format --check src app/cachy_freeze_gui
+  tests`.
+- PASS — `PYTHONPATH=src:app QT_QPA_PLATFORM=offscreen python -m unittest
+  discover -s tests -v`: 75 tests passed.
+- PASS — `PATH=/tmp/cachy-freeze-ansible-venv/bin:$PATH bash
+  ansible/test-syntax.sh`: all five playbooks passed syntax check. The sample
+  inventory still emits the expected empty-host warning because all example
+  hosts are commented.
+- PASS — `git diff --check`.
+- NOT RUN — local Docker Compose config or live Semaphore startup; Docker is
+  not installed on this workstation.
+
 ## 2026-09-04 — CachyFreeze v1.0.0rc10 release candidate — local working tree
 
 - UPDATED — release metadata is prepared as `1.0.0rc10` so GitHub downloaders

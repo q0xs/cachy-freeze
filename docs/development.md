@@ -46,3 +46,7 @@ checks `NOT RUN` or `BLOCKED`; do not infer success from source inspection.
 
 Before completion inspect `git status`, `git diff`, and `git diff --check`, scan
 for secrets and temporary artifacts, and preserve unrelated user changes.
+
+For a compact handoff to a later Codex or AI-coder session, read
+`docs/ai-coder-handoff.md` before changing release, UI, Ansible, or Semaphore
+behavior.
