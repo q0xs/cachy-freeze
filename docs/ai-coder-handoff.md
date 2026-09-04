@@ -27,6 +27,39 @@ layout fixes. The UI keeps short button labels for compact windows:
 Do not rename these back to longer labels unless the layout is revalidated at
 compact and high-DPI sizes.
 
+## Stable release gate
+
+Keep the project in prerelease status until Ansible fleet management and
+Semaphore UI operation have been tested on real approved targets. Before a
+stable `v1.0.0` release, complete and record these checks:
+
+1. Run the full non-destructive local test set.
+2. Run the GitHub Actions workflow to completion on `main`.
+3. Test `ansible/test-syntax.sh` and the Semaphore Compose config.
+4. Start Semaphore on an approved Master PC.
+5. Create the documented Semaphore project, key store, repository, inventory,
+   variable group, and task templates.
+6. Run `Filo Durumu` against a lab inventory.
+7. Run `Gece Bakimi` against lab before any production schedule.
+8. Validate at least one disposable VM or approved pilot PC through the full
+   install/reboot/FROZEN reset/THAWED persistence/FREEZE lifecycle.
+
+Do not cut stable `v1.0.0` from source review alone. The stable release should
+follow executed lab evidence.
+
+## Release asset signing note
+
+Current release assets have SHA-256 sidecar files. SHA-256 confirms that a
+downloaded file matches the published checksum, but it does not prove authorship
+if an attacker can replace both the installer and the checksum.
+
+Before stable `v1.0.0`, decide whether to add Minisign or GPG signatures for
+release assets. This would let users verify that the installer was signed by the
+project's private release key, not only that the download matches a checksum.
+For a 200-300 PC fleet where the installer runs with root privileges, signatures
+are a useful release-hardening improvement. They are not required for the
+current prerelease stage unless the operator chooses to add them earlier.
+
 ## Product boundaries
 
 - The product has only two runtime modes: FROZEN and THAWED.
@@ -168,5 +201,5 @@ inventory, repository files, task logs, or screenshots.
   the fleet controller is ready.
 - After one successful disposable VM or pilot-PC lifecycle pass, decide whether
   to publish stable `v1.0.0`.
-- Decide whether release assets need signatures in addition to SHA-256 sidecar
-  files.
+- Before stable `v1.0.0`, decide whether release assets need Minisign or GPG
+  signatures in addition to SHA-256 sidecar files.

@@ -4,6 +4,17 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-09-04 — Stable release gate documentation — local working tree
+
+- UPDATED — `docs/ai-coder-handoff.md` now explicitly keeps the project in
+  prerelease status until Ansible fleet management, Semaphore UI operation, and
+  disposable VM or approved pilot-PC lifecycle validation are executed and
+  recorded.
+- ADDED — a release asset signing note explaining that SHA-256 verifies file
+  integrity, while Minisign or GPG signatures would also verify release
+  authorship before a stable `v1.0.0` rollout.
+- NOT RUN — code tests for this note-only documentation update.
+
 ## 2026-09-04 — AI coder handoff and UI label documentation sync — local working tree
 
 - UPDATED — `README.md`, `KURULUM-TR.md`, and `docs/installation.md` now match
