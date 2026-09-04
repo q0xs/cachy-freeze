@@ -32,6 +32,15 @@ Never record passwords, hashes, tokens, device UUIDs, or private user data.
   sidecar verified with `sha256sum --check`.
 - PASS — extracted `dist/CachyFreeze-Installer-1.0.0rc10.run` payload contains
   `VERSION` as `1.0.0rc10` and the responsive UI layout code.
+- PASS — GitHub Actions run 33862384132 passed all three jobs for commit
+  `3e4bb23`: `static-tests`, `workstation-static`, and `grub-uefi-vm`.
+- PUBLISHED — GitHub prerelease `v1.0.0rc10` contains
+  `CachyFreeze-Installer-1.0.0rc10.run`,
+  `CachyFreeze-Installer-1.0.0rc10.run.sha256`,
+  `CachyWorkstation-Setup-1.0.2.run`, and
+  `CachyWorkstation-Setup-1.0.2.run.sha256`.
+- PASS — the published GitHub release assets were downloaded into a temporary
+  directory and both checksum sidecars verified with `sha256sum --check`.
 - NOT RUN — local Docker Compose config; Docker is not installed on this
   workstation. The GitHub workflow validates the Compose file with Docker.
 
