@@ -38,6 +38,12 @@ Unsupported layouts stop before CachyFreeze changes Btrfs or GRUB.
 
 ## Download
 
+rc11 bundles CachyWorkstation 1.0.3, adds Slack to employee installation and
+readiness checks, and fixes the KDE idle-agent configuration warning at login.
+The 60-minute lock and 120-minute poweroff policy stays the same. This is a
+prerelease; use the [Turkish laptop pilot guide](docs/testing/PILOT-RC11-TR.md)
+to validate login, all six apps, and freeze/thaw behavior on the target laptop.
+
 Download both files from the
 [v1.0.0rc11 release candidate](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc11):
 

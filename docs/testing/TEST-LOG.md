@@ -4,6 +4,31 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-09-13 — rc11 GitHub publication and verification
+
+Target: `main` implementation commit `2c012dd`, tagged `v1.0.0rc11`.
+
+- PASS — [GitHub Actions run 34781779232](https://github.com/q0xs/cachy-freeze/actions/runs/34781779232)
+  completed successfully with all three jobs: `workstation-static`,
+  `static-tests`, and `grub-uefi-vm`.
+- PASS — CI executed the Workstation regression tests and reproducible build;
+  Python/GUI quality and tests; Bash/static, Ansible syntax and Semaphore
+  Compose validation; isolated GRUB generation; disposable Btrfs engine/reset
+  integration; and QEMU/OVMF FROZEN/protected-THAWED GRUB acceptance.
+- PASS — rebuilt both installers from the pushed implementation and compared
+  them byte for byte with the locally tested artifacts; both matched.
+- PUBLISHED — [CachyFreeze v1.0.0rc11 prerelease](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc11)
+  with the graphical rc11 installer, standalone Workstation 1.0.3 installer,
+  and both SHA-256 sidecars. No stable release was published.
+- PASS — downloaded all four assets from the public release; all matched the
+  local verified files byte for byte and both downloaded sidecars passed
+  `sha256sum --check`.
+- UPDATED — README, current installation references, and AI-coder handoff
+  describe the rc11 changes, upgrade procedure, published assets, and pilot guide.
+- NOT RUN — physical laptop login, Slack application launch, real 60/120-minute
+  idle duration, full physical install/freeze/thaw/reboot lifecycle, and live
+  Semaphore operation. These remain operator pilot tasks.
+
 ## 2026-09-13 — rc11 Workstation startup and Slack — local CachyOS checkout
 
 Target: unprivileged checkout based on `3336b24`, prepared as CachyFreeze
@@ -60,7 +85,8 @@ physical boot configuration was changed.
   root-only Btrfs/initramfs integration, QEMU/OVMF, Docker Compose and live
   Semaphore. The operator will test the prepared installer on a separate
   laptop. These local tests do not establish physical acceptance.
-- PENDING — GitHub authentication, push, Actions and prerelease publication.
+- At this local checkpoint GitHub authentication, push, Actions and prerelease
+  publication were pending; their completed results are recorded above.
   This entry records local results only; no stable release is declared.
 
 ## 2026-09-04 — Stable release gate documentation — local working tree

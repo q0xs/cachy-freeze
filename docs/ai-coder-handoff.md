@@ -9,11 +9,11 @@ validated on this workstation, and the safe next steps.
 - Repository: `https://github.com/q0xs/cachy-freeze`
 - Default branch: `main`
 - Current source version: `1.0.0rc11`
-- Prepared release candidate: `v1.0.0rc11`; GitHub publication awaits operator
-  authentication. The current public release remains `v1.0.0rc10` until then.
+- Published release candidate: [v1.0.0rc11](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc11),
+  built from `2c012dd` and verified by downloading all four public assets.
 - Release status: prerelease by choice. Do not publish stable `v1.0.0` unless
   the operator explicitly requests it after pilot validation.
-- Prepared installer asset:
+- Published installer asset:
   `CachyFreeze-Installer-1.0.0rc11.run`
 - Workstation payload asset:
   `CachyWorkstation-Setup-1.0.3.run`
@@ -115,8 +115,11 @@ The current repository has test coverage for:
 - QEMU/OVMF GRUB authentication boundary in GitHub Actions.
 - Reproducible single-file installer builds and checksum sidecars.
 
-The latest known successful GitHub Actions workflow was `Statik kontroller` on
-`main` after the rc10 release-verification documentation update.
+The rc11 implementation at `2c012dd` passed all three jobs in
+[GitHub Actions run 34781779232](https://github.com/q0xs/cachy-freeze/actions/runs/34781779232)
+on `main`: Workstation tests and reproducible build, static/Python/Ansible/Compose
+checks and disposable Btrfs integrations, and the QEMU/OVMF GRUB acceptance test.
+These CI results do not replace the physical laptop pilot.
 
 ## Local validation commands
 
@@ -189,7 +192,7 @@ inventory, repository files, task logs, or screenshots.
 
 - The current public release is still a prerelease. GitHub's stable "latest
   release" API may not resolve while all public releases are prereleases. Use
-  the direct release-tag URL; `v1.0.0rc11` becomes available after publication.
+  the direct release-tag URL for `v1.0.0rc11`.
 - A full physical install/reboot/FROZEN reset/THAWED persistence lifecycle test
   requires a disposable CachyOS VM or approved pilot PC with a restorable disk
   snapshot.
