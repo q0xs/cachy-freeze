@@ -126,6 +126,7 @@ main() {
   run_step "Official dependencies" install_base_packages
   run_step "Google Chrome" install_chrome
   run_step "LibreOffice" install_libreoffice
+  run_step "Slack" install_slack
   run_step "AnyDesk" install_anydesk
   run_step "Zoiper" install_zoiper
   run_step "Wine and MicroSIP" install_microsip_for_target
@@ -142,7 +143,7 @@ main() {
 
   if (( health_result == 0 && summary_result == 0 )); then
     printf ' READY FOR FREEZE\n'
-    printf ' Run CachyFreeze only after manually opening and testing all five applications.\n'
+    printf ' Run CachyFreeze only after manually opening and testing all six applications.\n'
     printf '========================================\n'
     log_event PASS "provisioning complete; ready for manual app test and freeze"
     return 0

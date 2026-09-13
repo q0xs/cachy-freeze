@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Slack
+Comment=Team messaging and collaboration
+Exec=/usr/bin/slack --gtk-version=3 %U
+TryExec=/usr/bin/slack
+Icon=slack
+Terminal=false
+StartupNotify=true
+StartupWMClass=Slack
+Categories=Network;InstantMessaging;
+MimeType=x-scheme-handler/slack;
+X-CachyWorkstation-Managed=true

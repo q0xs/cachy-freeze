@@ -60,6 +60,32 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(SUPERVISOR.ConfigurationError):
             SUPERVISOR.read_config(path, require_root_owner=False, verify_account=False)
 
+    def test_accepts_corporate_uppercase_username(self) -> None:
+        path = self.write_config(
+            "TARGET_USER=WRW21166\n"
+            "TARGET_UID=1001\n"
+            "TARGET_GID=1001\n"
+            "TARGET_HOME=/home/WRW21166\n"
+            "LOCK_SECONDS=3600\n"
+            "SHUTDOWN_SECONDS=7200\n"
+        )
+        config = SUPERVISOR.read_config(path, require_root_owner=False, verify_account=False)
+        self.assertEqual(config.username, "WRW21166")
+
+    def test_rejects_unsafe_username(self) -> None:
+        for username in ("../employee", "-employee", "employee name", "a" * 32):
+            with self.subTest(username=username):
+                path = self.write_config(
+                    f"TARGET_USER={username}\n"
+                    "TARGET_UID=1001\n"
+                    "TARGET_GID=1001\n"
+                    "TARGET_HOME=/home/employee\n"
+                    "LOCK_SECONDS=3600\n"
+                    "SHUTDOWN_SECONDS=7200\n"
+                )
+                with self.assertRaises(SUPERVISOR.ConfigurationError):
+                    SUPERVISOR.read_config(path, require_root_owner=False, verify_account=False)
+
     def test_rejects_shutdown_before_lock(self) -> None:
         path = self.write_config(
             "TARGET_USER=wrw1166\n"

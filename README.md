@@ -39,23 +39,23 @@ Unsupported layouts stop before CachyFreeze changes Btrfs or GRUB.
 ## Download
 
 Download both files from the
-[v1.0.0rc10 release candidate](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc10):
+[v1.0.0rc11 release candidate](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc11):
 
-- `CachyFreeze-Installer-1.0.0rc10.run`
-- `CachyFreeze-Installer-1.0.0rc10.run.sha256`
+- `CachyFreeze-Installer-1.0.0rc11.run`
+- `CachyFreeze-Installer-1.0.0rc11.run.sha256`
 
 Verify them:
 
 ```bash
 cd "$(xdg-user-dir DOWNLOAD)"
-sha256sum --check CachyFreeze-Installer-1.0.0rc10.run.sha256
-chmod 0755 CachyFreeze-Installer-1.0.0rc10.run
+sha256sum --check CachyFreeze-Installer-1.0.0rc11.run.sha256
+chmod 0755 CachyFreeze-Installer-1.0.0rc11.run
 ```
 
 Continue only if the checksum prints:
 
 ```text
-CachyFreeze-Installer-1.0.0rc10.run: OK
+CachyFreeze-Installer-1.0.0rc11.run: OK
 ```
 
 ## Fresh Employee Workstation
@@ -69,14 +69,14 @@ CachyFreeze-Installer-1.0.0rc10.run: OK
 5. Run the installer without `sudo`:
 
 ```bash
-./CachyFreeze-Installer-1.0.0rc10.run
+./CachyFreeze-Installer-1.0.0rc11.run
 ```
 
 6. Approve the PolicyKit prompt.
 7. Enter the employee username.
 8. Click **INSTALL / REPAIR**.
 9. Log in as the employee and open these apps once:
-   Google Chrome, LibreOffice, AnyDesk, Zoiper, MicroSIP.
+   Google Chrome, LibreOffice, Slack, AnyDesk, Zoiper, MicroSIP.
 10. Return to the administrator account.
 11. Enter the employee username again and click **CHECK**.
 12. Continue only if the check reports `OVERALL: PASS` and
@@ -98,12 +98,18 @@ preselect the employee account.
 4. Confirm the app shows **THAWED** after reboot.
 5. Install or repair Workstation from the app.
 6. Run **CHECK**.
-7. Test the five employee apps manually.
+7. Test the six employee apps manually.
 8. Click **FREEZE COMPUTER**.
 9. Click **REBOOT NOW**.
 
 Never install, repair, or update Workstation while booted from FROZEN
 `@active`.
+
+When upgrading from an older release, use the newly downloaded `.run`
+installer after entering THAWED. Its **INSTALL / REPAIR** and **CHECK** use the
+new bundled Workstation payload. After testing the six apps, use **INSTALL
+CACHYFREEZE** in that installer to update the installed payload and prepare the
+new FROZEN baseline. The older installed app still contains its older recipes.
 
 ## Remote Fleet Management with Ansible
 

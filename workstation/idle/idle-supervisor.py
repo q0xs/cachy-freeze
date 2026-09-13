@@ -109,7 +109,7 @@ def read_config(
         raise ConfigurationError(
             f"configuration keys differ; missing={missing}, unexpected={unexpected}"
         )
-    if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,30}", values["TARGET_USER"]):
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]{0,30}", values["TARGET_USER"]):
         raise ConfigurationError("invalid target username")
     if not re.fullmatch(r"/home/[A-Za-z0-9._-]+", values["TARGET_HOME"]):
         raise ConfigurationError("invalid target home")

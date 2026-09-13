@@ -10,7 +10,7 @@ Dogru sira sudur:
 
 1. CachyOS kur.
 2. Calisan kullaniciyi standart kullanici olarak olustur.
-3. `CachyFreeze-Installer-1.0.0rc10.run` dosyasini indir.
+3. `CachyFreeze-Installer-1.0.0rc11.run` dosyasini indir.
 4. Installer icinden **INSTALL / REPAIR** calistir.
 5. Calisan hesabinda uygulamalari elle test et.
 6. Installer icinden **CHECK** calistir.
@@ -69,22 +69,22 @@ mkdir -p "$HOME/CachyKurulum"
 cd "$HOME/CachyKurulum"
 
 curl --fail --location --retry 3 --remote-name \
-  "https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc10/CachyFreeze-Installer-1.0.0rc10.run"
+  "https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc11/CachyFreeze-Installer-1.0.0rc11.run"
 curl --fail --location --retry 3 --remote-name \
-  "https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc10/CachyFreeze-Installer-1.0.0rc10.run.sha256"
+  "https://github.com/q0xs/cachy-freeze/releases/download/v1.0.0rc11/CachyFreeze-Installer-1.0.0rc11.run.sha256"
 ```
 
 ## 4. Dosyayi Dogrula
 
 ```bash
 cd "$HOME/CachyKurulum"
-sha256sum --check CachyFreeze-Installer-1.0.0rc10.run.sha256
+sha256sum --check CachyFreeze-Installer-1.0.0rc11.run.sha256
 ```
 
 Sonuc su olmali:
 
 ```text
-CachyFreeze-Installer-1.0.0rc10.run: OK
+CachyFreeze-Installer-1.0.0rc11.run: OK
 ```
 
 `FAILED` gorurseniz kurulum yapmayin. Dosyalari silip tekrar indirin.
@@ -92,7 +92,7 @@ CachyFreeze-Installer-1.0.0rc10.run: OK
 Calistirma izni verin:
 
 ```bash
-chmod 0755 CachyFreeze-Installer-1.0.0rc10.run
+chmod 0755 CachyFreeze-Installer-1.0.0rc11.run
 ```
 
 ## 5. Workstation'i Kur
@@ -101,7 +101,7 @@ Installer'i `sudo` ile baslatmayin:
 
 ```bash
 cd "$HOME/CachyKurulum"
-./CachyFreeze-Installer-1.0.0rc10.run
+./CachyFreeze-Installer-1.0.0rc11.run
 ```
 
 Acik pencerede:
@@ -111,7 +111,7 @@ Acik pencerede:
 3. **INSTALL / REPAIR** dugmesine basin.
 4. Islem bitene kadar pencereyi kapatmayin.
 
-Bu adim Google Chrome, LibreOffice, AnyDesk, Zoiper, MicroSIP/Wine,
+Bu adim Google Chrome, LibreOffice, Slack, AnyDesk, Zoiper, MicroSIP/Wine,
 masaustu kisayollari, login ekraninda calisan hesabinin secili gelmesini ve
 60/120 dakika bosta kalma politikasini kurar.
 
@@ -133,6 +133,7 @@ Calisan hesabina girin ve su uygulamalari tek tek acin:
 3. AnyDesk
 4. Zoiper
 5. MicroSIP
+6. Slack
 
 Kisayollar hem masaustunde hem de uygulama menusunde gorunmelidir.
 
@@ -142,7 +143,7 @@ Yonetici hesabina donun. Installer penceresi kapaliysa tekrar acin:
 
 ```bash
 cd "$HOME/CachyKurulum"
-./CachyFreeze-Installer-1.0.0rc10.run
+./CachyFreeze-Installer-1.0.0rc11.run
 ```
 
 Sonra:
@@ -204,6 +205,17 @@ Aktif verileri temizleyen guvenli adim poweroff/reboot sonrasi FROZEN `@active`
 subvolume'unun Golden'dan yeniden olusturulmasidir.
 
 ## Mevcut CachyFreeze Kuruluysa
+
+Eski surumden bu surume geciyorsaniz THAWED moda geldikten sonra yeni
+`CachyFreeze-Installer-1.0.0rc11.run` dosyasini acin. Yeni installer icinden
+**INSTALL / REPAIR** calistirin, Slack dahil alti uygulamayi calisan hesabinda
+test edin ve **CHECK** sonucunun PASS oldugunu dogrulayin. Ardindan ayni
+installer'da GRUB bakim parolasini girip **INSTALL CACHYFREEZE** calistirin.
+Boylece kurulu uygulamanin Workstation dosyalari da guncellenir ve yeni
+FROZEN temel durumu hazirlanir. Basari sonrasi **REBOOT NOW** ile donun.
+Eski kurulu uygulamanin INSTALL / REPAIR dugmesi eski paket tariflerini kullanir.
+
+Ayni surumde rutin bakim icin:
 
 1. CachyFreeze'i acin.
 2. **THAW COMPUTER** dugmesine basin.

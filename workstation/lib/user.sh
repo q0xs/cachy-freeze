@@ -219,6 +219,7 @@ install_user_launchers() {
   done <<'EOF'
 google-chrome|Google Chrome
 libreoffice|LibreOffice
+slack|Slack
 anydesk|AnyDesk
 zoiper|Zoiper
 microsip|MicroSIP

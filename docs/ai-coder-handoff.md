@@ -8,18 +8,22 @@ validated on this workstation, and the safe next steps.
 
 - Repository: `https://github.com/q0xs/cachy-freeze`
 - Default branch: `main`
-- Current source version: `1.0.0rc10`
-- Current public release candidate:
-  `https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc10`
+- Current source version: `1.0.0rc11`
+- Prepared release candidate: `v1.0.0rc11`; GitHub publication awaits operator
+  authentication. The current public release remains `v1.0.0rc10` until then.
 - Release status: prerelease by choice. Do not publish stable `v1.0.0` unless
   the operator explicitly requests it after pilot validation.
-- Public installer asset:
-  `CachyFreeze-Installer-1.0.0rc10.run`
+- Prepared installer asset:
+  `CachyFreeze-Installer-1.0.0rc11.run`
 - Workstation payload asset:
-  `CachyWorkstation-Setup-1.0.2.run`
+  `CachyWorkstation-Setup-1.0.3.run`
 
-`v1.0.0rc10` exists mainly so GitHub downloaders receive the responsive PyQt6 UI
-layout fixes. The UI keeps short button labels for compact windows:
+`v1.0.0rc11` adds Slack to Workstation installation, launchers and readiness
+checks, fixes the KDE idle-agent warning caused by the intentionally read-only
+home, and accepts corporate uppercase usernames consistently in the GUI and
+idle supervisor. The bundled Workstation version is `1.0.3`.
+
+The UI keeps the responsive layout and short labels for compact windows:
 
 - `INSTALL / REPAIR`
 - `CHECK`
@@ -185,7 +189,7 @@ inventory, repository files, task logs, or screenshots.
 
 - The current public release is still a prerelease. GitHub's stable "latest
   release" API may not resolve while all public releases are prereleases. Use
-  the direct `v1.0.0rc10` URL until a stable release is intentionally published.
+  the direct release-tag URL; `v1.0.0rc11` becomes available after publication.
 - A full physical install/reboot/FROZEN reset/THAWED persistence lifecycle test
   requires a disposable CachyOS VM or approved pilot PC with a restorable disk
   snapshot.

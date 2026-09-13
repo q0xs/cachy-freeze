@@ -4,6 +4,65 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-09-13 — rc11 Workstation startup and Slack — local CachyOS checkout
+
+Target: unprivileged checkout based on `3336b24`, prepared as CachyFreeze
+`1.0.0rc11` with Workstation `1.0.3`. No installed CachyFreeze deployment or
+physical boot configuration was changed.
+
+- REPRODUCED — compiled the original idle agent from `3336b24` and ran it
+  with the KDE platform theme and a read-only temporary configuration
+  directory. A replacement test-only `kdialog` captured the same
+  `cachy-workstation-idle-agentrc` not-writable warning reported in the photo.
+  The new startup regression correctly failed against this original binary.
+- FIXED/PASS — the rebuilt agent sets `KDE_HOME_READONLY=1` before Qt startup.
+  The same regression reaches `CWS_EVENT READY` without invoking `kdialog` or
+  writing a config file. Production `ProtectHome=read-only`,
+  `ProtectSystem=strict`, and 3600/7200-second intervals remain intact.
+  Neither test connected the event agent to lock or poweroff actions.
+- VERIFIED — the warning originates in upstream KDE KConfig's
+  [main-config writability check](https://invent.kde.org/frameworks/kconfig/-/blob/v6.30.0/src/core/ksharedconfig.cpp).
+  The agent is stateless; the actual policy is read by the root supervisor.
+- ADDED — Slack package installation, `libsecret` runtime dependency, employee
+  menu and desktop launchers, required package/executable health check, and
+  six-launcher readiness validation. Missing Slack blocks readiness.
+- PASS — reviewed upstream `slack-desktop` revision
+  `682e5dacaae96eeafcd8506e8403b2a8c29f31af`; `makepkg --noconfirm
+  --cleanbuild --clean` verified the official Slack 4.52.155 download and
+  desktop patch against the recipe's BLAKE2 checksums and produced an x86-64
+  Arch package as the unprivileged account. The package was not installed on
+  this development host.
+- FIXED/PASS — uppercase employee usernames now pass both GUI and supervisor
+  validation, matching the existing helper, provisioner, and Ansible contract.
+  Traversal, leading-dash, whitespace and overlong usernames remain rejected.
+- PASS — `ruff check .` and `ruff format --check src app/cachy_freeze_gui
+  tests workstation/idle/idle-supervisor.py workstation/tests`.
+- PASS — `PYTHONPATH=src:app QT_QPA_PLATFORM=offscreen python -m unittest
+  discover -s tests -v`: all 77 tests passed, with no skips.
+- PASS — `bash workstation/tests/static.sh`: all 17 Workstation tests passed,
+  including compiled-agent startup, Slack install failure propagation, actual
+  launcher install/repair/health behavior in temporary directories, and
+  supervisor lock/poweroff command mocks. Bash, ShellCheck, Ruff, desktop/unit
+  validation, KF6 release/LTO compilation, path guards, and all five reviewed
+  AUR recipe/SRCINFO/revision checks passed.
+- PASS — `SHELLCHECK_OPTS=--severity=error bash deepfreeze/tests/static.sh`,
+  `QT_QPA_PLATFORM=offscreen bash deepfreeze/tests/ui-smoke.sh`, and
+  `bash deepfreeze/tests/grub-generation.sh`.
+- PASS — `bash ansible/test-syntax.sh` and `shellcheck
+  ansible/test-syntax.sh`: all five playbooks passed; sample inventory emitted
+  its expected empty-host warning.
+- PASS — two consecutive builds of each `.run` were byte-identical and both
+  SHA-256 sidecars verified. Inspected both compressed payloads: updated
+  versions, Slack recipe/launcher, idle fix, executable modes, GTK license
+  symlink, and all 90 graphical/55 standalone manifest entries verified.
+- NOT RUN — physical application launch, real login after FROZEN reboot,
+  60/120-minute idle duration, full laptop install/reset/thaw/refreeze,
+  root-only Btrfs/initramfs integration, QEMU/OVMF, Docker Compose and live
+  Semaphore. The operator will test the prepared installer on a separate
+  laptop. These local tests do not establish physical acceptance.
+- PENDING — GitHub authentication, push, Actions and prerelease publication.
+  This entry records local results only; no stable release is declared.
+
 ## 2026-09-04 — Stable release gate documentation — local working tree
 
 - UPDATED — `docs/ai-coder-handoff.md` now explicitly keeps the project in

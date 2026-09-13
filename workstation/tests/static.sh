@@ -29,9 +29,8 @@ shellcheck -x "${shell_files[@]}"
 desktop-file-validate workstation/assets/desktop/*.desktop
 systemd-analyze verify workstation/systemd/cachy-workstation-idle.service
 
-ruff check workstation/idle/idle-supervisor.py workstation/tests/test_idle_supervisor.py
-ruff format --check workstation/idle/idle-supervisor.py workstation/tests/test_idle_supervisor.py
-python -m unittest discover -s workstation/tests -p 'test_*.py' -v
+ruff check workstation/idle/idle-supervisor.py workstation/tests
+ruff format --check workstation/idle/idle-supervisor.py workstation/tests
 
 build_dir=$(mktemp -d)
 cleanup() {
@@ -68,7 +67,12 @@ cmake \
   -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
 cmake --build "$build_dir" --parallel "$(nproc)"
 
-for package_name in google-chrome anydesk-bin zoiper-bin gtk2; do
+# Exercise the KDE platform theme that triggers KConfig's read-only-home warning.
+pacman -Q plasma-integration >/dev/null
+CWS_IDLE_TEST_AGENT="$build_dir/cachy-workstation-idle-agent" \
+  python -m unittest discover -s workstation/tests -p 'test_*.py' -v
+
+for package_name in google-chrome slack-desktop anydesk-bin zoiper-bin gtk2; do
   recipe_root=workstation/vendor/aur/$package_name
   diff -u "$recipe_root/.SRCINFO" <(
     cd "$recipe_root"

@@ -212,6 +212,31 @@ class InstallerGuiTests(unittest.TestCase):
             )
         self.assertTrue(window.install_button.isEnabled())
 
+    def test_workstation_check_accepts_corporate_uppercase_username(self) -> None:
+        backend = BackendClient(setup_root=__import__("pathlib").Path("."))
+        backend.refresh_local = Mock()
+        backend.run = Mock(return_value=True)
+        window = MainWindow(backend)
+        self.addCleanup(window.close)
+        window.workstation_user.setText("WRW21166")
+        window._check_workstation()
+        backend.run.assert_called_once_with("setup-workstation-check", secret="WRW21166")
+
+    def test_workstation_check_rejects_unsafe_username(self) -> None:
+        backend = BackendClient(setup_root=__import__("pathlib").Path("."))
+        backend.refresh_local = Mock()
+        backend.run = Mock(return_value=True)
+        window = MainWindow(backend)
+        self.addCleanup(window.close)
+        for username in ("../employee", "-employee", "employee name", "a" * 32):
+            with (
+                self.subTest(username=username),
+                patch("cachy_freeze_gui.window.QMessageBox.warning"),
+            ):
+                window.workstation_user.setText(username)
+                window._check_workstation()
+        backend.run.assert_not_called()
+
     def test_workstation_output_is_visible_in_gui(self) -> None:
         backend = BackendClient(setup_root=__import__("pathlib").Path("."))
         backend.refresh_local = Mock()

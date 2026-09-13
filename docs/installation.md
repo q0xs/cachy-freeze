@@ -22,23 +22,23 @@ initramfs, or GRUB state.
 2. Create the administrator account.
 3. Create the employee account as a standard user.
 4. Log in once as the employee, then return to the administrator account.
-5. Download `CachyFreeze-Installer-1.0.0rc10.run` and its `.sha256` file.
+5. Download `CachyFreeze-Installer-1.0.0rc11.run` and its `.sha256` file.
 6. Verify the download:
 
 ```bash
-sha256sum --check CachyFreeze-Installer-1.0.0rc10.run.sha256
-chmod 0755 CachyFreeze-Installer-1.0.0rc10.run
+sha256sum --check CachyFreeze-Installer-1.0.0rc11.run.sha256
+chmod 0755 CachyFreeze-Installer-1.0.0rc11.run
 ```
 
 7. Start the installer without `sudo`:
 
 ```bash
-./CachyFreeze-Installer-1.0.0rc10.run
+./CachyFreeze-Installer-1.0.0rc11.run
 ```
 
 8. Approve the PolicyKit prompt.
 9. Enter the employee username and click **INSTALL / REPAIR**.
-10. Log in as the employee and open Chrome, LibreOffice, AnyDesk, Zoiper, and
+10. Log in as the employee and open Chrome, LibreOffice, Slack, AnyDesk, Zoiper, and
     MicroSIP once.
 11. Return to the administrator account and click **CHECK**.
 12. Continue only if it reports `OVERALL: PASS` and `Ready for freeze: YES`.
@@ -63,6 +63,12 @@ Run Workstation repair or system updates only from THAWED:
 
 Never provision Workstation from FROZEN `@active`.
 
+For a release upgrade, open the new `.run` installer in THAWED, run its
+**INSTALL / REPAIR**, test all six employee apps, then run **CHECK**. Finish
+with **INSTALL CACHYFREEZE** in the new installer so the installed app also
+receives the updated Workstation payload. Re-enter the GRUB maintenance
+password when prompted, then reboot after success.
+
 ## GRUB Password
 
 The maintenance user is always `cachyadmin`.
@@ -78,7 +84,7 @@ The maintenance user is always `cachyadmin`.
 - THAWED is the only mode for updates, repairs, and Workstation changes.
 - Workstation health includes the employee account, applications, idle policy,
   and KDE login-screen preselection without automatic login.
-- The standalone `CachyWorkstation-Setup-1.0.2.run` remains available only for
+- The standalone `CachyWorkstation-Setup-1.0.3.run` remains available only for
   CLI-only deployments.
 
 ## Build

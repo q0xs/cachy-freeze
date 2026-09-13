@@ -282,7 +282,7 @@ class MainWindow(QMainWindow):
 
     def _workstation_user(self) -> str | None:
         target_user = self.workstation_user.text().strip()
-        if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,30}", target_user):
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]{0,30}", target_user):
             QMessageBox.warning(
                 self,
                 "Invalid employee username",

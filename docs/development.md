@@ -20,7 +20,8 @@ PYTHONPATH=src:app python -m unittest tests.test_ansible_contract -v
 bash deepfreeze/tests/boot-acceptance-vm.sh
 ```
 
-The workstation tests compile the KF6 KIdleTime agent, validate its root
+The workstation tests require `plasma-integration` for the KDE platform-theme
+startup regression. They compile the KF6 KIdleTime agent, validate its root
 supervisor with mocked lock/poweroff commands, check desktop/systemd files,
 verify every vendored PKGBUILD against its `.SRCINFO`, and build the separate
 portable payload. A live event-only test may run the compiled agent in a KDE

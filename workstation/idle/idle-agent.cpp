@@ -30,6 +30,10 @@ int parseSeconds(const QCommandLineParser &parser, const QCommandLineOption &opt
 
 int main(int argc, char **argv)
 {
+    // This event-only agent has no writable user configuration. The supervisor
+    // deliberately exposes HOME read-only; tell KConfig before the KDE platform
+    // theme is loaded so it does not open a blocking "config not writable" dialog.
+    qputenv("KDE_HOME_READONLY", "1");
     QGuiApplication application(argc, argv);
     QGuiApplication::setApplicationName(QStringLiteral("cachy-workstation-idle-agent"));
     QGuiApplication::setQuitOnLastWindowClosed(false);

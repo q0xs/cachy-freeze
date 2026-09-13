@@ -18,7 +18,7 @@ administrator manually tests the applications and runs CachyFreeze last.
    administrator-equivalent group and has no direct sudoers rule.
 5. Boot persistent THAWED `@`.
 6. Run CachyWorkstation Setup for that existing employee.
-7. Open and test Google Chrome, LibreOffice, AnyDesk, Zoiper, and MicroSIP as
+7. Open and test Google Chrome, LibreOffice, Slack, AnyDesk, Zoiper, and MicroSIP as
    the employee.
 8. Run `--check` and require every check to report `PASS`.
 9. Freeze the computer and reboot into FROZEN. The login screen should
@@ -38,8 +38,8 @@ bash packaging/build-workstation-installer.sh
 The reproducible outputs are:
 
 ```text
-dist/CachyWorkstation-Setup-1.0.2.run
-dist/CachyWorkstation-Setup-1.0.2.run.sha256
+dist/CachyWorkstation-Setup-1.0.3.run
+dist/CachyWorkstation-Setup-1.0.3.run.sha256
 ```
 
 The `.run` file contains the complete provisioner, reviewed AUR recipes,
@@ -50,33 +50,33 @@ for CachyOS packages and hash-pinned upstream application files.
 Copy both files to a target and verify them from their directory:
 
 ```bash
-sha256sum --check CachyWorkstation-Setup-1.0.2.run.sha256
+sha256sum --check CachyWorkstation-Setup-1.0.3.run.sha256
 ```
 
 Published binaries and checksums for the current Workstation payload are
 attached to the latest
-[CachyFreeze v1.0.0rc10
-release](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc10).
+[CachyFreeze v1.0.0rc11
+release](https://github.com/q0xs/cachy-freeze/releases/tag/v1.0.0rc11).
 
 ## CLI
 
 Initial reconcile:
 
 ```bash
-sudo ./CachyWorkstation-Setup-1.0.2.run wrw1166
+sudo ./CachyWorkstation-Setup-1.0.3.run wrw1166
 ```
 
 Read-only system/application health logic (apart from appending the audit log):
 
 ```bash
-sudo ./CachyWorkstation-Setup-1.0.2.run --check wrw1166
+sudo ./CachyWorkstation-Setup-1.0.3.run --check wrw1166
 ```
 
 Reconcile missing or changed managed files without deleting a valid Wine
 prefix:
 
 ```bash
-sudo ./CachyWorkstation-Setup-1.0.2.run --repair wrw1166
+sudo ./CachyWorkstation-Setup-1.0.3.run --repair wrw1166
 ```
 
 For development from a checkout, the equivalent entry point is:
@@ -102,6 +102,7 @@ The source snapshot currently pins:
 | --- | --- |
 | Google Chrome | reviewed `google-chrome` AUR recipe; official Google `.deb` |
 | LibreOffice | signed `libreoffice-fresh` package |
+| Slack | reviewed `slack-desktop` AUR recipe; official Slack `.deb` |
 | AnyDesk | reviewed `anydesk-bin` AUR recipe; official AnyDesk archive |
 | Zoiper | reviewed `zoiper-bin` AUR recipe; official Zoiper Linux archive |
 | MicroSIP | official MicroSIP 3.22.12 portable ZIP |
@@ -124,7 +125,7 @@ repeated install/repair runs. Only managed distribution files are overwritten;
 the prefix is never deleted. Recursive ownership is checked before the health
 check can pass.
 
-The five launchers are installed both to the user's XDG application-menu
+The six launchers are installed both to the user's XDG application-menu
 directory and to the desktop directory reported by `xdg-user-dir DESKTOP`, so
 localized desktop names are supported. They are mode `0755` (KDE's
 authorization mechanism for launchers outside a standard menu path), have
@@ -170,6 +171,19 @@ KDE's own screen-lock configuration is also reconciled to 60 minutes with a
 zero password grace period. The service remains the independent system-level
 source for the 120-minute shutdown.
 
+The agent is stateless and runs with the employee home read-only inside the
+service sandbox. Before Qt loads the KDE platform theme, it sets
+`KDE_HOME_READONLY=1`, which tells KConfig that writable per-user configuration
+is not expected. This prevents the blocking `cachy-workstation-idle-agentrc`
+warning at login while retaining `ProtectHome=read-only` and
+`ProtectSystem=strict`. The actual 60/120-minute policy still comes from the
+root-owned `/etc/cachy-workstation/workstation.conf`.
+
+The regression test starts the compiled agent with the KDE platform theme and
+a read-only temporary configuration directory. It checks that startup reaches
+`READY` without opening a warning or creating a configuration file. It never
+connects the test agent to lock or poweroff commands.
+
 ## Health checks and logs
 
 The installer continues with independent application sections when one fails,
@@ -179,10 +193,10 @@ prints `NOT READY FOR FREEZE` if any required step or check failed.
 Checks cover:
 
 - target account, home, UID/GID, and absence of admin-equivalent access;
-- all five packages/executables and Wine's checked 32-bit runtime libraries;
+- all six applications/executables and Wine's checked 32-bit runtime libraries;
 - AnyDesk service enabled and active;
 - MicroSIP archive/executable checksums and recursive prefix ownership;
-- five application-menu entries and five executable, user-owned desktop files;
+- six application-menu entries and six executable, user-owned desktop files;
 - KDE lock configuration;
 - root-owned idle policy configuration and installed binaries;
 - idle service enabled/active and its sleep inhibitor present;

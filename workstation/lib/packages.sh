@@ -40,6 +40,7 @@ readonly -a CWS_APP_RUNTIME_PACKAGES=(
   libglvnd
   libnotify
   libpulse
+  libsecret
   libx11
   libxdamage
   libxext
@@ -302,6 +303,11 @@ install_chrome() {
 install_libreoffice() {
   ensure_package libreoffice-fresh || return 1
   command -v libreoffice >/dev/null 2>&1 || fail "LibreOffice executable was not installed."
+}
+
+install_slack() {
+  ensure_package slack-desktop || return 1
+  command -v slack >/dev/null 2>&1 || fail "Slack executable was not installed."
 }
 
 install_anydesk() {

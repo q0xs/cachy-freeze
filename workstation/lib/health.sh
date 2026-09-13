@@ -56,6 +56,10 @@ check_libreoffice() {
   pacman -Q libreoffice-fresh >/dev/null 2>&1 && [[ -x /usr/bin/libreoffice ]]
 }
 
+check_slack() {
+  check_reviewed_package_version slack-desktop && [[ -x /usr/bin/slack ]]
+}
+
 check_anydesk() {
   check_reviewed_package_version anydesk-bin &&
     [[ -x /usr/bin/anydesk ]] &&
@@ -129,6 +133,7 @@ check_launcher_set() {
   done <<'EOF'
 google-chrome|Google Chrome
 libreoffice|LibreOffice
+slack|Slack
 anydesk|AnyDesk
 zoiper|Zoiper
 microsip|MicroSIP
@@ -249,6 +254,7 @@ run_health_check() {
   health_assert "User has no sudo/admin-equivalent access" check_no_admin_access
   health_assert "Google Chrome package and executable" check_chrome
   health_assert "LibreOffice package and executable" check_libreoffice
+  health_assert "Slack package and executable" check_slack
   health_assert "AnyDesk package, enabled service, running service" check_anydesk
   health_assert "Zoiper package and executable" check_zoiper
   health_assert "Wine and required checked 32-bit libraries" check_wine_dependencies
@@ -256,7 +262,7 @@ run_health_check() {
   health_assert "Reviewed official MicroSIP archive checksum" check_microsip_archive
   health_assert "MicroSIP prefix, executable, and recursive ownership" check_microsip_prefix
   health_assert "Root-owned MicroSIP launcher wrapper" check_microsip_wrapper
-  health_assert "Five menu entries and five owned desktop shortcuts" check_launcher_set
+  health_assert "Six menu entries and six owned desktop shortcuts" check_launcher_set
   health_assert "KDE 60-minute password lock configuration" check_kde_lock_config
   health_assert "Root-owned 60/120-minute idle policy configuration" check_idle_policy_config
   health_assert "Root-owned KDE idle agent and supervisor" check_idle_binaries
