@@ -117,4 +117,5 @@ CachyFreeze keeps no logically accessible historical FROZEN runtime or Golden
 archive. This is not physical secure erase; Btrfs CoW, TRIM, SSD wear leveling,
 and storage-controller behavior remain outside this guarantee. External drives,
 network storage, manually mounted filesystems, and unsupported layouts are also
-outside the reset boundary.
+outside the reset boundary. See `threat-model.md` for power-loss, seizure, and
+boot-time physical-access scenarios.

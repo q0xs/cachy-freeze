@@ -212,8 +212,9 @@ bash workstation/tests/static.sh
 ```
 
 More detail is in [docs/installation.md](docs/installation.md),
-[docs/workstation-provisioning.md](docs/workstation-provisioning.md), and
-[docs/architecture.md](docs/architecture.md).
+[docs/workstation-provisioning.md](docs/workstation-provisioning.md),
+[docs/architecture.md](docs/architecture.md), and
+[docs/threat-model.md](docs/threat-model.md).
 
 For the next maintenance or AI-coder pass, start with
 [docs/ai-coder-handoff.md](docs/ai-coder-handoff.md).

@@ -210,3 +210,8 @@ inventory, repository files, task logs, or screenshots.
   to publish stable `v1.0.0`.
 - Before stable `v1.0.0`, decide whether release assets need Minisign or GPG
   signatures in addition to SHA-256 sidecar files.
+- Data-destruction posture is documented in `docs/threat-model.md`. The operator
+  chose documentation-only for the prerelease window; crypto hardening
+  (per-boot ephemeral-key session layer, TRIM policy, no-swap/hibernate health
+  asserts) is a deliberate post-1.0.1 backlog and must not delay pilot or
+  stable work without a new operator decision.
