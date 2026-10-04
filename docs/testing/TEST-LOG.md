@@ -4,6 +4,35 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-10-04 — Raspberry Pi Debian ARM64 controller deployment
+
+Target: dedicated Raspberry Pi 5 control plane, Debian 13 ARM64, source
+`420bf98`. This machine is a controller, not a CachyFreeze workstation target.
+
+- PASS — installed Debian Ansible/Docker/Compose packages and deployed the
+  repository PostgreSQL 16 Compose stack with a local ARM64 Semaphore 2.19.12
+  override, persistent volumes, restart policy, bounded logs, and health checks.
+  The Arch-only bootstrap script was not executed on Debian.
+- PASS — all five playbooks passed syntax checks with host Ansible core 2.19.11
+  and container Ansible core 2.20.8; all 10 `tests.test_ansible_contract` tests
+  passed on the controller.
+- PASS — authenticated Semaphore API configuration created the fleet project,
+  encrypted SSH/provisioning credentials, local repository bindings, private
+  external inventory, variable groups, and six task templates. The weekend
+  maintenance schedule exists but remains disabled pending a lab pilot.
+- PASS — actual Semaphore controller-check task validated Ansible configuration
+  and role access with two successful tasks, zero changes and zero failures.
+- PASS — the status template successfully loaded the empty fleet inventory and
+  skipped all hosts. This validates task wiring only, not a real fleet target.
+- PASS — LAN HTTP response, API login, container restart/recreation persistence,
+  daily backup timer and systemd unit validation. A PostgreSQL backup restored
+  successfully into a separate temporary database, which was then removed.
+- NOT RUN — browser visual inspection, real target SSH, provisioning, maintenance,
+  freeze/thaw/reboot, physical workstation acceptance, and unrelated GUI/boot
+  integration suites. No workstation or controller boot stack was modified.
+- Local configuration, credentials, host inventory, and operational instructions
+  remain outside tracked source; no secrets or private fleet data were committed.
+
 ## 2026-09-13 — rc11 GitHub publication and verification
 
 Target: `main` implementation commit `2c012dd`, tagged `v1.0.0rc11`.
