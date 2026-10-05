@@ -31,6 +31,26 @@ fingerprints, host IP addresses, and private inventory data.
   rollout, and weekend maintenance schedule enablement. These remain pilot
   gates before wider operation.
 
+## 2026-10-05 — Live Semaphore maintenance pilot
+
+Target: same approved CachyOS x86-64 lab workstation and Raspberry Pi
+controller. This entry omits passwords, SSH fingerprints, host IP addresses,
+and private inventory data.
+
+- REPRODUCED — the first Semaphore **Gece Bakimi** run successfully thawed and
+  verified the host, then failed before package update because
+  `cachy_freeze_update_packages` was undefined in the playbook scope. The
+  rescue path behaved correctly: it wrote the maintenance failure marker and
+  intentionally left the host THAWED for administrator review.
+- FIXED — `maintenance.yml` now defaults that variable to `true` at the task
+  site, and inventory defaults declare `cachy_freeze_update_packages: true`
+  explicitly for controller/UI clarity.
+- PASS — after updating the controller variable group, the next Semaphore
+  **Gece Bakimi** run completed package upgrade, Workstation repair/check,
+  freeze, reboot, boot-success, and post-reboot FROZEN verification. A
+  follow-up fleet status task reported `FROZEN` with no pending reboot.
+- NOT RUN — production schedule enablement or multi-host batching.
+
 ## 2026-10-04 — Raspberry Pi Debian ARM64 controller deployment
 
 Target: dedicated Raspberry Pi 5 control plane, Debian 13 ARM64, source

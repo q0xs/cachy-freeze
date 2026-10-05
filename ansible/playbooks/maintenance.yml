@@ -21,7 +21,7 @@
               - --noconfirm
           register: cachy_freeze_pacman_upgrade
           changed_when: "'there is nothing to do' not in cachy_freeze_pacman_upgrade.stdout"
-          when: cachy_freeze_update_packages | bool
+          when: cachy_freeze_update_packages | default(true) | bool
 
         - name: Repair workstation payload
           ansible.builtin.include_role:
