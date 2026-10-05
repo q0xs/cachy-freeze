@@ -18,6 +18,11 @@ creates an SSH key if the controller does not already have one, then prints the
 `ssh-copy-id LocalAdm@HOST` commands needed to trust the controller on target
 workstations.
 
+Linux account names are case-sensitive. The examples use `LocalAdm`, but a
+target installed with `localadm` or another administrative account must use that
+exact login everywhere: `ssh-copy-id`, `ansible_user`, Semaphore Key Store
+login, and any host-specific inventory override.
+
 To run the optional web UI on the controller:
 
 ```bash
@@ -38,6 +43,8 @@ Edit `inventory/hosts.ini`:
 ```ini
 [lab]
 lab-01 ansible_host=192.0.2.10 employee_user=WRW21166
+# If the actual admin account is lowercase on this host:
+# lab-02 ansible_host=192.0.2.11 ansible_user=localadm localadm_user=localadm employee_user=WRW21167
 
 [production]
 wrw-001 ansible_host=198.51.100.10 employee_user=WRW21166
@@ -50,6 +57,9 @@ ansible_user: LocalAdm
 batch_size: "100%"
 cachy_freeze_remote_repo: /opt/cachy-freeze
 ```
+
+Keep `ansible_user` and `localadm_user` aligned with the real target account.
+Use host variables for mixed fleets instead of changing every target at once.
 
 The lab group runs at `100%`. Production defaults to `20%`, so a 250-machine
 fleet updates in controlled waves instead of all at once. Override with

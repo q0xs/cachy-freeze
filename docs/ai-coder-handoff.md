@@ -33,17 +33,19 @@ compact and high-DPI sizes.
 
 ## Stable release gate
 
-Keep the project in prerelease status until Ansible fleet management and
-Semaphore UI operation have been tested on real approved targets. Before a
-stable `v1.0.0` release, complete and record these checks:
+Keep the project in prerelease status until the full workstation acceptance
+matrix has been tested on a real approved target. A Raspberry Pi controller
+pilot has now executed a live Semaphore freeze/reboot/verify job successfully;
+before a stable `v1.0.0` release, complete and record the remaining checks:
 
 1. Run the full non-destructive local test set.
 2. Run the GitHub Actions workflow to completion on `main`.
 3. Test `ansible/test-syntax.sh` and the Semaphore Compose config.
-4. Start Semaphore on an approved Master PC.
-5. Create the documented Semaphore project, key store, repository, inventory,
-   variable group, and task templates.
-6. Run `Filo Durumu` against a lab inventory.
+4. Keep the approved controller Semaphore project, key store, repository,
+   inventory, variable group, and task templates in sync with the real target
+   administrative account name.
+5. Run `Filo Durumu` against a lab inventory.
+6. Run a browser/API Semaphore freeze or maintenance job against lab.
 7. Run `Gece Bakimi` against lab before any production schedule.
 8. Validate at least one disposable VM or approved pilot PC through the full
    install/reboot/FROZEN reset/THAWED persistence/FREEZE lifecycle.
@@ -194,20 +196,19 @@ inventory, repository files, task logs, or screenshots.
   release" API may not resolve while all public releases are prereleases. Use
   the direct release-tag URL for `v1.0.0rc11`.
 - A full physical install/reboot/FROZEN reset/THAWED persistence lifecycle test
-  requires a disposable CachyOS VM or approved pilot PC with a restorable disk
-  snapshot.
-- A real Semaphore browser session and live task execution require a controller
-  with Docker/Compose and lab targets.
+  still requires a disposable CachyOS VM or approved pilot PC with a restorable
+  disk snapshot. A live Semaphore freeze/reboot/verify pilot passed, but it does
+  not cover the full acceptance matrix.
 - Local installed metadata on a throwaway workstation may lag the source release
   if files were manually refreshed. Treat the GitHub release asset as the
   canonical installer for new machines.
 
 ## Suggested next decisions
 
-- Run a real Semaphore controller pilot or keep it documentation/CI-only until
-  the fleet controller is ready.
-- After one successful disposable VM or pilot-PC lifecycle pass, decide whether
-  to publish stable `v1.0.0`.
+- Finish the physical acceptance matrix on the pilot PC: employee app launch,
+  FROZEN reset, THAWED persistence, refreeze, and post-reboot fleet status.
+- After one complete disposable VM or pilot-PC lifecycle pass, decide whether to
+  publish stable `v1.0.0`.
 - Before stable `v1.0.0`, decide whether release assets need Minisign or GPG
   signatures in addition to SHA-256 sidecar files.
 - Data-destruction posture is documented in `docs/threat-model.md`. The operator

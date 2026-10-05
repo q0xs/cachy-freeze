@@ -44,6 +44,11 @@ SSH anahtari:
 - Private key: Master PC'deki LocalAdm hedeflerine yetkili SSH private key
   icerigi. Genelde `~/.ssh/id_ed25519` kullanilir.
 
+Linux kullanici adlari buyuk/kucuk harfe duyarlidir. Hedefte yonetici hesap
+gercekte `localadm` ise Key Store **Login**, Variable Group `ansible_user` ve
+inventory host degiskenleri de `localadm` olmalidir. Aksi halde Semaphore
+gorevi `Permission denied (publickey,password)` ile duser.
+
 GRUB bakim parolasi:
 
 - Name: `CachyFreeze GRUB Secret`
@@ -70,6 +75,8 @@ Mevcut filo icin Semaphore inventory'sine repo ile ayni INI icerigini girin:
 ```ini
 [lab]
 lab-01 ansible_host=192.0.2.10 employee_user=WRW21166
+# Hedefte yonetici hesap kucuk harf ise:
+# lab-02 ansible_host=192.0.2.11 ansible_user=localadm localadm_user=localadm employee_user=WRW21167
 
 [production]
 wrw-001 ansible_host=198.51.100.10 employee_user=WRW21166
@@ -90,6 +97,10 @@ ansible_become: true
 ansible_become_method: sudo
 batch_size: "20%"
 ```
+
+Buradaki `ansible_user` degeri Key Store login'i ve hedefteki gercek yonetici
+hesabiyla birebir ayni yazilmalidir. Karisik filoda host bazli
+`ansible_user`/`localadm_user` kullanin.
 
 Kurulum template'i icin ayri bir protected variable group kullanin:
 

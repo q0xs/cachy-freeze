@@ -4,6 +4,33 @@ This file is the durable, English-only record of executed tests. Add results wit
 date, target, commit, command or scenario, result, and relevant non-sensitive notes.
 Never record passwords, hashes, tokens, device UUIDs, or private user data.
 
+## 2026-10-05 — Live CachyOS pilot via Raspberry Pi controller
+
+Target: approved CachyOS x86-64 pilot workstation on a private LAN, controlled
+from the Raspberry Pi Debian ARM64 controller, source `d48a2f3` plus local
+controller configuration. This entry intentionally omits passwords, SSH
+fingerprints, host IP addresses, and private inventory data.
+
+- PASS — verified SSH host identity out of band, installed the controller fleet
+  public key on the workstation administrative account, and added one lab host
+  to the controller's external inventory with the real employee account.
+- PASS — Ansible reached the host with the controller SSH key and executed a
+  sudo validation command as root. The target reported CachyOS, x86-64, UEFI,
+  Btrfs `/@`, `/boot/efi` vfat, KDE Plasma, and Python available.
+- OBSERVED — the pilot used a lowercase administrative account while the
+  example Semaphore configuration used `LocalAdm`. The first Semaphore freeze
+  task failed with SSH `Permission denied` because the UI environment overrode
+  the host inventory user. Updating Semaphore Key Store login and variable
+  groups to match the real account fixed the connection.
+- PASS — the Semaphore **Dogrulanmis Freeze** task scheduled FROZEN, rebooted
+  the workstation, marked the boot successful, and verified the host as
+  `FROZEN` with no pending reboot. A subsequent fleet status task reported the
+  same FROZEN state.
+- NOT RUN — full physical acceptance matrix, employee application launch/reset
+  checks, THAWED persistence test, refreeze-after-THAWED test, production batch
+  rollout, and weekend maintenance schedule enablement. These remain pilot
+  gates before wider operation.
+
 ## 2026-10-04 — Raspberry Pi Debian ARM64 controller deployment
 
 Target: dedicated Raspberry Pi 5 control plane, Debian 13 ARM64, source
