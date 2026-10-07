@@ -131,6 +131,7 @@ main() {
   run_step "Zoiper" install_zoiper
   run_step "Wine and MicroSIP" install_microsip_for_target
   run_step "Desktop shortcuts" install_user_launchers
+  run_step "Desktop defaults" configure_user_desktop_defaults
   run_step "Idle security policy" install_idle_policy
   run_step "Login screen default" configure_login_screen_default_user
 

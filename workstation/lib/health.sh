@@ -165,6 +165,28 @@ check_kde_lock_config() {
   [[ $(ini_value "$config_file" Daemon LockOnResume) == true ]]
 }
 
+check_kde_dark_theme() {
+  local config_file=$TARGET_HOME/.config/kdeglobals
+  [[ -f $config_file && ! -L $config_file ]] || return 1
+  [[ $(stat -c '%u:%g' "$config_file") == "$TARGET_UID:$TARGET_GID" ]] || return 1
+  [[ $(ini_value "$config_file" General ColorScheme) == BreezeDark ]] || return 1
+  [[ $(ini_value "$config_file" KDE LookAndFeelPackage) == org.kde.breezedark.desktop ]]
+}
+
+check_cachyos_hello_disabled() {
+  local autostart=$TARGET_HOME/.config/autostart/cachyos-hello.desktop
+  local json=$TARGET_HOME/.config/cachyos-hello.json
+  local ini=$TARGET_HOME/.config/cachyos/cachyos-hello
+  [[ -f $autostart && ! -L $autostart ]] || return 1
+  [[ -f $json && ! -L $json ]] || return 1
+  [[ -f $ini && ! -L $ini ]] || return 1
+  [[ $(stat -c '%u:%g' "$autostart" "$json" "$ini" | sort -u) == "$TARGET_UID:$TARGET_GID" ]] ||
+    return 1
+  grep -Fxq 'Hidden=true' "$autostart" || return 1
+  grep -Fq '"showOnStartup": false' "$json" || return 1
+  [[ $(ini_value "$ini" General showOnStartup) == false ]]
+}
+
 check_idle_policy_config() {
   [[ -f $CWS_IDLE_CONFIG && ! -L $CWS_IDLE_CONFIG ]] || return 1
   [[ $(stat -c '%u:%g:%a' "$CWS_IDLE_CONFIG") == 0:0:600 ]] || return 1
@@ -264,6 +286,8 @@ run_health_check() {
   health_assert "Root-owned MicroSIP launcher wrapper" check_microsip_wrapper
   health_assert "Six menu entries and six owned desktop shortcuts" check_launcher_set
   health_assert "KDE 60-minute password lock configuration" check_kde_lock_config
+  health_assert "KDE Breeze Dark default theme" check_kde_dark_theme
+  health_assert "CachyOS Hello disabled for employee" check_cachyos_hello_disabled
   health_assert "Root-owned 60/120-minute idle policy configuration" check_idle_policy_config
   health_assert "Root-owned KDE idle agent and supervisor" check_idle_binaries
   health_assert "Idle shutdown service enabled and running" check_idle_service

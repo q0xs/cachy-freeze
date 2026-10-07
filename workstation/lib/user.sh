@@ -231,3 +231,71 @@ EOF
     warn "Application menu cache could not be refreshed; Plasma will refresh it on login."
   success "Application-menu entries and KDE desktop shortcuts installed"
 }
+
+configure_user_desktop_defaults() {
+  local config_dir autostart_dir kdeglobals hello_autostart hello_json hello_ini
+  config_dir=$TARGET_HOME/.config
+  autostart_dir=$config_dir/autostart
+  kdeglobals=$config_dir/kdeglobals
+  hello_autostart=$autostart_dir/cachyos-hello.desktop
+  hello_json=$config_dir/cachyos-hello.json
+  hello_ini=$config_dir/cachyos/cachyos-hello
+
+  ensure_target_directory "$config_dir" 0755 || return 1
+  ensure_target_directory "$autostart_dir" 0755 || return 1
+  ensure_target_directory "$config_dir/cachyos" 0755 || return 1
+
+  run_as_target tee "$kdeglobals" >/dev/null <<'EOF' || {
+[General]
+ColorScheme=BreezeDark
+
+[Icons]
+Theme=breeze-dark
+
+[KDE]
+LookAndFeelPackage=org.kde.breezedark.desktop
+widgetStyle=Breeze
+EOF
+    fail "KDE dark theme configuration could not be written."
+    return 1
+  }
+
+  run_as_target tee "$hello_autostart" >/dev/null <<'EOF' || {
+[Desktop Entry]
+Type=Application
+Name=CachyOS Hello
+Exec=cachyos-hello
+Hidden=true
+X-GNOME-Autostart-enabled=false
+EOF
+    fail "CachyOS Hello autostart override could not be written."
+    return 1
+  }
+
+  run_as_target tee "$hello_json" >/dev/null <<'EOF' || {
+{"showOnStartup": false, "firstRun": false}
+EOF
+    fail "CachyOS Hello JSON preference could not be written."
+    return 1
+  }
+
+  run_as_target tee "$hello_ini" >/dev/null <<'EOF' || {
+[General]
+showOnStartup=false
+firstRun=false
+EOF
+    fail "CachyOS Hello INI preference could not be written."
+    return 1
+  }
+
+  chmod 0644 "$kdeglobals" "$hello_autostart" "$hello_json" "$hello_ini" || {
+    fail "Desktop default permissions could not be set."
+    return 1
+  }
+  [[ $(stat -c '%u:%g' "$kdeglobals" "$hello_autostart" "$hello_json" "$hello_ini" |
+    sort -u) == "$TARGET_UID:$TARGET_GID" ]] || {
+    fail "Desktop default files have the wrong owner."
+    return 1
+  }
+  success "KDE dark theme and CachyOS Hello suppression configured"
+}
