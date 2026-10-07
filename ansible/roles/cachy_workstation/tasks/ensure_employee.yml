@@ -5,6 +5,17 @@
     shell: "{{ employee_shell }}"
     create_home: true
 
+- name: Set employee account password from protected variable
+  ansible.builtin.user:
+    name: "{{ employee_user }}"
+    password: "{{ employee_password | password_hash('sha512', employee_password_salt | default('cachyfreeze')) }}"
+    password_lock: false
+    update_password: always
+  when:
+    - employee_password is defined
+    - employee_password | length > 0
+  no_log: true
+
 - name: Read employee groups
   ansible.builtin.command:
     argv:

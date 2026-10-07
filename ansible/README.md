@@ -96,6 +96,8 @@ Semaphore surveys can provision one new machine without pre-editing
 `hosts.ini`. Pass `target_ip`, `employee_user`, and
 `cachy_freeze_target_hosts=semaphore_survey_targets`; `provision.yml` will add
 that target to an in-memory inventory group for the run.
+If the protected `employee_password` variable is present, the standard employee
+account password is set during provisioning without granting admin groups.
 
 ## Maintenance
 

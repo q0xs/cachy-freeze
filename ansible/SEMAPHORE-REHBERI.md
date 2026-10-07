@@ -146,6 +146,7 @@ Survey alanlari:
 - `target_ip`: hedef bilgisayarin IP adresi, ornek `192.0.2.10`
 - `employee_user`: calisan kullanici adi, ornek `WRW21166`
 - `target_name`: istege bagli gorunen host adi, ornek `wrw-001`
+- Protected variable `employee_password`: standart calisan hesabi parolasi
 
 Template extra vars:
 
